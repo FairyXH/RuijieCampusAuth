@@ -42,6 +42,7 @@ class RuijieClient:
         repeats: int = 3,
         log_file: str | Path | None = "ruijie-auth.log",
         verbose: bool = False,
+        private_tail: bool = True,
     ) -> None:
         self.username = username
         self._password = password
@@ -50,6 +51,7 @@ class RuijieClient:
         self.timeout = timeout
         self.retries = max(1, retries)
         self.repeats = max(1, repeats)
+        self.private_tail = private_tail
         self.logs: list[str] = []
         self._handler = _MemoryLogHandler(self.logs)
         self._interface: str | None = None
@@ -67,6 +69,8 @@ class RuijieClient:
         }
         if log_file is not None:
             setup_logging(Path(log_file), verbose)
+        else:
+            LOG.setLevel(logging.DEBUG)
 
     def _select_interface(self) -> str:
         if self._interface is None:
@@ -107,6 +111,7 @@ class RuijieClient:
                 timeout=self.timeout,
                 retries=self.retries,
                 repeats=self.repeats,
+                private=self.private_tail,
             ).authenticate()
             self._status.update(
                 state="authenticated" if ok else "failed",

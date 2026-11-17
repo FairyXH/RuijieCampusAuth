@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import getpass
 import hashlib
 import logging
+import os
 import queue
 import struct
 import sys
@@ -21,6 +23,8 @@ try:
     from scapy.interfaces import resolve_iface
 except ImportError as exc:  # pragma: no cover - dependency error path
     raise SystemExit("缺少依赖 Scapy，请执行: python -m pip install scapy") from exc
+
+from .private import NetworkInfo, TailOptions, build_tail, collect_network_info
 
 
 EAP_REQUEST = 1
@@ -240,9 +244,89 @@ def print_interfaces() -> None:
 
 
 def build_eapol_frame(source: str, destination: str, eap: bytes) -> Ether:
+    # The Ruijie tail sits outside the EAPOL length field: the EAPOL header
+    # carries only the standard EAP packet length, exactly like the client.
+    eapol_len = int.from_bytes(eap[2:4], "big") if len(eap) >= 4 else len(eap)
+    if not 0 < eapol_len <= len(eap):
+        eapol_len = len(eap)
     return Ether(src=source, dst=destination) / EAPOL(
-        version=1, type=0, len=len(eap)
+        version=1, type=0, len=eapol_len
     ) / eap
+
+
+class _PcapTimeval(ctypes.Structure):
+    _fields_ = [("tv_sec", ctypes.c_long), ("tv_usec", ctypes.c_long)]
+
+
+class _PcapPkthdr(ctypes.Structure):
+    _fields_ = [
+        ("ts", _PcapTimeval),
+        ("caplen", ctypes.c_uint32),
+        ("len", ctypes.c_uint32),
+    ]
+
+
+def _send_queue(interface: str, frames: list[Ether]) -> None:
+    """Send frames back-to-back through Npcap's send queue."""
+    lib = ctypes.WinDLL("wpcap.dll")
+    lib.pcap_open_live.argtypes = [
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_char_p,
+    ]
+    lib.pcap_open_live.restype = ctypes.c_void_p
+    lib.pcap_sendqueue_alloc.argtypes = [ctypes.c_uint]
+    lib.pcap_sendqueue_alloc.restype = ctypes.c_void_p
+    lib.pcap_sendqueue_queue.argtypes = [
+        ctypes.c_void_p,
+        ctypes.POINTER(_PcapPkthdr),
+        ctypes.c_char_p,
+    ]
+    lib.pcap_sendqueue_queue.restype = ctypes.c_int
+    lib.pcap_sendqueue_transmit.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_int,
+    ]
+    lib.pcap_sendqueue_transmit.restype = ctypes.c_int
+    lib.pcap_sendqueue_destroy.argtypes = [ctypes.c_void_p]
+    lib.pcap_close.argtypes = [ctypes.c_void_p]
+
+    payloads = [bytes(frame) for frame in frames]
+    errbuf = ctypes.create_string_buffer(256)
+    handle = lib.pcap_open_live(interface.encode(), 65536, 0, 100, errbuf)
+    if not handle:
+        raise OSError(errbuf.value.decode(errors="replace"))
+    queue = lib.pcap_sendqueue_alloc(sum(len(item) for item in payloads) + 64)
+    if not queue:
+        lib.pcap_close(handle)
+        raise OSError("pcap_sendqueue_alloc failed")
+    try:
+        for payload in payloads:
+            header = _PcapPkthdr()
+            header.caplen = len(payload)
+            header.len = len(payload)
+            if lib.pcap_sendqueue_queue(queue, ctypes.byref(header), payload) != 0:
+                raise OSError("pcap_sendqueue_queue failed")
+        if lib.pcap_sendqueue_transmit(handle, queue, 0) < 0:
+            raise OSError("pcap_sendqueue_transmit failed")
+    finally:
+        lib.pcap_sendqueue_destroy(queue)
+        lib.pcap_close(handle)
+
+
+def send_burst(interface: str, frames: list[Ether]) -> None:
+    if not frames:
+        return
+    if sys.platform == "win32":
+        try:
+            _send_queue(interface, frames)
+            return
+        except Exception as exc:  # noqa: BLE001 - fall back to Scapy
+            LOG.debug("Npcap 发送队列失败，回退 Scapy: %s", exc)
+    sendp(frames, iface=interface, inter=0, verbose=False)
 
 
 def eap_identity_response(identifier: int, identity: bytes) -> bytes:
@@ -329,6 +413,12 @@ class Supplicant:
         timeout: float,
         retries: int,
         repeats: int,
+        *,
+        private: bool = True,
+        logoff_first: bool = True,
+        response_delay: float = 0.04,
+        network: NetworkInfo | None = None,
+        tail_options: TailOptions | None = None,
     ) -> None:
         self.interface = interface
         self.identity = identity
@@ -336,22 +426,61 @@ class Supplicant:
         self.timeout = timeout
         self.retries = retries
         self.repeats = repeats
+        self.private = private
+        self.logoff_first = logoff_first
+        self.response_delay = max(0.0, response_delay)
+        self.network = network or collect_network_info(interface)
+        self.tail_options = tail_options
+        self._session_nonce = os.urandom(16).hex().upper().encode()
         self.source = get_if_hwaddr(interface)
         self.packets: queue.Queue[Ether] = queue.Queue()
         self.server_mac: str | None = None
 
-    def send(self, packet: Ether, count: int = 1) -> None:
-        sendp(
-            packet,
-            iface=self.interface,
-            count=count,
-            inter=0.001,
-            verbose=False,
+    def _tail(self, iv: bytes, nonce: bytes | None = None) -> bytes:
+        if not self.private:
+            return b""
+        options = self.tail_options
+        if options is None and nonce is not None:
+            options = TailOptions(nonce=nonce)
+        return build_tail(
+            self.identity,
+            self.password,
+            self.source,
+            self.network,
+            iv,
+            options,
         )
 
+    def _control_tail(self) -> bytes:
+        """Tail carried by EAPOL-Start/Logoff: session nonce, zero fingerprint."""
+        if not self.private:
+            return b""
+        nonce = self.tail_options.nonce if self.tail_options else self._session_nonce
+        options = TailOptions(
+            nonce=nonce,
+            fingerprint=bytes(128),
+            client_flag=b"\x01",
+        )
+        return build_tail(
+            self.identity,
+            self.password,
+            self.source,
+            self.network,
+            bytes(16),
+            options,
+        )
+
+    def send(self, packet: Ether, count: int = 1) -> None:
+        if count > 1:
+            send_burst(self.interface, [packet] * count)
+        else:
+            sendp(packet, iface=self.interface, verbose=False)
+
     def send_start(self) -> None:
-        frame = Ether(src=self.source, dst=RUIJIE_GROUP) / EAPOL(
-            version=1, type=1, len=0
+        frame = (
+            Ether(src=self.source, dst=RUIJIE_GROUP)
+            / EAPOL(version=1, type=1, len=0)
+            / self._control_tail()
         )
         self.send(frame, count=self.repeats)
         LOG.info("正在寻找认证服务器...")
@@ -368,6 +497,15 @@ class Supplicant:
             time.sleep(0.3)
             if not sniffer.running:
                 raise RuntimeError("抓包线程启动失败")
+            if self.logoff_first:
+                LOG.info("正在清理可能存在的旧会话...")
+                logoff = (
+                    Ether(src=self.source, dst=STANDARD_GROUP)
+                    / EAPOL(version=1, type=2, len=0)
+                    / self._control_tail()
+                )
+                self.send(logoff, count=self.repeats)
+                time.sleep(0.1)
             self.send_start()
             deadline = time.monotonic() + self.timeout
             starts_sent = 1
@@ -422,11 +560,14 @@ class Supplicant:
                 self.server_mac = destination
                 key = (identifier, eap_type, eap[5:])
                 response = handled.get(key)
+                is_new = response is None
 
                 if eap_type == EAP_IDENTITY:
-                    if response is None:
+                    if is_new:
                         LOG.info("已连接认证服务器，提交用户身份...")
-                        response = eap_identity_response(identifier, self.identity)
+                        response = eap_identity_response(
+                            identifier, self.identity
+                        ) + self._tail(bytes(16), nonce=self._session_nonce)
                         handled[key] = response
                 elif eap_type == EAP_MD5:
                     if len(eap) < 6:
@@ -436,17 +577,23 @@ class Supplicant:
                     if value_size != 16 or len(eap) < 6 + value_size:
                         LOG.error("不支持的 MD5 Challenge 长度: %d", value_size)
                         return False
-                    if response is None:
+                    if is_new:
                         challenge = eap[6 : 6 + value_size]
                         LOG.info("正在进行 EAP-MD5 认证...")
                         response = eap_md5_response(
                             identifier, self.password, challenge, self.identity
-                        )
+                        ) + self._tail(challenge)
                         handled[key] = response
                 else:
                     LOG.error("服务器请求了未实现的 EAP 类型: %d", eap_type)
                     return False
 
+                if not is_new:
+                    LOG.debug("忽略重复的 EAP 请求 id=%d type=%d", identifier, eap_type)
+                    continue
+
+                if self.response_delay:
+                    time.sleep(self.response_delay)
                 self.send(
                     build_eapol_frame(self.source, destination, response),
                     count=self.repeats,
@@ -489,6 +636,11 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--retries", type=int, default=3)
     parser.add_argument(
         "--repeats", type=int, default=3, help="每个请求的应答次数（默认与原客户端一致: 3）"
+    )
+    parser.add_argument(
+        "--no-private",
+        action="store_true",
+        help="不附加锐捷私有尾，仅发送标准 EAP-MD5（调试用）",
     )
     parser.add_argument("--log-file", type=Path, default=Path("ruijie-auth.log"))
     parser.add_argument("--logoff", action="store_true", help="仅注销当前 802.1X 会话")
@@ -542,6 +694,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         timeout=args.timeout,
         retries=max(1, args.retries),
         repeats=max(1, args.repeats),
+        private=not args.no_private,
     )
     try:
         return 0 if supplicant.authenticate() else 1
