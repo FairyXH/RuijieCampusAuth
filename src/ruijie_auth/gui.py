@@ -76,7 +76,6 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSizePolicy,
     QSpinBox,
-    QSplitter,
     QSystemTrayIcon,
     QTableWidget,
     QTableWidgetItem,
@@ -910,16 +909,13 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
         self.setWindowIcon(make_icon())
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, False)
+        self.setFixedSize(880, 620)
         screen = QApplication.primaryScreen()
         if screen is not None:
-            geometry = screen.availableGeometry()
-            width = min(1100, max(700, int(geometry.width() * 0.5)))
-            height = min(760, max(460, int(geometry.height() * 0.5)))
-            self.resize(width, height)
-            self.move(geometry.center() - self.rect().center())
-        else:
-            self.resize(900, 560)
-        self.setMinimumSize(700, 460)
+            self.move(
+                screen.availableGeometry().center() - self.rect().center()
+            )
         self._build_ui()
         self._refresh_interfaces()
         self._apply_settings()
@@ -958,21 +954,19 @@ class MainWindow(QMainWindow):
         header.addWidget(self.admin_button)
         root.addLayout(header)
 
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setChildrenCollapsible(False)
+        body = QHBoxLayout()
+        body.setSpacing(10)
         self.tabs = QTabWidget()
         self.tabs.setObjectName("sidebar")
         self.tabs.setDocumentMode(True)
+        self.tabs.setFixedWidth(440)
         self.tabs.addTab(self._build_accounts_page(), "账号")
         self.tabs.addTab(self._build_auth_page(), "认证")
         self.tabs.addTab(self._build_connection_page(), "连接")
         self.tabs.addTab(self._build_debug_page(), "调试")
-        splitter.addWidget(self.tabs)
-        splitter.addWidget(self._build_log_page())
-        splitter.setStretchFactor(0, 0)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([400, 560])
-        root.addWidget(splitter, 1)
+        body.addWidget(self.tabs, 0)
+        body.addWidget(self._build_log_page(), 1)
+        root.addLayout(body, 1)
         self.setCentralWidget(central)
 
     def _switch_row(
@@ -1037,11 +1031,26 @@ class MainWindow(QMainWindow):
             QAbstractItemView.EditTrigger.NoEditTriggers
         )
         self.account_table.setAlternatingRowColors(False)
+        self.account_table.setWordWrap(False)
+        self.account_table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.account_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.account_table.setHorizontalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel
+        )
+        self.account_table.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel
+        )
         header_view = self.account_table.horizontalHeader()
-        header_view.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header_view.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header_view.setStretchLastSection(False)
+        self.account_table.setColumnWidth(0, 52)
+        self.account_table.setColumnWidth(1, 130)
+        self.account_table.setColumnWidth(2, 180)
+        self.account_table.setColumnWidth(3, 70)
         layout.addWidget(self.account_table, 1)
 
         self.add_button = QPushButton("添加")
@@ -1072,18 +1081,10 @@ class MainWindow(QMainWindow):
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(10)
 
-        actions = QGridLayout()
-        actions.setHorizontalSpacing(8)
-        self.start_button = QPushButton("开始认证")
-        self.start_button.setObjectName("primary")
-        self.start_button.setMinimumHeight(42)
-        self.stop_button = QPushButton("停止")
-        self.stop_button.setObjectName("danger")
-        self.stop_button.setMinimumHeight(42)
-        self.stop_button.setEnabled(False)
-        actions.addWidget(self.start_button, 0, 0)
-        actions.addWidget(self.stop_button, 0, 1)
-        layout.addLayout(actions)
+        self.toggle_button = QPushButton("开始认证")
+        self.toggle_button.setObjectName("primary")
+        self.toggle_button.setMinimumHeight(44)
+        layout.addWidget(self.toggle_button)
 
         policy = QGroupBox("认证策略")
         policy_layout = QVBoxLayout(policy)
@@ -1207,7 +1208,7 @@ class MainWindow(QMainWindow):
         self.rediscover_button = QPushButton("强制重新探测")
         channel_layout.addWidget(self.cache_label)
         channel_layout.addWidget(self.rediscover_button)
-        layout.addWidget(channel)
+        layout.insertWidget(0, channel)
         layout.addStretch(1)
         scroll.setWidget(page)
         return scroll
@@ -1265,17 +1266,20 @@ class MainWindow(QMainWindow):
             return
         self.tray = QSystemTrayIcon(make_icon(), self)
         menu = QMenu()
+        menu.setStyleSheet(
+            "QMenu { background: #ffffff; border: 1px solid #e5e5ea; padding: 4px; }"
+            "QMenu::item { padding: 7px 26px 7px 24px; border-radius: 6px; }"
+            "QMenu::item:selected { background: #e5efff; color: #1c1c1e; }"
+            "QMenu::separator { height: 1px; background: #e5e5ea; margin: 4px 8px; }"
+        )
         show_action = QAction("显示主窗口", self)
         show_action.triggered.connect(self.show_window)
-        start_action = QAction("开始认证", self)
-        start_action.triggered.connect(self.start_auth)
-        stop_action = QAction("停止认证", self)
-        stop_action.triggered.connect(self.stop_auth)
+        self.tray_toggle_action = QAction("开始认证", self)
+        self.tray_toggle_action.triggered.connect(self.toggle_auth)
         quit_action = QAction("退出", self)
         quit_action.triggered.connect(self.quit_app)
         menu.addAction(show_action)
-        menu.addAction(start_action)
-        menu.addAction(stop_action)
+        menu.addAction(self.tray_toggle_action)
         menu.addSeparator()
         menu.addAction(quit_action)
         self.tray.setContextMenu(menu)
@@ -1291,8 +1295,7 @@ class MainWindow(QMainWindow):
         self.account_table.itemSelectionChanged.connect(self._on_account_selected)
         self.account_table.itemChanged.connect(self._on_account_item_changed)
         self.account_table.doubleClicked.connect(lambda _index: self.edit_account())
-        self.start_button.clicked.connect(self.start_auth)
-        self.stop_button.clicked.connect(self.stop_auth)
+        self.toggle_button.clicked.connect(self.toggle_auth)
         self.interface_refresh.clicked.connect(self.refresh_interfaces)
         self.rediscover_button.clicked.connect(self.force_rediscover)
         self.clear_log_button.clicked.connect(self.log_view.clear)
@@ -1588,6 +1591,12 @@ class MainWindow(QMainWindow):
         )
         return "认证成功" if supp.authenticate() else "认证失败（详见运行日志）"
 
+    def toggle_auth(self) -> None:
+        if self.worker and self.worker.isRunning():
+            self.stop_auth()
+        else:
+            self.start_auth()
+
     def start_auth(self) -> None:
         if self.worker and self.worker.isRunning():
             return
@@ -1655,6 +1664,18 @@ class MainWindow(QMainWindow):
         }
         self.state_label.setText(text)
         self.state_label.setStyleSheet(f"color: {colors.get(code, '#e5e7eb')};")
+        details = {
+            "authenticated": "认证成功，保持在线",
+            "authenticating": "正在认证",
+            "selecting": "正在建立认证通道",
+            "offline": "检测到掉线，正在抢占补入",
+            "retrying": "正在等待下一次重试",
+            "error": "认证异常，正在按策略处理",
+            "failed": "认证失败；点击开始重试",
+            "stopped": "认证任务已停止；点击开始重新认证",
+        }
+        if code in details:
+            self.detail_label.setText(details[code])
         if self.tray:
             self.tray.setToolTip(f"{APP_NAME} - {text}")
             self.tray.setIcon(make_icon(colors.get(code, "#38bdf8")))
@@ -1728,8 +1749,13 @@ class MainWindow(QMainWindow):
         return "已发送注销"
 
     def set_running(self, running: bool) -> None:
-        self.start_button.setEnabled(not running)
-        self.stop_button.setEnabled(running)
+        self.toggle_button.setText("停止" if running else "开始认证")
+        self.toggle_button.setObjectName("danger" if running else "primary")
+        self.toggle_button.style().unpolish(self.toggle_button)
+        self.toggle_button.style().polish(self.toggle_button)
+        action = getattr(self, "tray_toggle_action", None)
+        if action is not None:
+            action.setText("停止认证" if running else "开始认证")
         self.settings_group.setEnabled(not running)
         self.account_table.setEnabled(not running)
         for widget in (

@@ -76,6 +76,15 @@ if ($Deploy) {
     }
     New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
     $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
+    $running = Get-Process RuijieCampusAuth -ErrorAction SilentlyContinue
+    if ($running) {
+        Write-Host "Stopping running RuijieCampusAuth..."
+        $running | Stop-Process -Force
+        Start-Sleep -Seconds 2
+        if (Test-Path $target) {
+            & $target --restore-client | Out-Null
+        }
+    }
     Copy-Item $exe $target -Force
     Write-Host "Deployed exe: $target"
 
