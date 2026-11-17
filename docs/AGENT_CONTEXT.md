@@ -26,6 +26,11 @@ Windows client. It is a compatibility client, not an authentication bypass.
 - 23:50/23:54: after killing the GUI and after injecting a legacy markerless
   IFEO policy, the VBS logged `restoring stale policy` and
   `launching original supplicant`; the policy was removed and 8021x restarted.
+- 2026-11-18 00:03: server returned `不在认证时段内!` (outside the campus
+  authentication window). This is a server policy, not an account/client
+  failure. The GUI kept retrying as configured.
+- 0.5.0: GUI re-laid out to a ~1/4-screen iOS-style window with left tabs and a
+  right log pane; discovery cache added and unit-tested. 12 tests pass.
 
 ## Architecture
 
@@ -54,6 +59,10 @@ Windows client. It is a compatibility client, not an authentication bypass.
   - Saves/restores previous values; cleans legacy markerless policies.
 - `src/ruijie_auth/handoff.py`
   - `%ProgramData%\RuijieCampusAuth\takeover.ini` heartbeat every second.
+- `src/ruijie_auth/storage.py` (DiscoveryCache)
+  - `%APPDATA%\RuijieCampusAuth\discovery.json` caches interface/description/
+    MAC/server MAC after any server EAP response; clears when the channel does
+    not respond. The GUI exposes a force-rediscover button.
 - `packaging/restart_ruijie.vbs`
   - Original-client launcher with four-check takeover health and stale/legacy
     recovery.
@@ -143,6 +152,12 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   tight 3-frame bursts (~20 us spacing). Scapy's per-frame loop is much slower.
 - A ~40 ms delay before EAP responses matches the official client.
 - Duplicate EAP requests are ignored to avoid flooding the server.
+- Auto-detect uses `DiscoveryCache`: probe once, cache the interface/server MAC
+  after **any** server EAP response (Success, Failure, Identity/MD5), then skip
+  probing on later attempts. If no server EAP response arrives, the cache is
+  cleared and the next attempt re-probes. Explicit `interface=` bypasses the
+  cache. The GUI's force button clears the cache and aborts the current
+  `Supplicant` so the next loop re-discovers.
 
 ## Known Limitations / Next Steps
 
@@ -159,6 +174,11 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   falls back to launching the original client (safe but takeover is not
   skipped). The VBS/launcher path is fixed to the deploy directory; update it
   if the exe moves.
+- The campus server rejects authentication outside its time window
+  (`不在认证时段内!`). The GUI will keep retrying; a long backoff on that
+  message is a possible next improvement.
+- 0.5.0 discovery-cache behavior and the new layout were unit/offscreen tested;
+  a fresh live cache regression was not possible after the window closed.
 - The takeover handoff/blocker state is machine-wide under
   `%ProgramData%\RuijieCampusAuth`; the GUI must run elevated. Accounts and
   settings remain per-user under `%APPDATA%\RuijieCampusAuth`.
