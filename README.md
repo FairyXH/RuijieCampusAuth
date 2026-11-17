@@ -5,7 +5,8 @@
 > **当前状态：已在厦门华厦学院实网验证通过。** 2026-11-17 使用真实测试账号完成了
 > 原版客户端抓包、私有尾逐字节重建和 Python 客户端登录。Python 客户端完成标准
 > EAP-MD5 后会追加 569 字节锐捷私有尾，服务器返回 EAP-Success，日志显示
-> “认证成功 / 欢迎使用厦门华厦学院网络”。
+> “认证成功 / 欢迎使用厦门华厦学院网络”。桌面端和单文件 exe 见“GUI 应用”和
+> “构建单文件 exe”。
 
 ## 解决的问题
 
@@ -167,6 +168,120 @@ ruijie-auth --no-private --username YOUR_ID
 python -m ruijie_auth
 ```
 
+## GUI 应用
+
+项目附带一个 Qt（PySide6）桌面端，面向日常使用和校园网调试：
+
+- 多账号/密码管理器，支持启用、备注、测试登录和快速切换；
+- 抢占模式：认证成功后持续检测连通性，发现掉线立即发送 Logoff/Start 重新认证，
+  失败则无限重试；
+- 系统托盘：关闭窗口可最小化到托盘，支持托盘菜单开始/停止/退出；
+- 调试工具：网卡探测、发送 Logoff/Start、手动认证一次、原始以太网帧发送、
+  私有尾预览、源 MAC 覆盖、私有尾开关；
+- 数据持久化：账号和设置保存在 `%APPDATA%\RuijieCampusAuth`，账号密码使用
+  Windows DPAPI 加密，日志滚动保存在 `%APPDATA%\RuijieCampusAuth\logs`；
+- 托管模式：开启后持续结束 `8021x.exe`，并写入临时 IFEO 策略阻止其启动；
+  与认证任务绑定，停止认证或退出程序时自动恢复；
+- 与 `C:\Program Files\restart_ruijie.vbs` 联动：只有“状态已启用 + 心跳新鲜 +
+  记录的 PID 仍存活 + IFEO 标记存在”四项全部满足时才不拉起原客户端；否则自动
+  清理陈旧策略并回退原版；
+- Windows 下使用 Npcap 发送队列复现原客户端的紧凑三次发送。
+
+安装 GUI 依赖并以源码运行：
+
+```powershell
+python -m pip install -e ".[gui]"
+ruijie-auth-gui
+# 或
+python -m ruijie_auth.gui
+```
+
+带参数启动到托盘并自动开始认证任务：
+
+```powershell
+ruijie-auth-gui --tray --auto
+ruijie-auth-gui --tray --auto --account YOUR_ID
+ruijie-auth-gui --auto --interface "Realtek USB GbE"
+```
+
+参数说明：
+
+- `--tray`：启动后不显示主窗口，直接驻留托盘；
+- `--auto`：启动后自动开始认证任务（使用当前选中账号）；
+- `--account USERNAME`：按用户名选择账号；
+- `--interface NAME`：覆盖网卡（名称、描述或 NPF 设备名）；
+- `--verbose`：详细协议日志；
+- `--version`：显示版本后退出；
+- `--restore-client`：清除托管模式写入的 IFEO 策略/心跳并退出（需要管理员）。
+
+### 托管模式与网络管家
+
+GUI 的“托管模式”开关会同时启动抢占认证任务和原客户端阻止器。运行时写入：
+
+- `%ProgramData%\RuijieCampusAuth\takeover.ini`：`enabled=1`、GUI PID、程序路径，
+  每秒刷新一次心跳；
+- IFEO 键 `HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution
+  Options\8021x.exe` 下的 `Debugger` 和 `HXXYTakeover=RuijieCampusAuth` 标记
+  （同时写 64/32 位视图）；
+- `%ProgramData%\RuijieCampusAuth\blocker_state.json`：原策略备份，供崩溃恢复。
+
+`restart_ruijie.vbs` 只有以下四项全部成立时才跳过原版：
+
+1. `takeover.ini` 中 `enabled=1`；
+2. 文件修改时间距今不超过 12 秒（GUI 每秒刷新）；
+3. 文件中记录的 PID 仍以 `RuijieCampusAuth.exe` 运行；
+4. 64 位或 32 位注册表视图存在 `HXXYTakeover` 标记。
+
+任一项不满足时，VBS 视为陈旧/异常：结束残留 GUI、执行
+`RuijieCampusAuth.exe --restore-client` 清除 IFEO/心跳，然后按原逻辑结束
+8021x 并启动原客户端。旧版本没有 `HXXYTakeover` 标记的 IFEO 策略也会被识别和
+清理。手动恢复命令：
+
+```powershell
+& "D:\Storageredirect\Program\RuijieCampusAuth.exe" --restore-client
+```
+
+GUI 的抢占模式默认开启：认证成功后每 2 秒做一次 TCP 连通性检测（默认目标
+`www.baidu.com:80`），掉线后先发送带私有尾的 Logoff，再立即重新 Start/认证；
+失败按设定的重试间隔无限重试。检测地址、间隔、超时、Start 次数和应答次数都可
+在界面中调整。
+
+## 构建单文件 exe
+
+在 Windows 上执行：
+
+```powershell
+.\build.ps1
+```
+
+脚本会安装 `gui`/`build` 依赖，生成图标（如缺失），用 PyInstaller 构建单文件
+窗口程序：
+
+```text
+dist\RuijieCampusAuth.exe
+```
+
+- 单文件、无控制台、请求管理员权限（UAC）；
+- 内置图标和版本信息；
+- 仍需本机安装 Npcap（WinPcap API 兼容模式）；
+- 构建日志在 `logs\build.out.log` / `logs\build.err.log`；
+- `.\build.ps1 -Clean` 会先清理 `build`/`dist`；
+- `.\build.ps1 -SkipInstall` 跳过依赖安装，适合已配置好的构建机；
+- `.\build.ps1 -Deploy` 在构建后部署到 `D:\Storageredirect\Program`：
+  - 复制 `RuijieCampusAuth.exe`；
+  - 备份并更新 `C:\Program Files\restart_ruijie.vbs`；
+  - 在部署目录和桌面创建 `HXXY-CampusAuth.lnk`；
+  - 需要管理员 PowerShell。
+
+部署后的快捷方式、网络管家引用和 `--restore-client` 都从以下路径启动：
+
+```text
+D:\Storageredirect\Program\RuijieCampusAuth.exe
+```
+
+已验证构建产物可用 `--tray --auto` 启动并完成真实认证，且 VBS 能以健康/陈旧两种
+状态正确跳过或恢复原客户端。
+
 ## Python API
 
 推荐导入名为 `ruijie_hxxy`。便捷函数会同步执行一次登录，并返回保留本次运行状态和
@@ -236,6 +351,24 @@ client.logout()
 - 若更换学校或服务器策略，建议先用 `--verbose` 抓取一次原客户端和本工具的
   EAPOL 流程进行对比。
 
+## 0.4.0 改动
+
+- 新增 PySide6 GUI：多账号管理、抢占保活、系统托盘、调试工具；
+- 新增 `storage.py`：`%APPDATA%\RuijieCampusAuth` 持久化，Windows DPAPI
+  加密密码；
+- 新增 `blocker.py`：托管模式下持续结束 `8021x.exe`，写入 64/32 位 IFEO
+  `Debugger` 和 `HXXYTakeover` 标记，退出/停止时恢复；
+- 新增 `handoff.py`：`%ProgramData%\RuijieCampusAuth\takeover.ini` 每秒心跳，
+  供 VBS 判断托管是否健康；
+- 新增 `--restore-client`：清理陈旧 IFEO/心跳，兼容旧版无标记策略；
+- 重写 `restart_ruijie.vbs`：四重校验后决定是否拉起原版；陈旧/崩溃/旧策略时
+  自动恢复；
+- 新增 `--tray`/`--auto`/`--account`/`--interface` 启动参数；
+- 新增 `build.ps1`、PyInstaller spec、应用图标、版本信息、`-Deploy` 部署
+  （exe、VBS、快捷方式）；
+- 新增 GUI/存储/心跳/离屏冒烟测试；
+- `Supplicant` 支持取消、源 MAC 覆盖和带私有尾的 `logoff()`。
+
 ## 0.3.0 改动
 
 - 新增完整锐捷私有尾：23 字节混淆头、47 字节前导、0x17/0x2D/0x2F/0x39/0x54
@@ -285,6 +418,18 @@ client.logout()
 - Python 客户端完成 EAP-MD5 后收到 EAP-Success，服务器消息为
   “欢迎使用厦门华厦学院网络”；
 - 同一时间原客户端也可正常认证，网络和账号状态正常；
-- 自动化测试覆盖私有尾长度/结构、CRC/混淆、凭据加密和 EAPOL 长度字段。
+- 23:49 使用部署后的 `D:\Storageredirect\Program\RuijieCampusAuth.exe`
+  `--tray --auto` 完成真实认证；托管模式同时结束 8021x 并写入 64/32 位
+  IFEO 标记；
+- 23:50 调用部署后的 `restart_ruijie.vbs`：托管健康时日志为
+  `healthy takeover; skip original`，未拉起原版；
+- 强制结束 GUI 后再次调用 VBS：日志为 `restoring stale policy` →
+  `launching original supplicant`，IFEO/心跳恢复，原版 8021x 启动，网络 200；
+- 23:54 模拟旧版无 `HXXYTakeover` 标记的 IFEO 策略，VBS 同样能识别、恢复并
+  拉起原版；
+- 自动化测试覆盖私有尾长度/结构、CRC/混淆、凭据加密、EAPOL 长度、账号存储、
+  心跳和 GUI 离屏构建。
 
-测试账号和密码不包含在源码、配置、README 或安装元数据中。
+仓库源码、构建产物、README 和安装元数据不包含测试账号或密码。GUI 的账号文件
+位于 `%APPDATA%\RuijieCampusAuth`，由用户通过界面管理，密码使用 Windows
+DPAPI 加密。
