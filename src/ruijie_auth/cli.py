@@ -12,6 +12,7 @@ import os
 import queue
 import struct
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from logging.handlers import RotatingFileHandler
@@ -91,7 +92,11 @@ def list_interfaces() -> list[InterfaceInfo]:
     return result
 
 
-def probe_authenticator(interface: InterfaceInfo, timeout: float = 1.2) -> bool:
+def probe_authenticator(
+    interface: InterfaceInfo,
+    timeout: float = 1.2,
+    stop_event: threading.Event | None = None,
+) -> bool:
     packets: queue.Queue[Ether] = queue.Queue()
     sniffer = AsyncSniffer(
         iface=interface.key,
@@ -101,13 +106,19 @@ def probe_authenticator(interface: InterfaceInfo, timeout: float = 1.2) -> bool:
     )
     try:
         sniffer.start()
-        time.sleep(0.15)
+        if stop_event is not None:
+            if stop_event.wait(0.15):
+                return False
+        else:
+            time.sleep(0.15)
         frame = Ether(src=interface.mac, dst=RUIJIE_GROUP) / EAPOL(
             version=1, type=1, len=0
         )
         sendp(frame, iface=interface.key, verbose=False)
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
+            if stop_event is not None and stop_event.is_set():
+                return False
             try:
                 packet = packets.get(timeout=max(0.05, deadline - time.monotonic()))
             except queue.Empty:
@@ -124,7 +135,11 @@ def probe_authenticator(interface: InterfaceInfo, timeout: float = 1.2) -> bool:
                         version=1, type=2, len=0
                     )
                     sendp(logoff, iface=interface.key, verbose=False)
-                time.sleep(0.5)
+                if stop_event is not None:
+                    if stop_event.wait(0.5):
+                        return False
+                else:
+                    time.sleep(0.5)
                 return True
         return False
     except (OSError, ValueError):
@@ -134,7 +149,12 @@ def probe_authenticator(interface: InterfaceInfo, timeout: float = 1.2) -> bool:
             sniffer.stop()
 
 
-def choose_interface(requested: str | None) -> str:
+def choose_interface(
+    requested: str | None,
+    stop_event: threading.Event | None = None,
+) -> str:
+    if stop_event is not None and stop_event.is_set():
+        raise SystemExit("已取消")
     interfaces = list_interfaces()
     if requested:
         try:
@@ -184,13 +204,15 @@ def choose_interface(requested: str | None) -> str:
     )
     LOG.info("自动探测连接锐捷认证服务器的网卡...")
     for candidate in candidates:
+        if stop_event is not None and stop_event.is_set():
+            raise SystemExit("已取消")
         LOG.debug(
             "探测网卡: %s | %s | %s",
             candidate.description,
             candidate.ip or "-",
             candidate.mac,
         )
-        if probe_authenticator(candidate):
+        if probe_authenticator(candidate, stop_event=stop_event):
             LOG.info(
                 "自动选择认证网卡: %s | %s | %s",
                 candidate.description,
@@ -199,6 +221,8 @@ def choose_interface(requested: str | None) -> str:
             )
             return candidate.key
 
+    if stop_event is not None and stop_event.is_set():
+        raise SystemExit("已取消")
     routed = str(conf.route.route("0.0.0.0")[0])
     try:
         selected = resolve_iface(routed)
@@ -419,6 +443,7 @@ class Supplicant:
         response_delay: float = 0.04,
         network: NetworkInfo | None = None,
         tail_options: TailOptions | None = None,
+        source_mac: str | None = None,
     ) -> None:
         self.interface = interface
         self.identity = identity
@@ -432,9 +457,24 @@ class Supplicant:
         self.network = network or collect_network_info(interface)
         self.tail_options = tail_options
         self._session_nonce = os.urandom(16).hex().upper().encode()
-        self.source = get_if_hwaddr(interface)
+        self._stop_event = threading.Event()
+        self.source = source_mac or get_if_hwaddr(interface)
         self.packets: queue.Queue[Ether] = queue.Queue()
         self.server_mac: str | None = None
+
+    def stop(self) -> None:
+        """Request cancellation of a running authentication attempt."""
+        self._stop_event.set()
+
+    def logoff(self) -> None:
+        """Send a private-tail EAPOL-Logoff for the current account."""
+        frame = (
+            Ether(src=self.source, dst=STANDARD_GROUP)
+            / EAPOL(version=1, type=2, len=0)
+            / self._control_tail()
+        )
+        self.send(frame, count=self.repeats)
+        LOG.info("已发送带私有尾的 EAPOL-Logoff")
 
     def _tail(self, iv: bytes, nonce: bytes | None = None) -> bytes:
         if not self.private:
@@ -494,7 +534,9 @@ class Supplicant:
         )
         try:
             sniffer.start()
-            time.sleep(0.3)
+            if self._stop_event.wait(0.3):
+                LOG.info("认证已取消")
+                return False
             if not sniffer.running:
                 raise RuntimeError("抓包线程启动失败")
             if self.logoff_first:
@@ -505,7 +547,9 @@ class Supplicant:
                     / self._control_tail()
                 )
                 self.send(logoff, count=self.repeats)
-                time.sleep(0.1)
+                if self._stop_event.wait(0.1):
+                    LOG.info("认证已取消")
+                    return False
             self.send_start()
             deadline = time.monotonic() + self.timeout
             starts_sent = 1
@@ -513,6 +557,9 @@ class Supplicant:
             handled: dict[tuple[int, int, bytes], bytes] = {}
 
             while time.monotonic() < deadline:
+                if self._stop_event.is_set():
+                    LOG.info("认证已取消")
+                    return False
                 now = time.monotonic()
                 if self.server_mac is None and now >= next_retry:
                     if starts_sent >= self.retries:
@@ -593,7 +640,9 @@ class Supplicant:
                     continue
 
                 if self.response_delay:
-                    time.sleep(self.response_delay)
+                    if self._stop_event.wait(self.response_delay):
+                        LOG.info("认证已取消")
+                        return False
                 self.send(
                     build_eapol_frame(self.source, destination, response),
                     count=self.repeats,

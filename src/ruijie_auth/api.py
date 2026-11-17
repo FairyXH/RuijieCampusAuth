@@ -10,7 +10,7 @@ from typing import Any
 from scapy.all import get_if_hwaddr
 from scapy.interfaces import resolve_iface
 
-from .cli import LOG, Supplicant, choose_interface, send_logoff, setup_logging
+from .cli import LOG, Supplicant, choose_interface, setup_logging
 
 
 class _MemoryLogHandler(logging.Handler):
@@ -130,10 +130,19 @@ class RuijieClient:
             LOG.removeHandler(self._handler)
 
     def logout(self) -> None:
-        """Send EAPOL-Logoff on the selected interface."""
+        """Send a private-tail EAPOL-Logoff on the selected interface."""
         LOG.addHandler(self._handler)
         try:
-            send_logoff(self._select_interface())
+            interface = self._select_interface()
+            Supplicant(
+                interface=interface,
+                identity=self.username.encode(self.encoding),
+                password=self._password.encode(self.encoding),
+                timeout=self.timeout,
+                retries=self.retries,
+                repeats=self.repeats,
+                private=self.private_tail,
+            ).logoff()
             self._status.update(
                 state="logged_out", authenticated=False, message="已注销"
             )
