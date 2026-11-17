@@ -31,6 +31,10 @@ Windows client. It is a compatibility client, not an authentication bypass.
   failure. The GUI kept retrying as configured.
 - 0.5.0: GUI re-laid out to a ~1/4-screen iOS-style window with left tabs and a
   right log pane; discovery cache added and unit-tested. 12 tests pass.
+- 0.5.1: fixed 880x620 non-resizable window, fixed 440px left tab column,
+  single start/stop toggle, both-axis account-table scrolling, white tray menu,
+  and the auth-channel/force-rediscover block moved to the top of Connection.
+  All switches and connection parameters persist to settings.json.
 
 ## Architecture
 
@@ -152,6 +156,10 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   tight 3-frame bursts (~20 us spacing). Scapy's per-frame loop is much slower.
 - A ~40 ms delay before EAP responses matches the official client.
 - Duplicate EAP requests are ignored to avoid flooding the server.
+- GUI settings persistence: every strategy switch (preempt/block/auto-start/
+  start-minimized/close-minimize/verbose/logoff) and every connection field
+  (interface, intervals, timeout, start/repeat counts, connectivity URL) is
+  saved on change and restored by `_apply_settings`.
 - Auto-detect uses `DiscoveryCache`: probe once, cache the interface/server MAC
   after **any** server EAP response (Success, Failure, Identity/MD5), then skip
   probing on later attempts. If no server EAP response arrives, the cache is
