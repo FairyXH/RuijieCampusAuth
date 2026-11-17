@@ -35,6 +35,12 @@ Windows client. It is a compatibility client, not an authentication bypass.
   single start/stop toggle, both-axis account-table scrolling, white tray menu,
   and the auth-channel/force-rediscover block moved to the top of Connection.
   All switches and connection parameters persist to settings.json.
+- 2026-11-18 01:45: with the USB NIC pinned via Windows `IP_UNICAST_IF`
+  (ifIndex 16), TLS to www.baidu.com succeeds on 172.18.28.6 while EAPOL-Start
+  gets no server response. The switch appears to keep the earlier authorized
+  session; "link egress" and "fresh 802.1X auth" must be reported separately.
+  Pin the interface for probes: binding the source address alone still lets the
+  WLAN default route win.
 
 ## Architecture
 
@@ -72,6 +78,13 @@ Windows client. It is a compatibility client, not an authentication bypass.
     recovery.
 - `packaging/RuijieCampusAuth.spec`, `packaging/entry_gui.py`, `build.ps1`
   - PyInstaller onefile build, icon/version info, `-Deploy`.
+- `tools/campus_monitor.py`
+  - Passive 15-minute sampler; never sends EAPOL frames. Records USB NIC
+    link/IP, source-bound egress probes, GUI/8021x/Supplicant processes,
+    takeover/IFEO state, and app.log auth events. Writes
+    `%APPDATA%\RuijieCampusAuth\campus_status.json` plus
+    `logs/campus_status.jsonl`. Supports `--once`, `--interval`, `--until`,
+    `--reset`. Probes pin egress with `IP_UNICAST_IF`.
 - `tests/test_api.py`, `test_private.py`, `test_storage.py`, `test_handoff.py`,
   `test_gui.py`
   - API status, private tail, storage/DPAPI, heartbeat, offscreen GUI smoke.
