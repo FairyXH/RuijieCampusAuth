@@ -13,8 +13,10 @@ import ctypes
 import json
 import logging
 import os
+import threading
 import uuid
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -157,6 +159,78 @@ class AppSettings:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+@dataclass
+class DiscoveryInfo:
+    interface: str
+    description: str = ""
+    mac: str = ""
+    server_mac: str = ""
+    updated_at: str = ""
+
+
+class DiscoveryCache:
+    """Remember the working interface/authenticator between attempts."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._lock = threading.Lock()
+
+    def load(self) -> DiscoveryInfo | None:
+        with self._lock:
+            if not self.path.exists():
+                return None
+            try:
+                data = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return None
+            interface = str(data.get("interface", "") or "")
+            if not interface:
+                return None
+            return DiscoveryInfo(
+                interface=interface,
+                description=str(data.get("description", "") or ""),
+                mac=str(data.get("mac", "") or ""),
+                server_mac=str(data.get("server_mac", "") or ""),
+                updated_at=str(data.get("updated_at", "") or ""),
+            )
+
+    def save(
+        self,
+        interface: str,
+        description: str = "",
+        mac: str = "",
+        server_mac: str = "",
+    ) -> None:
+        payload = {
+            "version": FILE_VERSION,
+            "interface": interface,
+            "description": description,
+            "mac": mac,
+            "server_mac": server_mac,
+            "updated_at": datetime.now().astimezone().isoformat(timespec="seconds"),
+        }
+        with self._lock:
+            try:
+                self.path.parent.mkdir(parents=True, exist_ok=True)
+                temp = self.path.with_suffix(self.path.suffix + ".tmp")
+                temp.write_text(
+                    json.dumps(payload, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                os.replace(temp, self.path)
+            except OSError as exc:
+                LOG.warning("写入认证通道缓存失败: %s", exc)
+
+    def clear(self) -> None:
+        with self._lock:
+            try:
+                self.path.unlink()
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                LOG.warning("清除认证通道缓存失败: %s", exc)
 
 
 class AccountStore:

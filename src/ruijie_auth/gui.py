@@ -27,10 +27,32 @@ from pathlib import Path
 from typing import Callable, Iterable
 from urllib.parse import urlsplit
 
-from PySide6.QtCore import QObject, Qt, QThread, QTimer, Signal
-from PySide6.QtGui import QAction, QColor, QFont, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtCore import (
+    QEasingCurve,
+    QObject,
+    QPropertyAnimation,
+    QRectF,
+    QSize,
+    Qt,
+    QThread,
+    QTimer,
+    QUrl,
+    Property,
+    Signal,
+)
+from PySide6.QtGui import (
+    QAction,
+    QColor,
+    QDesktopServices,
+    QFont,
+    QIcon,
+    QPainter,
+    QPen,
+    QPixmap,
+)
 from PySide6.QtNetwork import QLocalServer, QLocalSocket
 from PySide6.QtWidgets import (
+    QAbstractButton,
     QAbstractItemView,
     QApplication,
     QCheckBox,
@@ -51,7 +73,10 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QScrollArea,
+    QSizePolicy,
     QSpinBox,
+    QSplitter,
     QSystemTrayIcon,
     QTableWidget,
     QTableWidgetItem,
@@ -72,7 +97,14 @@ from .cli import (
 )
 from .handoff import TakeoverState
 from .private import TailOptions, build_tail, collect_network_info
-from .storage import Account, AccountStore, AppSettings, program_data_dir
+from .storage import (
+    Account,
+    AccountStore,
+    AppSettings,
+    DiscoveryCache,
+    default_data_dir,
+    program_data_dir,
+)
 
 APP_NAME = "HXXY 校园网认证"
 APP_ID = "RuijieCampusAuth"
@@ -81,106 +113,187 @@ UI_FONT = "Microsoft YaHei UI"
 
 STYLE = """
 QWidget {
-    background: #0b1120;
-    color: #e5e7eb;
-    font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif;
+    background: transparent;
+    color: #1c1c1e;
+    font-family: "SF Pro Display", "Segoe UI Variable", "Segoe UI",
+                 "Microsoft YaHei UI", sans-serif;
     font-size: 13px;
 }
-QFrame#card, QGroupBox {
-    background: #111827;
-    border: 1px solid #1f2937;
-    border-radius: 12px;
+QMainWindow, QWidget#root { background: #f2f2f7; }
+QFrame#card {
+    background: #ffffff;
+    border: none;
+    border-radius: 16px;
 }
-QGroupBox {
-    margin-top: 14px;
-    padding: 18px 12px 12px 12px;
+QTabWidget#sidebar::pane {
+    background: #ffffff;
+    border: none;
+    border-radius: 16px;
+    top: -1px;
+}
+QTabWidget#sidebar QTabBar {
+    background: transparent;
+}
+QTabWidget#sidebar QTabBar::tab {
+    background: transparent;
+    padding: 9px 14px;
+    color: #8e8e93;
+    border: none;
+    font-weight: 500;
+}
+QTabWidget#sidebar QTabBar::tab:selected {
+    color: #007aff;
     font-weight: 600;
+    border-bottom: 2px solid #007aff;
+}
+QTabWidget#sidebar QTabBar::tab:hover { color: #1c1c1e; }
+QGroupBox {
+    background: #f2f2f7;
+    border: none;
+    border-radius: 12px;
+    margin-top: 12px;
+    padding: 26px 12px 10px 12px;
+    font-weight: 500;
 }
 QGroupBox::title {
     subcontrol-origin: margin;
-    left: 14px;
-    padding: 0 6px;
-    color: #93c5fd;
+    left: 12px;
+    top: 4px;
+    padding: 0;
+    color: #8e8e93;
+    font-size: 11px;
+    font-weight: 600;
 }
+QLabel { background: transparent; }
 QLabel#title {
-    font-size: 24px;
+    font-size: 20px;
     font-weight: 700;
-    color: #f8fafc;
+    color: #1c1c1e;
 }
 QLabel#state {
-    font-size: 26px;
+    font-size: 22px;
     font-weight: 700;
 }
-QLabel#muted { color: #94a3b8; }
+QLabel#muted { color: #8e8e93; font-size: 12px; }
+QLabel#value { color: #1c1c1e; }
 QPushButton {
-    background: #1f2937;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 8px 14px;
+    background: #ffffff;
+    border: 1px solid #d1d1d6;
+    border-radius: 10px;
+    padding: 8px 12px;
+    color: #007aff;
+    font-weight: 500;
 }
-QPushButton:hover { background: #273449; border-color: #38bdf8; }
-QPushButton:pressed { background: #0f172a; }
-QPushButton:disabled { color: #64748b; border-color: #1e293b; }
+QPushButton:hover { background: #f2f7ff; border-color: #007aff; }
+QPushButton:pressed { background: #e5efff; }
+QPushButton:disabled {
+    color: #c7c7cc;
+    border-color: #e5e5ea;
+    background: #fafafa;
+}
 QPushButton#primary {
-    background: #2563eb;
-    border: 1px solid #3b82f6;
+    background: #007aff;
+    border: none;
     color: #ffffff;
     font-weight: 600;
+    padding: 10px 14px;
 }
-QPushButton#primary:hover { background: #3b82f6; }
+QPushButton#primary:hover { background: #0a84ff; }
 QPushButton#danger {
-    background: #7f1d1d;
-    border: 1px solid #b91c1c;
-    color: #fecaca;
-}
-QPushButton#danger:hover { background: #991b1b; }
-QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
-    background: #0f172a;
-    border: 1px solid #334155;
-    border-radius: 8px;
-    padding: 7px 10px;
-    selection-background-color: #2563eb;
-}
-QComboBox::drop-down { border: none; width: 24px; }
-QTableWidget {
-    background: #0f172a;
-    border: 1px solid #1f2937;
-    border-radius: 10px;
-    gridline-color: #1f2937;
-}
-QTableWidget::item { padding: 6px; }
-QTableWidget::item:selected { background: #1d4ed8; }
-QHeaderView::section {
-    background: #111827;
+    background: #ff3b30;
     border: none;
-    padding: 8px;
-    color: #94a3b8;
+    color: #ffffff;
     font-weight: 600;
+    padding: 10px 14px;
 }
-QTabWidget::pane {
-    border: 1px solid #1f2937;
-    border-radius: 10px;
-    background: #0f172a;
-}
-QTabBar::tab {
+QPushButton#danger:hover { background: #ff453a; }
+QPushButton#link {
     background: transparent;
-    padding: 8px 18px;
-    color: #94a3b8;
+    border: none;
+    color: #007aff;
+    padding: 4px;
 }
-QTabBar::tab:selected {
-    color: #38bdf8;
-    border-bottom: 2px solid #38bdf8;
+QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
+    background: #f2f2f7;
+    border: 1px solid #e5e5ea;
+    border-radius: 9px;
+    padding: 7px 9px;
+    color: #1c1c1e;
+    selection-background-color: #007aff;
+    selection-color: #ffffff;
+}
+QComboBox::drop-down { border: none; width: 22px; }
+QComboBox QAbstractItemView {
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+    selection-background-color: #e5efff;
+    selection-color: #1c1c1e;
+}
+QTableWidget {
+    background: #ffffff;
+    border: none;
+    gridline-color: transparent;
+    selection-background-color: #e5efff;
+    selection-color: #1c1c1e;
+}
+QTableWidget::item {
+    padding: 6px 4px;
+    border-bottom: 1px solid #f2f2f7;
+}
+QHeaderView::section {
+    background: #ffffff;
+    border: none;
+    padding: 6px 4px;
+    color: #8e8e93;
+    font-size: 11px;
+    font-weight: 600;
+    border-bottom: 1px solid #e5e5ea;
 }
 QPlainTextEdit {
-    background: #0f172a;
-    border: 1px solid #1f2937;
-    border-radius: 10px;
-    font-family: "Cascadia Mono", "Consolas", monospace;
+    background: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-family: "Cascadia Mono", "SF Mono", "Consolas", monospace;
     font-size: 12px;
-    selection-background-color: #1d4ed8;
+    color: #1c1c1e;
+    selection-background-color: #007aff;
+    selection-color: #ffffff;
 }
-QCheckBox { spacing: 8px; }
-QStatusBar { color: #64748b; }
+QScrollArea { background: transparent; border: none; }
+QScrollArea QWidget { background: transparent; }
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 2px;
+}
+QScrollBar::handle:vertical {
+    background: #c7c7cc;
+    border-radius: 4px;
+    min-height: 24px;
+}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+QCheckBox { spacing: 8px; color: #1c1c1e; }
+QCheckBox::indicator {
+    width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    border: 1px solid #c7c7cc;
+    background: #ffffff;
+}
+QCheckBox::indicator:checked {
+    background: #007aff;
+    border-color: #007aff;
+}
+QStatusBar { color: #8e8e93; background: transparent; }
+QSplitter::handle { background: transparent; width: 10px; }
+QToolTip {
+    background: #1c1c1e;
+    color: #ffffff;
+    border: none;
+    padding: 6px 8px;
+    border-radius: 8px;
+}
 """
 
 
@@ -228,6 +341,66 @@ def make_icon(color: str = "#38bdf8", size: int = 64) -> QIcon:
     )
     painter.end()
     return QIcon(pixmap)
+
+
+class ToggleSwitch(QAbstractButton):
+    """Small iOS-style switch used for the settings rows."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._offset = 0.0
+        self._animation = QPropertyAnimation(self, b"offset", self)
+        self._animation.setDuration(160)
+        self._animation.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self.toggled.connect(self._animate)
+        self.setFixedSize(46, 28)
+
+    def _animate(self, checked: bool) -> None:
+        self._animation.stop()
+        self._animation.setStartValue(self._offset)
+        self._animation.setEndValue(1.0 if checked else 0.0)
+        self._animation.start()
+
+    def _get_offset(self) -> float:
+        return self._offset
+
+    def _set_offset(self, value: float) -> None:
+        self._offset = float(value)
+        self.update()
+
+    offset = Property(float, _get_offset, _set_offset)
+
+    def sizeHint(self) -> QSize:  # noqa: N802 - Qt API
+        return QSize(46, 28)
+
+    def paintEvent(self, event) -> None:  # noqa: N802 - Qt API
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        rect = QRectF(1, 1, self.width() - 2, self.height() - 2)
+        track = QColor("#34c759") if self.isChecked() else QColor("#e5e5ea")
+        if not self.isEnabled():
+            track = QColor("#e5e5ea")
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(track)
+        painter.drawRoundedRect(rect, rect.height() / 2, rect.height() / 2)
+        knob = rect.height() - 4
+        x = rect.left() + 2 + (rect.width() - knob - 4) * self._offset
+        painter.setBrush(QColor("#ffffff"))
+        painter.drawEllipse(QRectF(x, rect.top() + 2, knob, knob))
+        painter.end()
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 - Qt API
+        if (
+            self.isEnabled()
+            and event.button() == Qt.MouseButton.LeftButton
+            and self.rect().contains(event.position().toPoint())
+        ):
+            self.setChecked(not self.isChecked())
+            event.accept()
+            return
+        super().mouseReleaseEvent(event)
 
 
 def connectivity_target(url: str) -> tuple[str, int] | None:
@@ -383,12 +556,23 @@ class OneShotWorker(QThread):
 class AuthWorker(QThread):
     state = Signal(str, str)
     details = Signal(str)
+    channel = Signal(str)
 
-    def __init__(self, account: Account, settings: AppSettings, parent=None):
+    def __init__(
+        self,
+        account: Account,
+        settings: AppSettings,
+        discovery: DiscoveryCache | None = None,
+        parent=None,
+    ):
         super().__init__(parent)
         self.account = replace(account)
         self.settings = replace(settings)
+        self.discovery = discovery or DiscoveryCache(
+            default_data_dir() / "discovery.json"
+        )
         self._stop = threading.Event()
+        self._force_rediscover = threading.Event()
         self._supp: Supplicant | None = None
         self._resolved: str | None = None
         self.ever_authenticated = False
@@ -399,14 +583,49 @@ class AuthWorker(QThread):
         if supp is not None:
             supp.stop()
 
+    def force_rediscover(self) -> None:
+        self._force_rediscover.set()
+        self.discovery.clear()
+        supp = self._supp
+        if supp is not None:
+            supp.stop()
+
     def _wait_or_stop(self, seconds: float) -> bool:
         return self._stop.wait(seconds)
 
+    def _cached_key(self, cached) -> str | None:
+        if cached is None:
+            return None
+        for item in list_interfaces():
+            if item.key == cached.interface:
+                return item.key
+        return None
+
     def _logon(self) -> bool:
         requested = self.settings.interface or None
+        if self._force_rediscover.is_set():
+            self._force_rediscover.clear()
+            self._resolved = None
+            self.discovery.clear()
+            self.channel.emit("正在强制重新探测认证通道...")
+            LOG.info("强制重新探测认证通道")
+
         if self._resolved is None:
-            self.state.emit("selecting", "正在探测认证网卡...")
-            self._resolved = choose_interface(requested, stop_event=self._stop)
+            if requested:
+                self.state.emit("selecting", "正在解析指定网卡...")
+                self._resolved = choose_interface(requested, stop_event=self._stop)
+            else:
+                cached = self.discovery.load()
+                cached_key = self._cached_key(cached)
+                if cached and cached_key:
+                    self._resolved = cached_key
+                    label = cached.description or cached_key
+                    suffix = f" → {cached.server_mac}" if cached.server_mac else ""
+                    self.channel.emit(f"使用缓存通道: {label}{suffix}")
+                    LOG.info("使用缓存认证通道: %s%s", label, suffix)
+                else:
+                    self.state.emit("selecting", "正在探测认证网卡...")
+                    self._resolved = choose_interface(None, stop_event=self._stop)
             try:
                 from scapy.interfaces import resolve_iface
 
@@ -418,6 +637,7 @@ class AuthWorker(QThread):
                 )
             except Exception:  # noqa: BLE001 - details are best effort
                 pass
+
         self.state.emit("authenticating", f"正在认证 {self.account.username} ...")
         supp = Supplicant(
             interface=self._resolved,
@@ -431,9 +651,38 @@ class AuthWorker(QThread):
         )
         self._supp = supp
         try:
-            return supp.authenticate()
+            ok = supp.authenticate()
         finally:
             self._supp = None
+
+        if supp.connected:
+            try:
+                from scapy.interfaces import resolve_iface
+
+                info = resolve_iface(self._resolved)
+                description = str(getattr(info, "description", info.name))
+                mac = str(getattr(info, "mac", "") or "")
+            except Exception:  # noqa: BLE001
+                description = self._resolved
+                mac = ""
+            self.discovery.save(
+                self._resolved,
+                description=description,
+                mac=mac,
+                server_mac=supp.server_mac or "",
+            )
+            suffix = f" → {supp.server_mac}" if supp.server_mac else ""
+            self.channel.emit(f"已缓存通道: {description}{suffix}")
+            LOG.info(
+                "已记录认证通道: %s | %s", description, supp.server_mac or "-"
+            )
+        else:
+            self.discovery.clear()
+            if not requested:
+                self._resolved = None
+            self.channel.emit("认证通道无响应，将重新探测")
+            LOG.warning("认证服务器无响应，已清除认证通道缓存")
+        return ok
 
     def _online(self) -> bool:
         url = self.settings.connectivity_url.strip()
@@ -461,6 +710,7 @@ class AuthWorker(QThread):
                     break
                 self.state.emit("error", str(exc))
                 self._resolved = None
+                self.discovery.clear()
                 if not self.settings.preempt:
                     break
                 if self._wait_or_stop(self.settings.retry_interval):
@@ -472,6 +722,7 @@ class AuthWorker(QThread):
                     break
                 self.state.emit("error", f"认证异常: {exc}")
                 self._resolved = None
+                self.discovery.clear()
                 if not self.settings.preempt:
                     break
                 if self._wait_or_stop(self.settings.retry_interval):
@@ -517,6 +768,13 @@ class DebugPanel(QWidget):
 
         interface_row = QHBoxLayout()
         self.interface_combo = QComboBox()
+        self.interface_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.interface_combo.setMinimumContentsLength(8)
+        self.interface_combo.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed
+        )
         self.refresh_button = QPushButton("刷新网卡")
         interface_row.addWidget(QLabel("网卡"))
         interface_row.addWidget(self.interface_combo, 1)
@@ -524,32 +782,36 @@ class DebugPanel(QWidget):
         layout.addLayout(interface_row)
 
         option_row = QHBoxLayout()
-        self.private_check = QCheckBox("附加锐捷私有尾")
+        option_row.addWidget(QLabel("附加锐捷私有尾"))
+        self.private_check = ToggleSwitch()
         self.private_check.setChecked(True)
-        self.mac_edit = QLineEdit()
-        self.mac_edit.setPlaceholderText("源 MAC 覆盖（可选，如 00:e0:4c:68:00:c6）")
         option_row.addWidget(self.private_check)
-        option_row.addWidget(self.mac_edit, 1)
+        option_row.addStretch()
         layout.addLayout(option_row)
 
-        action_row = QHBoxLayout()
+        self.mac_edit = QLineEdit()
+        self.mac_edit.setPlaceholderText("源 MAC 覆盖（可选，如 00:e0:4c:68:00:c6）")
+        layout.addWidget(self.mac_edit)
+
+        action_grid = QGridLayout()
+        action_grid.setHorizontalSpacing(6)
+        action_grid.setVerticalSpacing(6)
         self.probe_button = QPushButton("探测服务器")
         self.logoff_button = QPushButton("发 Logoff")
         self.start_button = QPushButton("发送 Start")
         self.manual_button = QPushButton("手动认证一次")
-        for button in (
-            self.probe_button,
-            self.logoff_button,
-            self.start_button,
-            self.manual_button,
-        ):
-            action_row.addWidget(button)
-        layout.addLayout(action_row)
+        action_grid.addWidget(self.probe_button, 0, 0)
+        action_grid.addWidget(self.logoff_button, 0, 1)
+        action_grid.addWidget(self.start_button, 1, 0)
+        action_grid.addWidget(self.manual_button, 1, 1)
+        layout.addLayout(action_grid)
 
-        raw_group = QGroupBox("原始 EAPOL / 以太网帧")
+        raw_group = QGroupBox("原始 EAPOL / 以太帧")
         raw_layout = QVBoxLayout(raw_group)
+        raw_layout.setContentsMargins(4, 0, 4, 4)
         self.raw_edit = QPlainTextEdit()
         self.raw_edit.setPlaceholderText("粘贴完整以太网帧十六进制（可带空格/冒号）")
+        self.raw_edit.setMinimumHeight(64)
         self.raw_send_button = QPushButton("发送原始帧")
         raw_layout.addWidget(self.raw_edit)
         raw_layout.addWidget(self.raw_send_button)
@@ -557,18 +819,21 @@ class DebugPanel(QWidget):
 
         tail_group = QGroupBox("私有尾预览")
         tail_layout = QVBoxLayout(tail_group)
+        tail_layout.setContentsMargins(4, 0, 4, 4)
         self.tail_button = QPushButton("生成当前账号的 Identity 私有尾")
         self.tail_output = QPlainTextEdit()
         self.tail_output.setReadOnly(True)
+        self.tail_output.setMinimumHeight(72)
         self.tail_output.setMaximumBlockCount(2000)
         tail_layout.addWidget(self.tail_button)
-        tail_layout.addWidget(self.tail_output, 1)
-        layout.addWidget(tail_group, 1)
+        tail_layout.addWidget(self.tail_output)
+        layout.addWidget(tail_group)
 
         self.output = QPlainTextEdit()
         self.output.setReadOnly(True)
+        self.output.setMinimumHeight(72)
         self.output.setMaximumBlockCount(2000)
-        layout.addWidget(self.output, 1)
+        layout.addWidget(self.output)
 
         self.refresh_button.clicked.connect(self.refresh_interfaces)
         self.probe_button.clicked.connect(controller.debug_probe)
@@ -620,6 +885,7 @@ class MainWindow(QMainWindow):
         self.settings = settings
         self.args = args
         self.accounts = store.load_accounts()
+        self.discovery = DiscoveryCache(store.base_dir / "discovery.json")
         self.worker: AuthWorker | None = None
         self.one_shot: OneShotWorker | None = None
         self.tray: QSystemTrayIcon | None = None
@@ -644,7 +910,16 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle(f"{APP_NAME} {APP_VERSION}")
         self.setWindowIcon(make_icon())
-        self.resize(1160, 780)
+        screen = QApplication.primaryScreen()
+        if screen is not None:
+            geometry = screen.availableGeometry()
+            width = min(1100, max(700, int(geometry.width() * 0.5)))
+            height = min(760, max(460, int(geometry.height() * 0.5)))
+            self.resize(width, height)
+            self.move(geometry.center() - self.rect().center())
+        else:
+            self.resize(900, 560)
+        self.setMinimumSize(700, 460)
         self._build_ui()
         self._refresh_interfaces()
         self._apply_settings()
@@ -658,15 +933,17 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         central = QWidget()
+        central.setObjectName("root")
         root = QVBoxLayout(central)
-        root.setContentsMargins(18, 16, 18, 12)
-        root.setSpacing(12)
+        root.setContentsMargins(16, 14, 16, 10)
+        root.setSpacing(10)
 
         header = QHBoxLayout()
         title_box = QVBoxLayout()
-        title = QLabel("HXXY 校园网认证")
+        title_box.setSpacing(1)
+        title = QLabel("校园网认证")
         title.setObjectName("title")
-        subtitle = QLabel("锐捷 EAP-MD5 · 569 字节私有尾 · 抢占保活")
+        subtitle = QLabel("HXXY · 锐捷 EAP-MD5 · 自动托管")
         subtitle.setObjectName("muted")
         title_box.addWidget(title)
         title_box.addWidget(subtitle)
@@ -675,27 +952,81 @@ class MainWindow(QMainWindow):
         self.admin_badge = QLabel()
         self.admin_badge.setObjectName("muted")
         self.admin_button = QPushButton("以管理员重启")
+        self.admin_button.setObjectName("link")
         self.admin_button.clicked.connect(self.relaunch_as_admin)
         header.addWidget(self.admin_badge)
         header.addWidget(self.admin_button)
         root.addLayout(header)
 
-        body = QHBoxLayout()
-        body.setSpacing(12)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
+        self.tabs = QTabWidget()
+        self.tabs.setObjectName("sidebar")
+        self.tabs.setDocumentMode(True)
+        self.tabs.addTab(self._build_accounts_page(), "账号")
+        self.tabs.addTab(self._build_auth_page(), "认证")
+        self.tabs.addTab(self._build_connection_page(), "连接")
+        self.tabs.addTab(self._build_debug_page(), "调试")
+        splitter.addWidget(self.tabs)
+        splitter.addWidget(self._build_log_page())
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([400, 560])
+        root.addWidget(splitter, 1)
+        self.setCentralWidget(central)
 
-        left_card = QFrame()
-        left_card.setObjectName("card")
-        left_card.setFixedWidth(400)
-        left_layout = QVBoxLayout(left_card)
-        left_layout.setContentsMargins(14, 14, 14, 14)
-        left_layout.setSpacing(10)
+    def _switch_row(
+        self, title: str, description: str, switch: ToggleSwitch
+    ) -> QWidget:
+        row = QWidget()
+        layout = QHBoxLayout(row)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(8)
+        texts = QVBoxLayout()
+        texts.setSpacing(0)
+        label = QLabel(title)
+        label.setObjectName("value")
+        texts.addWidget(label)
+        if description:
+            detail = QLabel(description)
+            detail.setObjectName("muted")
+            detail.setWordWrap(True)
+            detail.setSizePolicy(
+                QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred
+            )
+            detail.setMinimumWidth(0)
+            texts.addWidget(detail)
+        layout.addLayout(texts, 1)
+        layout.addWidget(switch, 0, Qt.AlignmentFlag.AlignVCenter)
+        return row
 
-        left_title = QLabel("账号管理")
-        left_title.setStyleSheet("font-size: 16px; font-weight: 700;")
-        left_layout.addWidget(left_title)
+    def _compact_switch_cell(
+        self, title: str, switch: ToggleSwitch
+    ) -> QWidget:
+        cell = QWidget()
+        layout = QHBoxLayout(cell)
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(6)
+        label = QLabel(title)
+        label.setObjectName("value")
+        layout.addWidget(label, 1)
+        layout.addWidget(switch, 0, Qt.AlignmentFlag.AlignVCenter)
+        return cell
+
+    def _build_accounts_page(self) -> QWidget:
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+        hint = QLabel("多账号管理 · 密码由 Windows DPAPI 加密")
+        hint.setObjectName("muted")
+        layout.addWidget(hint)
+
         self.account_table = QTableWidget(0, 4)
         self.account_table.setHorizontalHeaderLabels(["启用", "用户名", "备注", "状态"])
         self.account_table.verticalHeader().setVisible(False)
+        self.account_table.setShowGrid(False)
+        self.account_table.setMinimumHeight(160)
         self.account_table.setSelectionBehavior(
             QAbstractItemView.SelectionBehavior.SelectRows
         )
@@ -711,69 +1042,133 @@ class MainWindow(QMainWindow):
         header_view.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header_view.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         header_view.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        left_layout.addWidget(self.account_table, 1)
+        layout.addWidget(self.account_table, 1)
 
-        account_buttons = QGridLayout()
         self.add_button = QPushButton("添加")
         self.edit_button = QPushButton("编辑")
         self.delete_button = QPushButton("删除")
         self.test_button = QPushButton("测试登录")
-        account_buttons.addWidget(self.add_button, 0, 0)
-        account_buttons.addWidget(self.edit_button, 0, 1)
-        account_buttons.addWidget(self.delete_button, 0, 2)
-        account_buttons.addWidget(self.test_button, 1, 0, 1, 3)
-        left_layout.addLayout(account_buttons)
+        buttons = QGridLayout()
+        buttons.setHorizontalSpacing(6)
+        buttons.setVerticalSpacing(6)
+        buttons.addWidget(self.add_button, 0, 0)
+        buttons.addWidget(self.edit_button, 0, 1)
+        buttons.addWidget(self.delete_button, 0, 2)
+        buttons.addWidget(self.test_button, 1, 0, 1, 3)
+        layout.addLayout(buttons)
 
         self.active_label = QLabel("当前账号: 未选择")
         self.active_label.setObjectName("muted")
-        left_layout.addWidget(self.active_label)
-        body.addWidget(left_card)
+        layout.addWidget(self.active_label)
+        return page
 
-        right_card = QFrame()
-        right_card.setObjectName("card")
-        right_layout = QVBoxLayout(right_card)
-        right_layout.setContentsMargins(16, 14, 16, 14)
-        right_layout.setSpacing(10)
+    def _build_auth_page(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
 
-        status_row = QHBoxLayout()
-        status_box = QVBoxLayout()
-        self.state_label = QLabel("未启动")
-        self.state_label.setObjectName("state")
-        self.state_label.setStyleSheet("color: #94a3b8;")
-        self.detail_label = QLabel("选择一个账号，然后开始认证。")
-        self.detail_label.setObjectName("muted")
-        self.detail_label.setWordWrap(True)
-        self.interface_label = QLabel("网卡: 自动探测")
-        self.interface_label.setObjectName("muted")
-        status_box.addWidget(self.state_label)
-        status_box.addWidget(self.detail_label)
-        status_box.addWidget(self.interface_label)
-        status_row.addLayout(status_box, 1)
-        right_layout.addLayout(status_row)
-
-        controls = QHBoxLayout()
+        actions = QGridLayout()
+        actions.setHorizontalSpacing(8)
         self.start_button = QPushButton("开始认证")
         self.start_button.setObjectName("primary")
+        self.start_button.setMinimumHeight(42)
         self.stop_button = QPushButton("停止")
         self.stop_button.setObjectName("danger")
+        self.stop_button.setMinimumHeight(42)
         self.stop_button.setEnabled(False)
-        controls.addWidget(self.start_button)
-        controls.addWidget(self.stop_button)
-        controls.addStretch()
-        self.preempt_check = QCheckBox("抢占模式（掉线立即补入 + 无限重试）")
-        controls.addWidget(self.preempt_check)
-        right_layout.addLayout(controls)
+        actions.addWidget(self.start_button, 0, 0)
+        actions.addWidget(self.stop_button, 0, 1)
+        layout.addLayout(actions)
 
-        self.settings_group = QGroupBox("认证设置")
-        settings_grid = QGridLayout(self.settings_group)
-        settings_grid.setHorizontalSpacing(10)
-        settings_grid.setVerticalSpacing(8)
+        policy = QGroupBox("认证策略")
+        policy_layout = QVBoxLayout(policy)
+        policy_layout.setContentsMargins(4, 0, 4, 4)
+        policy_layout.setSpacing(0)
+        self.preempt_check = ToggleSwitch()
+        policy_layout.addWidget(
+            self._switch_row("抢占模式", "掉线后立即补入并无限重试", self.preempt_check)
+        )
+        self.block_check = ToggleSwitch()
+        self.block_check.setToolTip(
+            "开启后每 0.5 秒结束 8021x.exe，并写入临时 IFEO 策略阻止其启动。\n"
+            "关闭开关、停止认证或退出程序时自动恢复。"
+        )
+        policy_layout.addWidget(
+            self._switch_row("托管模式", "持续阻止原客户端 8021x.exe", self.block_check)
+        )
+        self.block_status = QLabel("")
+        self.block_status.setObjectName("muted")
+        self.block_status.setContentsMargins(50, 0, 4, 4)
+        policy_layout.addWidget(self.block_status)
+
+        self.auto_start_check = ToggleSwitch()
+        self.start_minimized_check = ToggleSwitch()
+        self.minimize_check = ToggleSwitch()
+        self.verbose_check = ToggleSwitch()
+        self.logoff_on_stop_check = ToggleSwitch()
+        secondary = QGridLayout()
+        secondary.setHorizontalSpacing(4)
+        secondary.setVerticalSpacing(2)
+        compact_items = [
+            ("启动后自动认证", self.auto_start_check),
+            ("启动时最小化", self.start_minimized_check),
+            ("关闭窗口最小化", self.minimize_check),
+            ("详细协议日志", self.verbose_check),
+            ("停止时发送注销", self.logoff_on_stop_check),
+        ]
+        for index, (caption, switch) in enumerate(compact_items):
+            secondary.addWidget(
+                self._compact_switch_cell(caption, switch),
+                index // 2,
+                index % 2,
+            )
+        policy_layout.addLayout(secondary)
+        layout.addWidget(policy)
+        layout.addStretch(1)
+        scroll.setWidget(page)
+        return scroll
+
+    def _build_connection_page(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        settings = QGroupBox("连接设置")
+        self.settings_group = settings
+        form = QFormLayout(settings)
+        form.setContentsMargins(10, 4, 10, 8)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(8)
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
 
         self.interface_combo = QComboBox()
+        self.interface_combo.setSizeAdjustPolicy(
+            QComboBox.SizeAdjustPolicy.AdjustToMinimumContentsLengthWithIcon
+        )
+        self.interface_combo.setMinimumContentsLength(8)
+        self.interface_combo.setSizePolicy(
+            QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Fixed
+        )
         self.interface_refresh = QPushButton("刷新")
-        settings_grid.addWidget(QLabel("网卡"), 0, 0)
-        settings_grid.addWidget(self.interface_combo, 0, 1, 1, 4)
-        settings_grid.addWidget(self.interface_refresh, 0, 5)
+        interface_row = QHBoxLayout()
+        interface_row.setSpacing(6)
+        interface_row.addWidget(self.interface_combo, 1)
+        interface_row.addWidget(self.interface_refresh)
+        interface_widget = QWidget()
+        interface_widget.setLayout(interface_row)
+        form.addRow("网卡", interface_widget)
 
         self.check_spin = QDoubleSpinBox()
         self.check_spin.setRange(0.5, 120.0)
@@ -791,62 +1186,78 @@ class MainWindow(QMainWindow):
         self.retries_spin.setRange(1, 10)
         self.repeats_spin = QSpinBox()
         self.repeats_spin.setRange(1, 10)
-        settings_grid.addWidget(QLabel("掉线检测"), 1, 0)
-        settings_grid.addWidget(self.check_spin, 1, 1)
-        settings_grid.addWidget(QLabel("失败重试"), 1, 2)
-        settings_grid.addWidget(self.retry_spin, 1, 3)
-        settings_grid.addWidget(QLabel("认证超时"), 2, 0)
-        settings_grid.addWidget(self.timeout_spin, 2, 1)
-        settings_grid.addWidget(QLabel("Start 次数"), 2, 2)
-        settings_grid.addWidget(self.retries_spin, 2, 3)
-        settings_grid.addWidget(QLabel("应答次数"), 2, 4)
-        settings_grid.addWidget(self.repeats_spin, 2, 5)
+        form.addRow("掉线检测", self.check_spin)
+        form.addRow("失败重试", self.retry_spin)
+        form.addRow("认证超时", self.timeout_spin)
+        form.addRow("Start 次数", self.retries_spin)
+        form.addRow("应答次数", self.repeats_spin)
 
         self.url_edit = QLineEdit()
         self.url_edit.setPlaceholderText("http://www.baidu.com/")
-        settings_grid.addWidget(QLabel("连通检测"), 3, 0)
-        settings_grid.addWidget(self.url_edit, 3, 1, 1, 5)
+        form.addRow("连通检测", self.url_edit)
+        layout.addWidget(settings)
 
-        self.auto_start_check = QCheckBox("启动后自动开始认证")
-        self.start_minimized_check = QCheckBox("启动时最小化到托盘")
-        self.minimize_check = QCheckBox("关闭窗口最小化到托盘")
-        self.verbose_check = QCheckBox("详细协议日志")
-        self.logoff_on_stop_check = QCheckBox("停止时发送注销")
-        checks = QHBoxLayout()
-        checks.addWidget(self.auto_start_check)
-        checks.addWidget(self.start_minimized_check)
-        checks.addWidget(self.minimize_check)
-        checks.addWidget(self.verbose_check)
-        checks.addWidget(self.logoff_on_stop_check)
-        checks.addStretch()
-        right_layout.addWidget(self.settings_group)
-        right_layout.addLayout(checks)
+        channel = QGroupBox("认证通道")
+        channel_layout = QVBoxLayout(channel)
+        channel_layout.setContentsMargins(8, 0, 8, 6)
+        channel_layout.setSpacing(4)
+        self.cache_label = QLabel("认证通道: 自动探测")
+        self.cache_label.setObjectName("muted")
+        self.cache_label.setWordWrap(True)
+        self.rediscover_button = QPushButton("强制重新探测")
+        channel_layout.addWidget(self.cache_label)
+        channel_layout.addWidget(self.rediscover_button)
+        layout.addWidget(channel)
+        layout.addStretch(1)
+        scroll.setWidget(page)
+        return scroll
 
-        block_row = QHBoxLayout()
-        self.block_check = QCheckBox("托管模式：持续阻止原客户端 8021x.exe")
-        self.block_check.setToolTip(
-            "开启后每 0.5 秒结束 8021x.exe，并写入临时 IFEO 策略阻止其启动。\n"
-            "关闭开关或退出本程序时自动恢复原策略。"
-        )
-        self.block_status = QLabel("")
-        self.block_status.setObjectName("muted")
-        block_row.addWidget(self.block_check)
-        block_row.addWidget(self.block_status)
-        block_row.addStretch()
-        right_layout.addLayout(block_row)
+    def _build_debug_page(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.debug_panel = DebugPanel(self)
+        scroll.setWidget(self.debug_panel)
+        return scroll
 
-        self.tabs = QTabWidget()
+    def _build_log_page(self) -> QWidget:
+        card = QFrame()
+        card.setObjectName("card")
+        layout = QVBoxLayout(card)
+        layout.setContentsMargins(14, 12, 14, 12)
+        layout.setSpacing(8)
+
+        header = QHBoxLayout()
+        title = QLabel("运行日志")
+        title.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.clear_log_button = QPushButton("清空")
+        self.clear_log_button.setObjectName("link")
+        self.open_log_button = QPushButton("日志目录")
+        self.open_log_button.setObjectName("link")
+        header.addWidget(title)
+        header.addStretch()
+        header.addWidget(self.clear_log_button)
+        header.addWidget(self.open_log_button)
+        layout.addLayout(header)
+
+        self.state_label = QLabel("未启动")
+        self.state_label.setObjectName("state")
+        self.state_label.setStyleSheet("color: #8e8e93;")
+        self.detail_label = QLabel("选择一个账号，然后开始认证。")
+        self.detail_label.setObjectName("muted")
+        self.detail_label.setWordWrap(True)
+        self.interface_label = QLabel("网卡: 自动探测")
+        self.interface_label.setObjectName("muted")
+        layout.addWidget(self.state_label)
+        layout.addWidget(self.detail_label)
+        layout.addWidget(self.interface_label)
+
         self.log_view = QPlainTextEdit()
         self.log_view.setReadOnly(True)
         self.log_view.setMaximumBlockCount(5000)
-        self.debug_panel = DebugPanel(self)
-        self.tabs.addTab(self.log_view, "运行日志")
-        self.tabs.addTab(self.debug_panel, "调试工具")
-        right_layout.addWidget(self.tabs, 1)
-
-        body.addWidget(right_card, 1)
-        root.addLayout(body, 1)
-        self.setCentralWidget(central)
+        layout.addWidget(self.log_view, 1)
+        return card
 
     def _setup_tray(self) -> None:
         if not QSystemTrayIcon.isSystemTrayAvailable():
@@ -883,6 +1294,9 @@ class MainWindow(QMainWindow):
         self.start_button.clicked.connect(self.start_auth)
         self.stop_button.clicked.connect(self.stop_auth)
         self.interface_refresh.clicked.connect(self.refresh_interfaces)
+        self.rediscover_button.clicked.connect(self.force_rediscover)
+        self.clear_log_button.clicked.connect(self.log_view.clear)
+        self.open_log_button.clicked.connect(self.open_log_dir)
         for widget in (
             self.check_spin,
             self.retry_spin,
@@ -891,7 +1305,7 @@ class MainWindow(QMainWindow):
             self.repeats_spin,
         ):
             widget.valueChanged.connect(self._save_settings_from_ui)
-        self.interface_combo.currentIndexChanged.connect(self._save_settings_from_ui)
+        self.interface_combo.currentIndexChanged.connect(self._interface_changed)
         self.url_edit.textChanged.connect(self._save_settings_from_ui)
         for check in (
             self.preempt_check,
@@ -919,6 +1333,7 @@ class MainWindow(QMainWindow):
         self.logoff_on_stop_check.setChecked(self.settings.logoff_on_stop)
         self.block_check.setChecked(self.settings.block_official_client)
         self._select_interface(self.settings.interface)
+        self._update_cache_label()
 
     def _save_settings_from_ui(self) -> None:
         if self._loading:
@@ -941,6 +1356,35 @@ class MainWindow(QMainWindow):
             logging.DEBUG if self.settings.verbose else logging.INFO
         )
         self.store.save_settings(self.settings)
+
+    def _interface_changed(self) -> None:
+        self._save_settings_from_ui()
+        self._update_cache_label()
+
+    def _update_cache_label(self) -> None:
+        if self.settings.interface:
+            self.cache_label.setText("认证通道: 指定网卡（不使用自动探测缓存）")
+            return
+        info = self.discovery.load()
+        if info:
+            description = info.description or info.interface
+            suffix = f" → {info.server_mac}" if info.server_mac else ""
+            self.cache_label.setText(f"已缓存通道: {description}{suffix}")
+        else:
+            self.cache_label.setText("认证通道: 自动探测")
+
+    def force_rediscover(self) -> None:
+        if self.worker and self.worker.isRunning():
+            self.worker.force_rediscover()
+            self.cache_label.setText("正在强制重新探测认证通道...")
+            LOG.info("已请求强制重新探测认证通道")
+        else:
+            self.discovery.clear()
+            self._update_cache_label()
+            LOG.info("已清除认证通道缓存")
+
+    def open_log_dir(self) -> None:
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.logs_dir)))
 
     def _refresh_interfaces(self) -> None:
         current = str(self.interface_combo.currentData() or self.settings.interface)
@@ -1161,9 +1605,10 @@ class MainWindow(QMainWindow):
         self._save_settings_from_ui()
         self._last_account = account
         self._last_state = "starting"
-        self.worker = AuthWorker(account, self.settings, self)
+        self.worker = AuthWorker(account, self.settings, self.discovery, self)
         self.worker.state.connect(self.on_worker_state)
         self.worker.details.connect(self.on_worker_details)
+        self.worker.channel.connect(self.on_worker_channel)
         self.worker.finished.connect(self.on_worker_finished)
         self.worker.start()
         self._sync_takeover()
@@ -1237,6 +1682,9 @@ class MainWindow(QMainWindow):
 
     def on_worker_details(self, text: str) -> None:
         self.interface_label.setText(f"网卡: {text}")
+
+    def on_worker_channel(self, text: str) -> None:
+        self.cache_label.setText(text)
 
     def on_worker_finished(self) -> None:
         worker = self.worker

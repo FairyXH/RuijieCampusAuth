@@ -461,6 +461,8 @@ class Supplicant:
         self.source = source_mac or get_if_hwaddr(interface)
         self.packets: queue.Queue[Ether] = queue.Queue()
         self.server_mac: str | None = None
+        self.connected = False
+        self.connected_at: float | None = None
 
     def stop(self) -> None:
         """Request cancellation of a running authentication attempt."""
@@ -526,6 +528,8 @@ class Supplicant:
         LOG.info("正在寻找认证服务器...")
 
     def authenticate(self) -> bool:
+        self.connected = False
+        self.connected_at = None
         sniffer = AsyncSniffer(
             iface=self.interface,
             filter="ether proto 0x888e",
@@ -577,6 +581,9 @@ class Supplicant:
                 if parsed is None:
                     continue
                 code, identifier, eap = parsed
+                self.connected = True
+                self.connected_at = time.monotonic()
+                self.server_mac = packet[Ether].src
                 LOG.debug(
                     "RX EAP code=%d id=%d length=%d from=%s",
                     code,
