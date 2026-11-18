@@ -5,6 +5,12 @@ namespace RuijieCampusAuth.Service;
 
 public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
 {
+    private readonly UserStore _store = new(ServiceConfig.ServiceRoot);
+    private GuardianClient? _guardian;
+    private int _guardianFailures;
+    private DateTimeOffset _nextGuardianCheck = DateTimeOffset.MinValue;
+    private bool? _lastGuardianDecision;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         ServiceConfig? config = null;
@@ -26,6 +32,17 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         if (config is null)
         {
             return;
+        }
+        if (config.Settings.GuardianEnabled)
+        {
+            try
+            {
+                _guardian = new GuardianClient(config.Settings.GuardianUrl);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "网络管家地址无效，系统服务回退本机探测");
+            }
         }
 
         while (!stoppingToken.IsCancellationRequested)
@@ -64,6 +81,8 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
             }
         }
 
+        _guardian?.Dispose();
+        _guardian = null;
         ServiceStatus.Write("stopped", "服务停止");
         logger.LogInformation("认证服务停止");
     }
@@ -72,7 +91,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         ServiceConfig config,
         CancellationToken stoppingToken)
     {
-        var interfaceName = ResolveInterface(config.Settings.Interface);
+        var interfaceName = ResolveInterface(config.Settings);
         logger.LogInformation("使用网卡: {Interface}", interfaceName);
         ServiceStatus.Write("authenticating", "正在认证", interfaceName);
         var locked = config.Settings.ServerLock &&
@@ -94,16 +113,47 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
             error: message => logger.LogError("{Message}", message));
         using var registration = stoppingToken.Register(supplicant.Stop);
         var ok = supplicant.Authenticate();
+        var description = PcapNative.ListDevices()
+            .FirstOrDefault(item => item.Name.Equals(interfaceName, StringComparison.OrdinalIgnoreCase))
+            ?.Description ?? interfaceName;
+        if (supplicant.Connected)
+        {
+            _store.SaveDiscovery(
+                interfaceName,
+                description,
+                supplicant.SourceMac,
+                supplicant.ServerMac ?? "");
+            _store.UpsertServer(
+                supplicant.ServerMac ?? "",
+                interfaceName,
+                description,
+                ok);
+        }
+        else
+        {
+            _store.ClearDiscovery();
+        }
         return (ok, supplicant.ServerMac, interfaceName);
     }
 
-    private static string ResolveInterface(string configured)
+    private string ResolveInterface(ServiceSettings settings)
     {
-        if (!string.IsNullOrWhiteSpace(configured))
+        if (!string.IsNullOrWhiteSpace(settings.Interface))
         {
-            return configured;
+            return settings.Interface;
         }
         var devices = PcapNative.ListDevices();
+        var cached = _store.LoadDiscovery();
+        if (cached is not null &&
+            devices.Any(item =>
+                item.Name.Equals(cached.Interface, StringComparison.OrdinalIgnoreCase)))
+        {
+            logger.LogInformation(
+                "使用缓存认证通道: {Interface} -> {Server}",
+                cached.Description,
+                cached.ServerMac);
+            return cached.Interface;
+        }
         var selected = devices
             .Where(item =>
                 !item.Name.Contains("loopback", StringComparison.OrdinalIgnoreCase) &&
@@ -123,6 +173,9 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
 
     private async Task HoldAsync(ServiceConfig config, CancellationToken stoppingToken)
     {
+        _guardianFailures = 0;
+        _nextGuardianCheck = DateTimeOffset.MinValue;
+        _lastGuardianDecision = null;
         while (!stoppingToken.IsCancellationRequested)
         {
             if (!await OnlineAsync(config.Settings, stoppingToken))
@@ -137,11 +190,61 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         }
     }
 
-    private static async Task<bool> OnlineAsync(
+    private async Task<bool> OnlineAsync(
         ServiceSettings settings,
         CancellationToken stoppingToken)
     {
-        var url = settings.ConnectivityUrl.Trim();
+        if (_guardian is not null)
+        {
+            var now = DateTimeOffset.Now;
+            if (now >= _nextGuardianCheck)
+            {
+                _nextGuardianCheck = now.AddSeconds(Math.Max(1, settings.GuardianInterval));
+                try
+                {
+                    var probe = await _guardian.ProbeAsync(settings.Interface, stoppingToken);
+                    if (probe.Online is bool online)
+                    {
+                        if (online && !probe.CaptivePortal)
+                        {
+                            _guardianFailures = 0;
+                            _lastGuardianDecision = true;
+                            logger.LogInformation("网络管家: {Status}", probe.Short());
+                            return true;
+                        }
+                        _guardianFailures++;
+                        logger.LogWarning(
+                            "网络管家: {Status} | 连续异常 {Count}/{Threshold}",
+                            probe.Short(),
+                            _guardianFailures,
+                            Math.Max(1, settings.GuardianFailures));
+                        if (_guardianFailures >= Math.Max(1, settings.GuardianFailures))
+                        {
+                            _lastGuardianDecision = false;
+                            return false;
+                        }
+                        _lastGuardianDecision = true;
+                        return true;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning("网络管家不可用，回退本机探测: {Error}", ex.Message);
+                }
+            }
+            else if (_lastGuardianDecision is { } cached)
+            {
+                return cached;
+            }
+        }
+        return await TcpOnlineAsync(settings.ConnectivityUrl, stoppingToken);
+    }
+
+    private static async Task<bool> TcpOnlineAsync(
+        string connectivityUrl,
+        CancellationToken stoppingToken)
+    {
+        var url = connectivityUrl.Trim();
         if (string.IsNullOrEmpty(url))
         {
             return true;

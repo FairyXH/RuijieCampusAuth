@@ -132,6 +132,7 @@ public sealed class TakeoverGuard
                 state.Services.Add(new ServiceBackup { Name = name, Start = start });
                 SetServiceDisabled(name);
                 StopService(name);
+                _logger.LogWarning("已成功阻止原版服务运行: {Service}", name);
             }
             File.WriteAllText(
                 StatePath,
@@ -185,7 +186,7 @@ public sealed class TakeoverGuard
 
     private void WatchLoop(CancellationToken token)
     {
-        var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var reportedServices = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         while (!token.IsCancellationRequested)
         {
             foreach (var name in _processNames)
@@ -196,10 +197,10 @@ public sealed class TakeoverGuard
                     try
                     {
                         process.Kill(entireProcessTree: true);
-                        if (reported.Add(name))
-                        {
-                            _logger.LogWarning("已阻止官方进程: {Process}", name);
-                        }
+                        _logger.LogWarning(
+                            "已成功阻止原版进程运行: {Process} (PID {Pid})",
+                            name,
+                            process.Id);
                     }
                     catch (Exception ex)
                     {
@@ -220,6 +221,14 @@ public sealed class TakeoverGuard
                     {
                         service.Stop();
                         service.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(2));
+                        if (reportedServices.Add(name))
+                        {
+                            _logger.LogWarning("已成功阻止原版服务运行: {Service}", name);
+                        }
+                    }
+                    else
+                    {
+                        reportedServices.Remove(name);
                     }
                 }
                 catch (Exception ex)

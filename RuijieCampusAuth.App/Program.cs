@@ -1,6 +1,7 @@
 ﻿using Avalonia;
 using System;
 using System.Threading;
+using RuijieCampusAuth.Core;
 
 namespace RuijieCampusAuth.App;
 
@@ -12,6 +13,14 @@ sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        foreach (var arg in args)
+        {
+            if (arg.Equals("--restore-client", StringComparison.OrdinalIgnoreCase))
+            {
+                TakeoverPolicy.Restore(AppContext.BaseDirectory);
+                return;
+            }
+        }
         using var mutex = new Mutex(true, "HXXY-CampusAuth-GUI", out var createdNew);
         if (!createdNew)
         {

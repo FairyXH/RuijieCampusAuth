@@ -71,6 +71,13 @@ to the Python tree under `python/`.
   static ID (0x54), Start retry interval, DHCP mode/timeout/Option 82, school
   code. Service name and static ID are applied to Identity/MD5/Start/Logoff
   private tails.
+- 2026-11-18 18:19: C# release deployed to
+  `D:\Storageredirect\Program\RuijieCampusAuth`. `HXXY-CampusAuth` runs as
+  LocalSystem/auto and authenticated live (`00:1a:a9:17:ff:ff`); takeover
+  blocked 7 official process names and `RJSuService`; GUI `--tray --auto`
+  loaded the account pool and learned-server list; `baidu HTTP 200`. Service
+  logs include `已成功阻止原版进程运行: <exe> (PID <pid>)` and
+  `已成功阻止原版服务运行: <service>`.
 
 ## Official Client Configuration Surface
 
@@ -110,15 +117,22 @@ Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
   locked-server unicast Start, group Logoff, retries/timeouts.
 - `RuijieCampusAuth.Core/ServiceConfig.cs` — service.json read/write,
   LocalMachine DPAPI on Windows / 0600 plain on Unix; includes
-  `takeover_enabled`.
-- `RuijieCampusAuth.Core/ServiceInstaller.cs` — Windows `sc.exe` service
-  install/uninstall/start/stop; Linux systemd unit.
+  `takeover_enabled`, DHCP/school/Guardian fields.
+- `RuijieCampusAuth.Core/UserStore.cs` — Python-compatible `accounts.json`,
+  `settings.json`, `discovery.json`, and `servers.json`; user DPAPI for GUI
+  passwords; multi-account load/save and learned-server upsert.
+- `RuijieCampusAuth.Core/GuardianClient.cs` — loopback-only MCP client;
+  `initialize` + `guardian_status`, adapter-GUID match, fallback probe.
+- `RuijieCampusAuth.Core/ServiceInstaller.cs` — Windows SCM P/Invoke service
+  install/uninstall/start/stop; Linux writes an `hxxy-campus-auth.service`
+  unit (no subprocess launch).
 - `RuijieCampusAuth.Cli` — live auth, `config init|show|takeover`,
   `service install|uninstall|start|stop|status`.
 - `RuijieCampusAuth.Service` — `AddWindowsService` / `AddSystemd` worker;
-  AuthWorker; TakeoverGuard/TakeoverService.
+  AuthWorker with discovery cache + Guardian; TakeoverGuard/TakeoverService.
 - `RuijieCampusAuth.App` — Avalonia Fluent light UI, `--tray --auto`, tray icon,
-  account/auth/service/settings tabs.
+  account/server/auth/service/settings tabs; account pool with enable/disable,
+  learned-server list with lock/unlock, and full config persistence.
 - Verified: C# CLI and Windows service both authenticated live as SYSTEM;
   service install/start via CLI worked. Takeover wrote IFEO markers for
   enumerated official exe names, stopped/disabled `RJSuService`, and restored
@@ -244,45 +258,54 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 - The app writes `takeover.ini` (`enabled=1`, PID, exe) every second.
 - The blocker writes `Debugger` and `HXXYTakeover=RuijieCampusAuth` to both
   IFEO registry views and saves previous values in
-  `<install_dir>\blocker_state.json`
+  `<install_dir>\takeover_state.json`
   (`D:\Storageredirect\Program\RuijieCampusAuth`).
 - `restart_ruijie.vbs` skips the official client only when:
   1. `enabled=1`;
   2. the heartbeat file mtime is <= 12 seconds old;
-  3. the recorded PID is still running as `RuijieCampusAuth.exe`;
+  3. the recorded PID is still running as `RuijieCampusAuth.exe` or
+     `RuijieCampusAuth.Service.exe`;
   4. the IFEO marker exists in the 64- or 32-bit view.
-- Otherwise the VBS kills a stale/hung GUI, runs
+- Otherwise the VBS kills a stale/hung GUI/service, runs
   `RuijieCampusAuth.exe --restore-client`, then kills 8021x and launches
   `RuijieSupplicant.exe` as before.
-- `--restore-client` also removes markerless legacy IFEO policies from older
-  builds and writes `enabled=0`.
+- C# `--restore-client` runs before any Avalonia/mutex initialization:
+  it restores IFEO values and service `Start` types from `takeover_state.json`,
+  removes the state/heartbeat files, and exits. If the state file is missing it
+  removes markerless `cmd.exe /c exit` policies from the official client
+  directory.
 - Deploy path: `D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe`;
-  the launcher and shortcuts point there. `build.ps1 -Deploy` copies the exe,
-  backs up and updates `C:\Program Files\restart_ruijie.vbs`, and creates
-  `HXXY-CampusAuth.lnk` in the deploy dir and on the desktop.
+  the launcher and shortcuts point there. `build-csharp.ps1 -Deploy` copies the
+  published GUI/CLI/service, backs up and updates `C:\Program Files\restart_ruijie.vbs`,
+  and creates `HXXY-CampusAuth.lnk` in the deploy dir and on the desktop.
 - GUI / tray launch command (do not change):
   `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`.
 
-## Windows System Service (0.9.0)
+## Windows System Service (C#)
 
-- `RuijieCampusAuth.exe --service` implements the SCM dispatcher in
-  `system_service.py` and runs a headless `SystemAgent`; it never creates a Qt
+- `RuijieCampusAuth.Service.exe` is the service host
+  (`Microsoft.Extensions.Hosting.WindowsServices`); Linux uses `AddSystemd`
+  only when `INVOCATION_ID` is present. It never creates an Avalonia/Qt
   application.
 - Service name `HXXY-CampusAuth`, LocalSystem, auto start. It starts at boot
   before user login and keeps the 802.1X session alive.
 - Data root is the exe directory
   `D:\Storageredirect\Program\RuijieCampusAuth` (not `%ProgramData%`):
-  `service.json`, `service_status.json`, `discovery_service.json`,
-  `servers_service.json`, `logs\service.log`, `blocker_state.json`,
-  `takeover.ini`.
+  `service.json`, `service_status.json`, `discovery.json`, `servers.json`,
+  `logs\service.log`, `takeover_state.json`, `takeover.ini`.
+- GUI user data remains `%APPDATA%\RuijieCampusAuth`:
+  `accounts.json`, `settings.json`, `discovery.json`, `servers.json`. The GUI
+  reads the newest discovery cache from either location and reads service
+  servers when the user copy is empty.
 - `service.json` stores the password with **LocalMachine DPAPI** and is ACLed to
   SYSTEM / Administrators only. Machine-wide state must survive the frozen C:
   volume; keep it on D:.
-- The GUI exposes “系统服务开机自启”; enabling writes the current account and
-  settings, creates/updates the service, and starts it. When the service is
-  running the GUI skips `--auto` and refuses to start its own AuthWorker.
-- `restart_ruijie.vbs` reads `takeover.ini` and `blocker_state.json` from the
-  install directory, matching `storage.install_dir()`.
+- The GUI exposes “系统服务开机自启”; applying service config writes the
+  current account and settings, creates/updates the service, and starts it.
+  When the service is running the GUI skips `--auto` and refuses to start its
+  own AuthWorker.
+- `restart_ruijie.vbs` reads `takeover.ini` and `takeover_state.json` from the
+  install directory.
 - `service_status.json` is written on state changes and read by the GUI's
   service status label.
 
@@ -304,6 +327,11 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   (`guardian_enabled/url/interval/failures`), and every connection field
   (interface, intervals, timeout, start/repeat counts, connectivity URL) is
   saved on change and restored by `_apply_settings`.
+- The takeover checkbox auto-saves on toggle: it writes both user
+  `settings.json` and the service `service.json` (`takeover_enabled`), so the
+  running service applies/restores within its 2-second config poll and the
+  checkbox stays set after a GUI restart. On startup the checkbox prefers the
+  service config when `service.json` is present.
 - Auto-detect uses `DiscoveryCache`: probe once, cache the interface/server MAC
   after **any** server EAP response (Success, Failure, Identity/MD5), then skip
   probing on later attempts. If no server EAP response arrives, the cache is
@@ -331,9 +359,18 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   message is a possible next improvement.
 - 0.5.0 discovery-cache behavior and the new layout were unit/offscreen tested;
   a fresh live cache regression was not possible after the window closed.
-- The takeover handoff/blocker state is machine-wide under
-  `%ProgramData%\RuijieCampusAuth`; the GUI must run elevated. Accounts and
-  settings remain per-user under `%APPDATA%\RuijieCampusAuth`.
+- Machine-wide takeover state lives in the install directory on D:
+  (`takeover_state.json`, `takeover.ini`); the GUI must run elevated. Accounts
+  and settings remain per-user under `%APPDATA%\RuijieCampusAuth`.
+- The service uses the single account in `service.json`; GUI multi-account
+  rotation is not yet applied inside the Windows service. Applying service
+  config writes the GUI-selected account.
+- The service writes `discovery.json`/`servers.json` under the install
+  directory, while GUI auth writes them under `%APPDATA%`. The GUI reads the
+  newest discovery cache and falls back to service servers when the user list
+  is empty; the two stores are not yet merged automatically.
+- Linux `ServiceInstaller.Install` only writes the systemd unit; start/stop are
+  left to `systemctl`. macOS launchd is not implemented.
 - The analysis artifacts (IDA database, pcaps, Frida logs) are local temporary
   files and are not part of the repository.
 

@@ -21,6 +21,10 @@ public sealed class ServiceSettings
     public bool ServerLock { get; init; }
     public string LockedServer { get; init; } = "";
     public bool TakeoverEnabled { get; init; }
+    public string DhcpMode { get; init; } = "before";
+    public double DhcpTimeout { get; init; } = 30;
+    public bool DhcpOption82 { get; init; }
+    public string SchoolCode { get; init; } = "";
     public bool GuardianEnabled { get; init; }
     public string GuardianUrl { get; init; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; init; } = 5;
@@ -68,6 +72,10 @@ public sealed class ServiceConfig
             ServerLock = GetBool(settingsElement, "server_lock") ?? false,
             LockedServer = GetString(settingsElement, "locked_server"),
             TakeoverEnabled = GetBool(settingsElement, "takeover_enabled") ?? false,
+            DhcpMode = GetStringOr(settingsElement, "dhcp_mode", "before"),
+            DhcpTimeout = GetDouble(settingsElement, "dhcp_timeout") ?? 30,
+            DhcpOption82 = GetBool(settingsElement, "dhcp_option82") ?? false,
+            SchoolCode = GetString(settingsElement, "school_code"),
             GuardianEnabled = GetBool(settingsElement, "guardian_enabled") ?? false,
             GuardianUrl = GetStringOr(settingsElement, "guardian_url", "http://127.0.0.1:18765/mcp"),
             GuardianInterval = GetDouble(settingsElement, "guardian_interval") ?? 5,
@@ -135,6 +143,10 @@ public sealed class ServiceConfig
                 server_lock = settings.ServerLock,
                 locked_server = settings.LockedServer,
                 takeover_enabled = settings.TakeoverEnabled,
+                dhcp_mode = settings.DhcpMode,
+                dhcp_timeout = settings.DhcpTimeout,
+                dhcp_option82 = settings.DhcpOption82,
+                school_code = settings.SchoolCode,
                 guardian_enabled = settings.GuardianEnabled,
                 guardian_url = settings.GuardianUrl,
                 guardian_interval = settings.GuardianInterval,
