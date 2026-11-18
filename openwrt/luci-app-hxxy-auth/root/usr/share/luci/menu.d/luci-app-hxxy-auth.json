@@ -32,6 +32,17 @@
 			"acl": [ "luci-app-hxxy-auth" ]
 		}
 	},
+	"admin/services/hxxy-auth/mac": {
+		"title": "MAC",
+		"order": 25,
+		"action": {
+			"type": "view",
+			"path": "hxxy-auth/mac"
+		},
+		"depends": {
+			"acl": [ "luci-app-hxxy-auth" ]
+		}
+	},
 	"admin/services/hxxy-auth/settings": {
 		"title": "Settings",
 		"order": 30,

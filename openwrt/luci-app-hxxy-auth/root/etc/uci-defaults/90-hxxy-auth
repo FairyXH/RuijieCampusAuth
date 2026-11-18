@@ -1,6 +1,13 @@
 #!/bin/sh
 
 chmod 600 /etc/config/hxxy-auth 2>/dev/null
+
+# UA3F L3 rewrite needs the normal netfilter path.
+uci -q set firewall.@defaults[0].flow_offloading='0'
+uci -q set firewall.@defaults[0].flow_offloading_hw='0'
+uci -q commit firewall
+
 /etc/init.d/hxxy-auth enable 2>/dev/null
-/etc/init.d/hxxy-auth start 2>/dev/null
+/etc/init.d/hxxy-disguise enable 2>/dev/null
+/etc/init.d/https-dns-proxy enable 2>/dev/null
 exit 0

@@ -16,6 +16,7 @@ import (
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/config"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/control"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/daemon"
+	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/netcfg"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/protocol"
 	serverstore "github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/servers"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/status"
@@ -49,6 +50,8 @@ func main() {
 		runServers(os.Args[2:])
 	case "discovery":
 		runDiscovery(os.Args[2:])
+	case "mac":
+		runMAC(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -284,6 +287,68 @@ func runDiscovery(args []string) {
 	}
 }
 
+func runMAC(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: mac show|set|random|clear")
+		os.Exit(2)
+	}
+	action := args[0]
+	fs := flag.NewFlagSet("mac "+action, flag.ExitOnError)
+	section := fs.String("section", "wan", "network section")
+	asJSON := fs.Bool("json", false, "输出 JSON")
+	_ = fs.Parse(args[1:])
+	rest := fs.Args()
+
+	switch action {
+	case "show":
+		info, err := netcfg.Show(*section)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if *asJSON {
+			data, _ := json.MarshalIndent(info, "", "  ")
+			fmt.Println(string(data))
+			return
+		}
+		fmt.Printf("section=%s device=%s configured=%s effective=%s\n",
+			info.Section, info.Device, info.Configured, info.Effective)
+	case "set":
+		if len(rest) < 1 {
+			fmt.Fprintln(os.Stderr, "用法: mac set [--section wan] <mac>")
+			os.Exit(2)
+		}
+		if err := netcfg.Set(*section, rest[0]); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		_ = control.Send(control.DefaultSocket, "reload")
+		fmt.Println("mac set", rest[0])
+	case "random":
+		mac, err := netcfg.Random()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := netcfg.Set(*section, mac); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		_ = control.Send(control.DefaultSocket, "reload")
+		fmt.Println(mac)
+	case "clear":
+		if err := netcfg.Clear(*section); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		_ = control.Send(control.DefaultSocket, "reload")
+		fmt.Println("mac cleared")
+	default:
+		fmt.Fprintln(os.Stderr, "用法: mac show|set|random|clear")
+		os.Exit(2)
+	}
+}
+
 func runTail(args []string) {
 	fs := flag.NewFlagSet("tail", flag.ExitOnError)
 	username := fs.String("username", "", "校园网用户名")
@@ -400,6 +465,8 @@ func usage() {
                    查看/管理已学习认证服务器
   discovery show|clear
                    查看/清除探测缓存
+  mac show|set|random|clear
+                   查看/修改 WAN MAC（写 network UCI 并 ifup）
   tail             生成 569 字节私有尾（调试）
   selftest         跑 569 字节 golden vector
   help             显示帮助`)

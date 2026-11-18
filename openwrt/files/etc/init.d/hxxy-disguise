@@ -1,0 +1,39 @@
+#!/bin/sh /etc/rc.common
+
+START=99
+
+start() {
+	local mode
+	mode=$(uci -q get hxxy-auth.main.disguise 2>/dev/null)
+	[ -z "$mode" ] && mode=basic
+
+	if [ "$mode" = "off" ]; then
+		/etc/init.d/ua3f stop 2>/dev/null
+		nft delete table inet hxxy 2>/dev/null
+		return 0
+	fi
+
+	if command -v nft >/dev/null 2>&1; then
+		nft delete table inet hxxy 2>/dev/null
+		nft add table inet hxxy
+		nft 'add chain inet hxxy post { type filter hook postrouting priority mangle; policy accept; }'
+		nft 'add rule inet hxxy post tcp flags syn tcp option maxseg size set 1460'
+		nft 'add rule inet hxxy post ip ttl set 128'
+	fi
+
+	if [ "$mode" = "full" ]; then
+		/etc/init.d/ua3f restart 2>/dev/null
+	else
+		/etc/init.d/ua3f stop 2>/dev/null
+	fi
+}
+
+stop() {
+	/etc/init.d/ua3f stop 2>/dev/null
+	nft delete table inet hxxy 2>/dev/null
+}
+
+reload() {
+	stop
+	start
+}

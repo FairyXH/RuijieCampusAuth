@@ -88,6 +88,8 @@ return view.extend({
 	handleSaveApply: function(ev, mode) {
 		return this.super('handleSaveApply', [ ev, mode ]).then(function() {
 			return fs.exec('/usr/sbin/hxxy-auth', [ 'reload' ]).catch(function() {});
+		}).then(function() {
+			return fs.exec('/etc/init.d/hxxy-disguise', [ 'restart' ]).catch(function() {});
 		});
 	}
 });
