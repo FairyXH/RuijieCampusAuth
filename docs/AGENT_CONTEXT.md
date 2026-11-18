@@ -453,6 +453,64 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 
 ## Known Limitations / Next Steps
 
+- OpenWrt build/environment is deployed on the Ubuntu 26.04 VM and verified
+  (2026-11-18); details and commands are in `docs/OPENWRT_BUILD_ENV.md`.
+  Go 1.25.5 is at `/usr/local/go`; the 24.10.0 `ramips/mt7621` Image Builder is
+  at `/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64`
+  (SHA256 `37b9bff3...571b3e`). Ubuntu 26.04 maps `/usr/bin/install` to
+  uutils, so Image Builder must run with
+  `PATH=/opt/openwrt/gnu-bin:$PATH` where `install -> /usr/bin/gnuinstall`.
+  A stock `xiaomi_mi-router-3g` image and a `FILES=files/` overlay image both
+  built successfully; `sha256sum -c sha256sums` passed, and the overlay marker
+  plus LuCI assets were found in `root.squashfs`. Go `linux/mipsle`
+  `GOMIPS=softfloat` smoke tests passed under `qemu-mipsel`, including
+  `x/text` GB18030 (`b5e7d0c5bfedb4f8b7fecef1`, matching Python). The R3G
+  sysupgrade image cannot boot in QEMU (no MT7621 model); an x86_64 OpenWrt
+  24.10 QEMU instance is running for LuCI testing (VM-local 18080/18443;
+  host-accessible via socat 28080/28443), root/empty password, image
+  `/opt/openwrt/qemu/openwrt-x86-64.img`, serial log
+  `/opt/openwrt/qemu/serial.log`. QEMU 10.2.1 hostfwd hangs on non-loopback
+  sources, hence the socat hop. It is stock OpenWrt, not the custom app yet.
+  The clean R3G sysupgrade image SHA256 is
+  `c4742ea371e7053933a308e1ef92761dad2dfd77aa4f13fc58992d10ec133e4a`.
+  Credentials for the VM itself are not stored here.
+- `openwrt/` — R3G source tree, added 2026-11-18. `hxxy-auth/` is the Go
+  module: `internal/protocol` has the private tail, CRC16/XMODEM, bit
+  obfuscation, MD5-chained credentials, EAPOL framing, EAP-MD5, and GB18030
+  server-message parsing. The 569-byte golden test passes with SHA256
+  `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`.
+  The CLI supports `version`, `status [--json]`, `tail`, and `selftest`.
+  `luci-app-hxxy-auth/` contains the menu, rpcd ACL, overview/settings/logs
+  views; `files/etc/config/hxxy-auth` holds UCI defaults;
+  `scripts/build-go.sh` cross-compiles mipsle and `scripts/build-image.sh`
+  assembles the Image Builder overlay. Source lives in the Windows repo;
+  compile/test/image work happens only on the Ubuntu VM (see
+  `docs/OPENWRT_BUILD_ENV.md`). A custom R3G image (7.9MB, SHA256
+  `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`)
+  contains `/usr/sbin/hxxy-auth`, the LuCI views/menu/ACL, and the UCI config.
+  MD5 is protocol-mandated for EAP-MD5 and the private tail; it is documented
+  as wire compatibility, not password storage. The daemon/supplicant, raw
+  socket, procd init, hotplug, account pool, and UA3F disguise are next.
+- `docs/OPENWRT_FEASIBILITY.md` — OpenWrt soft-router port assessment, updated
+  for the Xiaomi R3G target. The auth algorithm is fully portable; account
+  pool, failover, discovery, server lock, logging, status, and home-network
+  pause are portable. Windows takeover, IFEO, DPAPI, Guardian loopback MCP,
+  SCM/systemd installers, and the Avalonia GUI are not. R3G original
+  (MT7621A/MIPS32, 256MB RAM, 128MB NAND) should use a Go `linux/mipsle`
+  `GOMIPS=softfloat` daemon + procd + UCI. `.NET` has no MIPS32 runtime, so C#
+  is excluded. LuCI is a hard requirement: five pages (overview/accounts/
+  servers/settings/logs) use `L.uci` for non-secret settings and `rpcd` +
+  `fs.exec` against the `hxxy-auth` CLI for status/control/accounts/servers/
+  logs; accounts live in a 0600 `accounts.json`, not UCI. Anti-sharing disguise
+  is tiered: `basic` (MAC clone, Windows DHCP fingerprint, TTL 128, MSS clamp,
+  IPv6 off, WAN drop, UPnP off) is default; `full` adds UA3F
+  (`mipsel_24kc`, 5.43MiB) L3 rewrite. MIPS32 cannot use UA3F eBPF, so `full`
+  runs through NFQUEUE; the campus link is 100Mbps, so throughput is workable
+  but still measured with `iperf3`. Pure DHCP and pre-auth DHCP are confirmed.
+  No R3G hardware is on hand yet; build/unit/veth/QEMU first, then live test.
+  The campus has not kicked a Windows mobile hotspot, so multi-device detection
+  appears weak; remaining live unknowns are account/MAC binding, static-ID
+  validation, server-initiated re-auth, and DHCP fingerprinting.
 - `Static:AB45A862` and the default service name `电信宽带服务` are observed
   HXXY/test-machine constants. Other machines/schools may require deriving the
   static ID or parsing type 0x66 from the server.
