@@ -1,6 +1,21 @@
-# OpenWrt / Xiaomi R3G 组件
+# OpenWrt 组件（当前验证目标：Xiaomi R3G）
 
-本目录是 R3G 软路由端的源码，和仓库根目录的 C#/Python 实现并列维护。
+本目录是 OpenWrt 软路由端的源码，和仓库根目录的 C#/Python 实现并列维护。
+
+## 目标可移植性
+
+源码不绑定 R3G。Go daemon、LuCI、UCI 都只依赖 OpenWrt 用户态和标准
+AF_PACKET/ubus/UCI 能力，没有 MT7621 专属代码。目标相关只有：
+
+- Image Builder 的 `PROFILE` 和 device packages（默认
+  `xiaomi_mi-router-3g`）；
+- `GOARCH`（默认 `mipsle`，换 ARM/ARM64/x86 时改这里）；
+- UCI 的 `device`（默认 `wan`，不同设备按实际 netdev 调整）；
+- `disguise=full` 时 UA3F 的 kmod 依赖（`kmod-nft-queue`、
+  `kmod-nft-tproxy`），这是 OpenWrt 目标相关，不是 R3G 专属。
+
+所以同 target（`ramips/mt7621`）的其他 OpenWrt 设备只改 `PROFILE` 就能构建；
+换架构只改 `GOARCH` 重新编译，LuCI/UCI 文件不用动。
 
 ## 目录
 
@@ -45,6 +60,9 @@ sh scripts/build-image.sh
 - 2026-11-18 已验证：`go test ./...`、`go vet ./...`、mipsle 交叉编译、
   `qemu-mipsel selftest`、R3G 自定义镜像（7.9MB，
   SHA256 `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`）。
+- LuCI 实测：x86_64 OpenWrt QEMU 注入 amd64 CLI + 同一套 LuCI 文件后，
+  Services → HXXY Auth 概览页显示 `stopped`/`服务未运行`，设置页正确回显
+  UCI 配置；R3G 镜像使用同一套文件。
 
 待下一提交：
 

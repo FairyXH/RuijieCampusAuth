@@ -24,3 +24,4 @@ service_status.json
 discovery_service.json
 servers_service.json
 openwrt/build/
+.playwright-mcp/

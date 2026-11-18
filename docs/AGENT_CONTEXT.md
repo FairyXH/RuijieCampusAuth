@@ -489,8 +489,16 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`)
   contains `/usr/sbin/hxxy-auth`, the LuCI views/menu/ACL, and the UCI config.
   MD5 is protocol-mandated for EAP-MD5 and the private tail; it is documented
-  as wire compatibility, not password storage. The daemon/supplicant, raw
-  socket, procd init, hotplug, account pool, and UA3F disguise are next.
+  as wire compatibility, not password storage. The source is generic OpenWrt,
+  not R3G-specific: only the Image Builder `PROFILE`/device packages, the
+  target `GOARCH`, the UCI `device`, and UA3F's kmod dependencies are target
+  related. LuCI was verified in the x86 QEMU guest by injecting the amd64 CLI
+  and the same LuCI files: Services → HXXY Auth shows `stopped`/`服务未运行`
+  and the settings page loads the UCI values. The pre-injection x86 image is
+  backed up as `/opt/openwrt/qemu/openwrt-x86-64.img.bak`. Source is on
+  branch `feat/openwrt-r3g`, commits `da8f56e` (docs) and `6683ac0` (code),
+  pushed to GitHub. The daemon/supplicant, raw socket, procd init, hotplug,
+  account pool, and UA3F disguise are next.
 - `docs/OPENWRT_FEASIBILITY.md` — OpenWrt soft-router port assessment, updated
   for the Xiaomi R3G target. The auth algorithm is fully portable; account
   pool, failover, discovery, server lock, logging, status, and home-network

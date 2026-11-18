@@ -235,11 +235,24 @@ kill "$(cat /tmp/socat-http.pid)" "$(cat /tmp/socat-https.pid)"
 
 - VM 上 `bettercap` 占用了 `8081`，所以用 `18080/18443`。
 - 没有 `/dev/kvm`，QEMU 走 TCG；OpenWrt 启动约 30–60 秒。
-- 这个 x86 镜像是 **stock OpenWrt**，还没有 `hxxy-auth` / LuCI 应用。
-  应用写好后有两种测试方式：
+- x86 测试镜像（2026-11-18）：已注入 amd64 CLI + 同一套 LuCI 文件，
+  实测 Services → HXXY Auth 概览页显示 `stopped`/`服务未运行`，设置页
+  正确回显 UCI 配置。注入前的 stock 镜像备份在
+  `/opt/openwrt/qemu/openwrt-x86-64.img.bak`。
+- 快速迭代方式：
   1. 用 x86_64 Image Builder 重新构建带 `files/` 的 x86 镜像；
   2. 给 QEMU 加 SSH hostfwd（例如 `12222->22`），把 `files/` 直接
-     SCP 进运行中的 guest，重启 uhttpd/procd 做快速迭代。
+     SCP 进运行中的 guest，重启 uhttpd/procd；
+  3. 停 QEMU，`losetup -Pf` 挂载镜像 `p2`，复制 CLI/LuCI 文件后重启
+     （本次使用）。
+- 从 Windows 浏览器访问：
+  - VM 的 `28080` 已经是 socat 到 QEMU `18080`，可以直接开
+    `http://<vm-ip>:28080`；
+  - 或在本机开 SSH 本地转发：
+    ```sh
+    ssh -N -L 127.0.0.1:28080:127.0.0.1:28080 root@<vm>
+    ```
+    然后开 `http://127.0.0.1:28080`。
 - 默认 root 空密码只适用于这个本地 QEMU 测试，不要暴露到不可信网络。
 
 ## 5. MIPS32 测试
