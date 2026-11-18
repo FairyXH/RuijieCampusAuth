@@ -5,6 +5,7 @@ using RuijieCampusAuth.Core;
 
 Console.OutputEncoding = Encoding.UTF8;
 UserStore.MigrateLegacy(ServiceConfig.ServiceRoot);
+new UserStore(ServiceConfig.ServiceRoot).UpgradePasswordProtection();
 
 var options = Parse(args);
 if (options.ContainsKey("--list-devices"))

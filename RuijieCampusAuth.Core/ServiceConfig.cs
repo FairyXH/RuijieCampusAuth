@@ -29,6 +29,35 @@ public sealed class ServiceSettings
     public string GuardianUrl { get; init; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; init; } = 5;
     public int GuardianFailures { get; init; } = 2;
+
+    public static ServiceSettings FromUser(UserSettings settings)
+    {
+        return new ServiceSettings
+        {
+            Interface = settings.Interface,
+            ServiceName = settings.ServiceName,
+            StaticId = settings.StaticId,
+            Timeout = settings.Timeout,
+            Retries = settings.Retries,
+            Repeats = settings.Repeats,
+            StartTimeout = settings.StartTimeout,
+            Preempt = settings.Preempt,
+            CheckInterval = settings.CheckInterval,
+            RetryInterval = settings.RetryInterval,
+            ConnectivityUrl = settings.ConnectivityUrl,
+            ServerLock = settings.ServerLock,
+            LockedServer = settings.LockedServer,
+            TakeoverEnabled = settings.TakeoverEnabled,
+            DhcpMode = settings.DhcpMode,
+            DhcpTimeout = settings.DhcpTimeout,
+            DhcpOption82 = settings.DhcpOption82,
+            SchoolCode = settings.SchoolCode,
+            GuardianEnabled = settings.GuardianEnabled,
+            GuardianUrl = settings.GuardianUrl,
+            GuardianInterval = settings.GuardianInterval,
+            GuardianFailures = settings.GuardianFailures,
+        };
+    }
 }
 
 public sealed class ServiceConfig

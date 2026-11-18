@@ -7,6 +7,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
 {
     private readonly UserStore _store = new(ServiceConfig.ServiceRoot);
     private GuardianClient? _guardian;
+    private string _guardianKey = "";
     private int _guardianFailures;
     private DateTimeOffset _nextGuardianCheck = DateTimeOffset.MinValue;
     private bool? _lastGuardianDecision;
@@ -33,35 +34,56 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         {
             return;
         }
-        if (config.Settings.GuardianEnabled)
-        {
-            try
-            {
-                _guardian = new GuardianClient(config.Settings.GuardianUrl);
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "网络管家地址无效，系统服务回退本机探测");
-            }
-        }
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            var result = await Task.Run(
-                () => Authenticate(config, stoppingToken),
-                stoppingToken);
-            if (result.ok)
+            var settings = ResolveSettings(config);
+            EnsureGuardian(settings);
+            var accounts = ResolveAccounts(config);
+            if (accounts.Count == 0)
             {
+                ServiceStatus.Write("error", "没有可用账号");
+                logger.LogError("accounts.json 和 service.json 都没有可用账号");
+                await Task.Delay(
+                    TimeSpan.FromSeconds(Math.Max(1, settings.RetryInterval)),
+                    stoppingToken);
+                continue;
+            }
+
+            var authenticated = false;
+            foreach (var account in accounts)
+            {
+                if (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                logger.LogInformation("尝试账号: {Account}", account.Username);
+                var result = await Task.Run(
+                    () => Authenticate(
+                        settings,
+                        account.Username,
+                        account.Password,
+                        stoppingToken),
+                    stoppingToken);
+                if (!result.ok)
+                {
+                    logger.LogWarning(
+                        "账号 {Account} 认证失败，尝试下一个账号",
+                        account.Username);
+                    continue;
+                }
+                authenticated = true;
                 ServiceStatus.Write(
                     "authenticated",
                     "认证成功",
                     result.interfaceName,
                     result.server);
                 logger.LogInformation(
-                    "认证成功: {Interface} -> {Server}",
+                    "认证成功: {Account} | {Interface} -> {Server}",
+                    account.Username,
                     result.interfaceName,
                     result.server ?? "-");
-                if (!config.Settings.Preempt)
+                if (!settings.Preempt)
                 {
                     ServiceStatus.Write("idle", "认证成功，服务保持运行");
                     while (!stoppingToken.IsCancellationRequested)
@@ -70,13 +92,14 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     }
                     break;
                 }
-                await HoldAsync(config, stoppingToken);
+                await HoldAsync(settings, stoppingToken);
+                break;
             }
-            else
+            if (!authenticated)
             {
                 ServiceStatus.Write("retrying", "认证失败，等待重试");
                 await Task.Delay(
-                    TimeSpan.FromSeconds(Math.Max(1, config.Settings.RetryInterval)),
+                    TimeSpan.FromSeconds(Math.Max(1, settings.RetryInterval)),
                     stoppingToken);
             }
         }
@@ -87,28 +110,114 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         logger.LogInformation("认证服务停止");
     }
 
+    private ServiceSettings ResolveSettings(ServiceConfig config)
+    {
+        try
+        {
+            if (File.Exists(_store.SettingsPath))
+            {
+                return ServiceSettings.FromUser(_store.LoadSettings());
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "读取 settings.json 失败，回退 service.json");
+        }
+        return config.Settings;
+    }
+
+    private List<(string Username, string Password)> ResolveAccounts(ServiceConfig config)
+    {
+        var result = new List<(string Username, string Password)>();
+        try
+        {
+            var activeId = _store.LoadSettings().ActiveAccountId;
+            var accounts = _store.LoadAccounts();
+            var active = accounts.FirstOrDefault(account =>
+                account.Id == activeId &&
+                account.Enabled &&
+                !string.IsNullOrWhiteSpace(account.Username) &&
+                !string.IsNullOrWhiteSpace(account.Password));
+            if (active is not null)
+            {
+                result.Add((active.Username, active.Password));
+            }
+            foreach (var account in accounts.Where(account =>
+                         account != active &&
+                         account.Enabled &&
+                         !string.IsNullOrWhiteSpace(account.Username) &&
+                         !string.IsNullOrWhiteSpace(account.Password)))
+            {
+                result.Add((account.Username, account.Password));
+            }
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "读取 accounts.json 失败，回退 service.json");
+        }
+        if (result.Count == 0 &&
+            !string.IsNullOrWhiteSpace(config.Username) &&
+            !string.IsNullOrWhiteSpace(config.Password))
+        {
+            result.Add((config.Username, config.Password));
+            logger.LogWarning("accounts.json 无可用账号，回退 service.json 账号");
+        }
+        else if (result.Count > 0)
+        {
+            logger.LogInformation("账号池加载: {Count} 个可用账号", result.Count);
+        }
+        return result;
+    }
+
+    private void EnsureGuardian(ServiceSettings settings)
+    {
+        var key = settings.GuardianEnabled ? settings.GuardianUrl.Trim() : "";
+        if (key.Equals(_guardianKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        _guardian?.Dispose();
+        _guardian = null;
+        _guardianKey = key;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+        try
+        {
+            _guardian = new GuardianClient(key);
+            logger.LogInformation("网络管家联动已启用: {Url}", key);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "网络管家地址无效，系统服务回退本机探测");
+        }
+    }
+
     private (bool ok, string? server, string interfaceName) Authenticate(
-        ServiceConfig config,
+        ServiceSettings settings,
+        string username,
+        string password,
         CancellationToken stoppingToken)
     {
-        var interfaceName = ResolveInterface(config.Settings);
+        var interfaceName = ResolveInterface(settings);
         logger.LogInformation("使用网卡: {Interface}", interfaceName);
         ServiceStatus.Write("authenticating", "正在认证", interfaceName);
-        var locked = config.Settings.ServerLock &&
-                     !string.IsNullOrWhiteSpace(config.Settings.LockedServer)
-            ? config.Settings.LockedServer
+        var locked = settings.ServerLock &&
+                     !string.IsNullOrWhiteSpace(settings.LockedServer)
+            ? settings.LockedServer
             : null;
         using var supplicant = new Supplicant(
             interfaceName,
-            config.Username,
-            config.Password,
-            timeout: config.Settings.Timeout,
-            retries: config.Settings.Retries,
-            repeats: config.Settings.Repeats,
-            startTimeout: config.Settings.StartTimeout,
+            username,
+            password,
+            timeout: settings.Timeout,
+            retries: settings.Retries,
+            repeats: settings.Repeats,
+            startTimeout: settings.StartTimeout,
             lockedServer: locked,
-            serviceName: config.Settings.ServiceName,
-            staticId: config.Settings.StaticId,
+            serviceName: settings.ServiceName,
+            staticId: settings.StaticId,
             log: message => logger.LogInformation("{Message}", message),
             error: message => logger.LogError("{Message}", message));
         using var registration = stoppingToken.Register(supplicant.Stop);
@@ -171,21 +280,21 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                ?? throw new InvalidOperationException("没有可用的抓包网卡");
     }
 
-    private async Task HoldAsync(ServiceConfig config, CancellationToken stoppingToken)
+    private async Task HoldAsync(ServiceSettings settings, CancellationToken stoppingToken)
     {
         _guardianFailures = 0;
         _nextGuardianCheck = DateTimeOffset.MinValue;
         _lastGuardianDecision = null;
         while (!stoppingToken.IsCancellationRequested)
         {
-            if (!await OnlineAsync(config.Settings, stoppingToken))
+            if (!await OnlineAsync(settings, stoppingToken))
             {
                 logger.LogWarning("检测到掉线，开始补认证");
                 ServiceStatus.Write("offline", "检测到掉线，开始补认证");
                 return;
             }
             await Task.Delay(
-                TimeSpan.FromSeconds(Math.Max(0.5, config.Settings.CheckInterval)),
+                TimeSpan.FromSeconds(Math.Max(0.5, settings.CheckInterval)),
                 stoppingToken);
         }
     }

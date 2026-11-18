@@ -86,6 +86,11 @@ to the Python tree under `python/`.
   there; the old `%APPDATA%` log stopped updating. CLI `config path/show` reads
   the same install-dir `service.json`. Service stayed authenticated and
   `baidu HTTP 200`.
+- 2026-11-18 18:43: Windows service account-pool alignment verified. After the
+  GUI upgraded `accounts.json` to `machine-dpapi:`, a service restart logged
+  `账号池加载: 1 个可用账号`, tried `S12016004`, and authenticated live
+  (`00:1a:a9:17:ff:ff`). Service now reads `settings.json` for runtime settings
+  instead of only `service.json`.
 
 ## Official Client Configuration Surface
 
@@ -127,8 +132,9 @@ Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
   LocalMachine DPAPI on Windows / 0600 plain on Unix; includes
   `takeover_enabled`, DHCP/school/Guardian fields.
 - `RuijieCampusAuth.Core/UserStore.cs` — Python-compatible `accounts.json`,
-  `settings.json`, `discovery.json`, and `servers.json`; user DPAPI for GUI
-  passwords; multi-account load/save and learned-server upsert.
+  `settings.json`, `discovery.json`, and `servers.json`; machine DPAPI for
+  account passwords so the LocalSystem service can read the pool; multi-account
+  load/save and learned-server upsert.
 - `RuijieCampusAuth.Core/GuardianClient.cs` — loopback-only MCP client;
   `initialize` + `guardian_status`, adapter-GUID match, fallback probe.
 - `RuijieCampusAuth.Core/ServiceInstaller.cs` — Windows SCM P/Invoke service
@@ -308,6 +314,10 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   is no `%APPDATA%` runtime split. `UserStore` defaults to
   `AppContext.BaseDirectory`; the CLI uses `ServiceConfig.ServiceRoot`; the
   service already used the install directory.
+- `AuthWorker` prefers `settings.json` + `accounts.json`; `service.json` remains
+  the fallback account/settings source and owns the takeover switch. Active
+  account first, then other enabled accounts, with a new pool read each retry
+  cycle.
 - One-time migration: on first GUI/CLI start, missing `accounts.json`,
   `settings.json`, `discovery.json`, or `servers.json` are copied from the old
   `%APPDATA%\RuijieCampusAuth` location. Existing target files are never
@@ -381,9 +391,11 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   directory on D: (`takeover_state.json`, `takeover.ini`, `service.json`,
   `accounts.json`, `settings.json`, `discovery.json`, `servers.json`); the GUI
   must run elevated.
-- The service uses the single account in `service.json`; GUI multi-account
-  rotation is not yet applied inside the Windows service. Applying service
-  config writes the GUI-selected account.
+- The Windows service reads `settings.json` + `accounts.json` from the install
+  directory: it tries the active enabled account first, then the remaining
+  enabled accounts, and falls back to `service.json` when the pool is empty.
+  Account passwords are machine-DPAPI encrypted so LocalSystem can decrypt
+  them; GUI startup upgrades old user-DPAPI `accounts.json` entries in place.
 - Linux `ServiceInstaller.Install` only writes the systemd unit; start/stop are
   left to `systemctl`. macOS launchd is not implemented.
 - The analysis artifacts (IDA database, pcaps, Frida logs) are local temporary
@@ -393,6 +405,7 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 
 No test account or password is stored in the repository. Tests use dummy
 credentials. The README does not contain captured credentials. The GUI account
-store lives in the install directory (`accounts.json`); passwords are
-DPAPI-encrypted and are not committed. The validation account was supplied by
-the user and is stored only in that local file.
+store lives in the install directory (`accounts.json`); passwords use machine
+DPAPI so the LocalSystem service can read the pool, and are not committed. The
+validation account was supplied by the user and is stored only in that local
+file.

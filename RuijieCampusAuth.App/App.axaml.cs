@@ -23,6 +23,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             UserStore.MigrateLegacy(AppContext.BaseDirectory);
+            new UserStore(AppContext.BaseDirectory).UpgradePasswordProtection();
             var viewModel = new MainViewModel();
             var window = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = window;

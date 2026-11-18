@@ -127,6 +127,14 @@ def unprotect_password_machine(value: str) -> str:
     return unprotect_password(value)
 
 
+def protect_account_password(password: str) -> str:
+    """Use machine scope so the Windows service can read the account pool."""
+    try:
+        return protect_password_machine(password)
+    except OSError:
+        return protect_password(password)
+
+
 def default_data_dir() -> Path:
     if getattr(sys, "frozen", False):
         return install_dir()
@@ -527,7 +535,9 @@ class AccountStore:
                 Account(
                     id=str(item.get("id") or uuid.uuid4().hex),
                     username=str(item["username"]),
-                    password=unprotect_password(str(item.get("password_enc", ""))),
+                    password=unprotect_password_machine(
+                        str(item.get("password_enc", ""))
+                    ),
                     note=str(item.get("note", "")),
                     enabled=bool(item.get("enabled", True)),
                 )
@@ -541,7 +551,7 @@ class AccountStore:
                 {
                     "id": account.id,
                     "username": account.username,
-                    "password_enc": protect_password(account.password),
+                    "password_enc": protect_account_password(account.password),
                     "note": account.note,
                     "enabled": account.enabled,
                 }

@@ -78,7 +78,9 @@ RuijieCampusAuth.Cli.exe service uninstall
 - **Windows**：服务名 `HXXY-CampusAuth`，`LocalSystem`，自动启动，登录前运行。
   服务配置、GUI 账号、设置、发现缓存和服务器列表全部在程序目录直读：
   `service.json`、`accounts.json`、`settings.json`、`discovery.json`、
-  `servers.json`。`service.json` 密码使用 LocalMachine DPAPI 加密。
+  `servers.json`。服务优先使用 `settings.json` + `accounts.json` 的账号池，
+  当前账号失败后自动尝试其他已启用账号；`service.json` 作为回退并把密码用
+  LocalMachine DPAPI 加密。
 - **Linux**：`service install` 写入
   `/etc/systemd/system/hxxy-campus-auth.service`，`Type=notify`，由
   `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。

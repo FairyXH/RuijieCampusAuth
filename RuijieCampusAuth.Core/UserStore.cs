@@ -273,6 +273,49 @@ public sealed class UserStore
         WriteFile(AccountsPath, JsonSerializer.Serialize(payload, JsonOptions));
     }
 
+    public bool UpgradePasswordProtection()
+    {
+        if (!File.Exists(AccountsPath))
+        {
+            return false;
+        }
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllText(AccountsPath));
+            if (!document.RootElement.TryGetProperty("accounts", out var accounts) ||
+                accounts.ValueKind != JsonValueKind.Array)
+            {
+                return false;
+            }
+            var needsUpgrade = false;
+            var count = 0;
+            foreach (var item in accounts.EnumerateArray())
+            {
+                count++;
+                var encrypted = GetString(item, "password_enc");
+                if (encrypted.StartsWith("dpapi:", StringComparison.Ordinal))
+                {
+                    needsUpgrade = true;
+                }
+            }
+            if (!needsUpgrade)
+            {
+                return false;
+            }
+            var loaded = LoadAccounts();
+            if (loaded.Count != count)
+            {
+                return false;
+            }
+            SaveAccounts(loaded);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     public UserAccount? ActiveAccount(IEnumerable<UserAccount>? accounts = null)
     {
         var settings = LoadSettings();
@@ -448,8 +491,11 @@ public sealed class UserStore
         var raw = Encoding.UTF8.GetBytes(password);
         if (OperatingSystem.IsWindows())
         {
-            var encrypted = ProtectedData.Protect(raw, null, DataProtectionScope.CurrentUser);
-            return "dpapi:" + Convert.ToBase64String(encrypted);
+            var encrypted = ProtectedData.Protect(
+                raw,
+                null,
+                DataProtectionScope.LocalMachine);
+            return "machine-dpapi:" + Convert.ToBase64String(encrypted);
         }
         return "plain:" + Convert.ToBase64String(raw);
     }
@@ -460,6 +506,19 @@ public sealed class UserStore
         {
             return "";
         }
+        if (value.StartsWith("machine-dpapi:", StringComparison.Ordinal))
+        {
+            if (!OperatingSystem.IsWindows())
+            {
+                return "";
+            }
+            var raw = Convert.FromBase64String(value["machine-dpapi:".Length..]);
+            var plain = ProtectedData.Unprotect(
+                raw,
+                null,
+                DataProtectionScope.LocalMachine);
+            return Encoding.UTF8.GetString(plain);
+        }
         if (value.StartsWith("dpapi:", StringComparison.Ordinal))
         {
             if (!OperatingSystem.IsWindows())
@@ -467,7 +526,10 @@ public sealed class UserStore
                 return "";
             }
             var raw = Convert.FromBase64String(value[6..]);
-            var plain = ProtectedData.Unprotect(raw, null, DataProtectionScope.CurrentUser);
+            var plain = ProtectedData.Unprotect(
+                raw,
+                null,
+                DataProtectionScope.CurrentUser);
             return Encoding.UTF8.GetString(plain);
         }
         if (value.StartsWith("plain:", StringComparison.Ordinal))
