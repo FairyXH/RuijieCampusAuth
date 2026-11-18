@@ -369,6 +369,19 @@ client.logout()
 - 若更换学校或服务器策略，建议先用 `--verbose` 抓取一次原客户端和本工具的
   EAPOL 流程进行对比。
 
+## 0.7.0 改动
+
+- 新增“联动”页：填写本机 Network Guardian MCP 地址，默认
+  `http://127.0.0.1:18765/mcp`，仅允许 `127.0.0.1` 回环；
+- 联动启用后，认证线程按网卡 GUID/MAC 从 `guardian_status` 读取认证网卡的
+  真实外网探测（`isOnline` / `stableOnline` / 强制门户），连续 N 次判定离线
+  自动补认证；
+- MCP 不可用或该网卡没有探测数据时，自动回退到本机 TCP 检查；
+- 新增零依赖 `guardian.py` MCP 客户端；设置页提供“测试并读取”查看当前网卡、
+  IP、网关、探测摘要；
+- 配置项持久化：`guardian_enabled` / `guardian_url` / `guardian_interval` /
+  `guardian_failures`。
+
 ## 0.6.0 改动
 
 - 新增“服务器”页：服务器应答 EAPOL 后自动入库，记录 MAC、名称/描述、发现时间、

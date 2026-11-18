@@ -54,6 +54,10 @@ def test_settings_roundtrip(tmp_path) -> None:
         block_official_client=True,
         server_lock=True,
         locked_server="00:1A:A9:17:FF:FF",
+        guardian_enabled=True,
+        guardian_url="http://127.0.0.1:18765/mcp",
+        guardian_interval=7.5,
+        guardian_failures=3,
     )
     store.save_settings(settings)
     loaded = store.load_settings()
@@ -65,6 +69,10 @@ def test_settings_roundtrip(tmp_path) -> None:
     assert loaded.block_official_client is True
     assert loaded.server_lock is True
     assert loaded.locked_server == "00:1a:a9:17:ff:ff"
+    assert loaded.guardian_enabled is True
+    assert loaded.guardian_url == "http://127.0.0.1:18765/mcp"
+    assert loaded.guardian_interval == 7.5
+    assert loaded.guardian_failures == 3
 
 
 def test_settings_clamped(tmp_path) -> None:

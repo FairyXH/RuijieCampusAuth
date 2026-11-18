@@ -21,6 +21,7 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 from dataclasses import replace
 from datetime import datetime
 from logging.handlers import RotatingFileHandler
@@ -96,6 +97,12 @@ from .cli import (
     choose_interface,
     list_interfaces,
     probe_authenticator,
+)
+from .guardian import (
+    DEFAULT_GUARDIAN_URL,
+    GuardianClient,
+    GuardianError,
+    GuardianProbe,
 )
 from .handoff import TakeoverState
 from .private import (
@@ -628,6 +635,7 @@ class AuthWorker(QThread):
     state = Signal(str, str)
     details = Signal(str)
     channel = Signal(str)
+    guardian = Signal(str)
 
     def __init__(
         self,
@@ -649,6 +657,21 @@ class AuthWorker(QThread):
         self._supp: Supplicant | None = None
         self._resolved: str | None = None
         self.ever_authenticated = False
+        self.guardian_client: GuardianClient | None = None
+        if self.settings.guardian_enabled:
+            try:
+                self.guardian_client = GuardianClient(
+                    self.settings.guardian_url,
+                    timeout=min(8.0, max(3.0, self.settings.timeout / 2)),
+                )
+            except ValueError as exc:
+                LOG.warning("网络管家地址无效，联动未启用: %s", exc)
+        self._guardian_last: GuardianProbe | None = None
+        self._guardian_decision: bool | None = None
+        self._guardian_last_state: bool | None = None
+        self._guardian_next = 0.0
+        self._guardian_fail_streak = 0
+        self._guardian_warned_at = 0.0
 
     def stop(self) -> None:
         self._stop.set()
@@ -776,7 +799,74 @@ class AuthWorker(QThread):
             LOG.warning("认证服务器无响应，已清除认证通道缓存")
         return ok
 
+    def _reset_guardian(self) -> None:
+        self._guardian_last = None
+        self._guardian_decision = None
+        self._guardian_last_state = None
+        self._guardian_next = 0.0
+        self._guardian_fail_streak = 0
+
+    def _guardian_online(self) -> bool | None:
+        client = self.guardian_client
+        if client is None:
+            return None
+        now = time.monotonic()
+        interval = max(1.0, float(self.settings.guardian_interval))
+        if now < self._guardian_next and self._guardian_decision is not None:
+            return self._guardian_decision
+        self._guardian_next = now + interval
+        try:
+            probe = client.probe(self._resolved)
+        except (GuardianError, OSError, ValueError) as exc:
+            self._guardian_last = None
+            self._guardian_decision = None
+            self._guardian_fail_streak = 0
+            if now - self._guardian_warned_at >= 60:
+                self._guardian_warned_at = now
+                LOG.warning("网络管家 MCP 查询失败，回退本机探测: %s", exc)
+                self.guardian.emit(f"网络管家不可用，回退本机探测: {exc}")
+            return None
+        self._guardian_last = probe
+        if probe.online is None:
+            self._guardian_fail_streak = 0
+            self._guardian_decision = None
+            if self._guardian_last_state is not False:
+                self._guardian_last_state = False
+                LOG.info("网络管家: %s", probe.short())
+                self.guardian.emit(probe.describe())
+            return None
+        if probe.online and not probe.captive_portal:
+            self._guardian_fail_streak = 0
+            self._guardian_decision = True
+            if self._guardian_last_state is not True:
+                self._guardian_last_state = True
+                LOG.info("网络管家: %s", probe.short())
+                self.guardian.emit(probe.describe())
+            return True
+        self._guardian_fail_streak += 1
+        threshold = max(1, int(self.settings.guardian_failures))
+        if self._guardian_fail_streak in (1, threshold):
+            message = (
+                f"{probe.short()} | 连续异常 "
+                f"{self._guardian_fail_streak}/{threshold}"
+            )
+            LOG.warning("网络管家: %s", message)
+            self.guardian.emit(message)
+        if self._guardian_fail_streak >= threshold:
+            self._guardian_decision = False
+            LOG.warning(
+                "网络管家判定外网离线（%s），触发补认证",
+                probe.interface_name or self._resolved,
+            )
+            return False
+        self._guardian_decision = True
+        return True
+
     def _online(self) -> bool:
+        if self.guardian_client is not None:
+            state = self._guardian_online()
+            if state is not None:
+                return state
         url = self.settings.connectivity_url.strip()
         if not url:
             return True
@@ -825,6 +915,7 @@ class AuthWorker(QThread):
                 break
             if ok:
                 self.ever_authenticated = True
+                self._reset_guardian()
                 self.state.emit("authenticated", "认证成功")
                 if not self.settings.preempt:
                     break
@@ -1061,6 +1152,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_auth_page(), "认证")
         self.tabs.addTab(self._build_connection_page(), "连接")
         self.tabs.addTab(self._build_server_page(), "服务器")
+        self.tabs.addTab(self._build_guardian_page(), "联动")
         self.tabs.addTab(self._build_debug_page(), "调试")
         body.addWidget(self.tabs, 0)
         body.addWidget(self._build_log_page(), 1)
@@ -1394,6 +1486,88 @@ class MainWindow(QMainWindow):
         layout.addWidget(lock_group)
         return page
 
+    def _build_guardian_page(self) -> QWidget:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        hint = QLabel(
+            "连接本机 Network Guardian MCP，读取认证网卡的真实外网探测；"
+            "连续判定离线后自动补认证。"
+        )
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        settings = QGroupBox("网络管家联动")
+        self.guardian_group = settings
+        settings_layout = QVBoxLayout(settings)
+        settings_layout.setContentsMargins(4, 0, 4, 4)
+        settings_layout.setSpacing(4)
+
+        self.guardian_check = ToggleSwitch()
+        settings_layout.addWidget(
+            self._switch_row(
+                "启用网络管家联动",
+                "用管家的外网探测替代本机 TCP 判断；MCP 不可用时自动回退",
+                self.guardian_check,
+            )
+        )
+
+        form = QFormLayout()
+        form.setContentsMargins(10, 2, 10, 4)
+        form.setHorizontalSpacing(10)
+        form.setVerticalSpacing(6)
+        form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+
+        self.guardian_url_edit = QLineEdit()
+        self.guardian_url_edit.setPlaceholderText(DEFAULT_GUARDIAN_URL)
+        self.guardian_test_button = QPushButton("测试并读取")
+        url_row = QHBoxLayout()
+        url_row.setSpacing(6)
+        url_row.addWidget(self.guardian_url_edit, 1)
+        url_row.addWidget(self.guardian_test_button)
+        url_widget = QWidget()
+        url_widget.setLayout(url_row)
+        form.addRow("MCP 地址", url_widget)
+
+        self.guardian_interval_spin = QDoubleSpinBox()
+        self.guardian_interval_spin.setRange(1.0, 60.0)
+        self.guardian_interval_spin.setDecimals(1)
+        self.guardian_interval_spin.setSuffix(" s")
+        self.guardian_failures_spin = QSpinBox()
+        self.guardian_failures_spin.setRange(1, 10)
+        self.guardian_failures_spin.setSuffix(" 次")
+        form.addRow("探测间隔", self.guardian_interval_spin)
+        form.addRow("离线确认", self.guardian_failures_spin)
+        settings_layout.addLayout(form)
+        layout.addWidget(settings)
+
+        status_group = QGroupBox("最近状态")
+        status_layout = QVBoxLayout(status_group)
+        status_layout.setContentsMargins(10, 4, 10, 8)
+        self.guardian_status_label = QLabel(
+            "尚未读取。点击“测试并读取”验证 MCP 连接。"
+        )
+        self.guardian_status_label.setObjectName("muted")
+        self.guardian_status_label.setWordWrap(True)
+        self.guardian_status_label.setMinimumHeight(120)
+        self.guardian_status_label.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+        )
+        status_layout.addWidget(self.guardian_status_label)
+        layout.addWidget(status_group)
+        layout.addStretch(1)
+        scroll.setWidget(page)
+        return scroll
+
     def _build_debug_page(self) -> QWidget:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -1486,6 +1660,14 @@ class MainWindow(QMainWindow):
         self.server_delete_button.clicked.connect(self.delete_server)
         self.server_refresh_button.clicked.connect(self._refresh_servers)
         self.server_lock_check.toggled.connect(self._on_server_lock_toggled)
+        self.guardian_test_button.clicked.connect(self.test_guardian)
+        self.guardian_check.toggled.connect(self._save_settings_from_ui)
+        self.guardian_url_edit.textChanged.connect(self._save_settings_from_ui)
+        for widget in (
+            self.guardian_interval_spin,
+            self.guardian_failures_spin,
+        ):
+            widget.valueChanged.connect(self._save_settings_from_ui)
         self.tabs.currentChanged.connect(self._on_tab_changed)
         self.clear_log_button.clicked.connect(self.log_view.clear)
         self.open_log_button.clicked.connect(self.open_log_dir)
@@ -1525,6 +1707,12 @@ class MainWindow(QMainWindow):
         self.logoff_on_stop_check.setChecked(self.settings.logoff_on_stop)
         self.block_check.setChecked(self.settings.block_official_client)
         self.server_lock_check.setChecked(self.settings.server_lock)
+        self.guardian_check.setChecked(self.settings.guardian_enabled)
+        self.guardian_url_edit.setText(
+            self.settings.guardian_url or DEFAULT_GUARDIAN_URL
+        )
+        self.guardian_interval_spin.setValue(self.settings.guardian_interval)
+        self.guardian_failures_spin.setValue(self.settings.guardian_failures)
         self._select_interface(self.settings.interface)
         self._refresh_servers()
         self._update_cache_label()
@@ -1546,6 +1734,12 @@ class MainWindow(QMainWindow):
         self.settings.logoff_on_stop = self.logoff_on_stop_check.isChecked()
         self.settings.block_official_client = self.block_check.isChecked()
         self.settings.server_lock = self.server_lock_check.isChecked()
+        self.settings.guardian_enabled = self.guardian_check.isChecked()
+        self.settings.guardian_url = (
+            self.guardian_url_edit.text().strip() or DEFAULT_GUARDIAN_URL
+        )
+        self.settings.guardian_interval = self.guardian_interval_spin.value()
+        self.settings.guardian_failures = self.guardian_failures_spin.value()
         self.settings.interface = str(self.interface_combo.currentData() or "")
         self.log_handler.setLevel(
             logging.DEBUG if self.settings.verbose else logging.INFO
@@ -1759,6 +1953,32 @@ class MainWindow(QMainWindow):
             self.server_lock_check.blockSignals(False)
         self._refresh_servers()
         self._update_cache_label()
+
+    def test_guardian(self) -> None:
+        self._save_settings_from_ui()
+        url = self.settings.guardian_url
+        resolved = self.settings.interface or None
+        if not resolved:
+            info = self.discovery.load()
+            resolved = info.interface if info else None
+        self.guardian_status_label.setText("正在读取网络管家状态...")
+
+        def action() -> str:
+            return GuardianClient(url).probe(resolved).describe()
+
+        self._run_one_shot(
+            action,
+            "网络管家联动",
+            quiet=True,
+            on_done=self._show_guardian_status,
+            on_error=self._show_guardian_error,
+        )
+
+    def _show_guardian_status(self, text: str) -> None:
+        self.guardian_status_label.setText(text)
+
+    def _show_guardian_error(self, text: str) -> None:
+        self.guardian_status_label.setText(f"读取失败: {text}")
 
     def open_log_dir(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.logs_dir)))
@@ -2006,6 +2226,7 @@ class MainWindow(QMainWindow):
         self.worker.state.connect(self.on_worker_state)
         self.worker.details.connect(self.on_worker_details)
         self.worker.channel.connect(self.on_worker_channel)
+        self.worker.guardian.connect(self.on_guardian_status)
         self.worker.finished.connect(self.on_worker_finished)
         self.worker.start()
         self._sync_takeover()
@@ -2097,6 +2318,9 @@ class MainWindow(QMainWindow):
     def on_worker_channel(self, text: str) -> None:
         self.cache_label.setText(text)
 
+    def on_guardian_status(self, text: str) -> None:
+        self.guardian_status_label.setText(text)
+
     def on_worker_finished(self) -> None:
         worker = self.worker
         self.worker = None
@@ -2151,6 +2375,7 @@ class MainWindow(QMainWindow):
             action.setText("停止认证" if running else "开始认证")
         self.settings_group.setEnabled(not running)
         self.account_table.setEnabled(not running)
+        self.guardian_group.setEnabled(not running)
         self.server_table.setEnabled(not running)
         self.server_lock_check.setEnabled(not running)
         for widget in (
@@ -2292,6 +2517,8 @@ class MainWindow(QMainWindow):
         func: Callable[[], str],
         title: str,
         quiet: bool = False,
+        on_done: Callable[[str], None] | None = None,
+        on_error: Callable[[str], None] | None = None,
     ) -> None:
         if self.one_shot and self.one_shot.isRunning():
             QMessageBox.information(self, title, "已有调试任务在运行")
@@ -2302,12 +2529,16 @@ class MainWindow(QMainWindow):
         def done(result: str) -> None:
             self.one_shot = None
             self.debug_panel.append_output(f"[{title}] {result}")
+            if on_done is not None:
+                on_done(result)
             if not quiet:
                 QMessageBox.information(self, title, result)
 
         def failed(error: str) -> None:
             self.one_shot = None
             self.debug_panel.append_output(f"[{title}] 失败: {error}")
+            if on_error is not None:
+                on_error(error)
             if not quiet:
                 QMessageBox.warning(self, title, error)
 

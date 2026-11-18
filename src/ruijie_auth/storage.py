@@ -147,6 +147,10 @@ class AppSettings:
     block_official_client: bool = False
     server_lock: bool = False
     locked_server: str = ""
+    guardian_enabled: bool = False
+    guardian_url: str = "http://127.0.0.1:18765/mcp"
+    guardian_interval: float = 5.0
+    guardian_failures: int = 2
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -160,6 +164,13 @@ class AppSettings:
         settings.retries = max(1, int(settings.retries))
         settings.repeats = max(1, int(settings.repeats))
         settings.locked_server = normalize_mac(settings.locked_server)
+        settings.guardian_url = str(settings.guardian_url or "").strip()
+        settings.guardian_interval = min(
+            60.0, max(1.0, float(settings.guardian_interval))
+        )
+        settings.guardian_failures = min(
+            10, max(1, int(settings.guardian_failures))
+        )
         return settings
 
     def to_dict(self) -> dict[str, Any]:

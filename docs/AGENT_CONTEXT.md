@@ -49,6 +49,13 @@ Windows client. It is a compatibility client, not an authentication bypass.
   EAP-Success. A **unicast Logoff** to the authenticator does not clear the
   switch session and makes the next Start fail with EAP-Failure; Logoff must
   stay on the standard PAE group `01:80:c2:00:00:03`.
+- 0.7.0: Network Guardian linkage. The app queries the loopback MCP
+  `http://127.0.0.1:18765/mcp` (stateless HTTP, protocol `2025-11-25`) with
+  `guardian_status`, matches the auth NIC by NPF GUID to `adapterGuid`, and
+  treats `isOnline=false` or `captivePortalSuspected=true` as offline after N
+  confirmations. MCP errors fall back to the local TCP check.
+- 2026-11-18 09:17: live query returned `NG-TMP-0000 | 172.18.28.6 |
+  online/stable | source=认证网卡` for the USB NIC.
 
 ## Architecture
 
@@ -67,8 +74,16 @@ Windows client. It is a compatibility client, not an authentication bypass.
 - `src/ruijie_auth/gui.py`
   - PySide6 main window, account manager, tray, debug tools.
   - Server tab: learned authenticators, manual add/rename/delete, lock switch.
+  - Linkage tab: Guardian MCP URL, enable switch, probe interval, offline count.
   - Preempt auth worker and TCP connectivity monitor.
+  - AuthWorker polls Guardian while online; N confirmed failures trigger re-auth.
   - Takeover switch wiring: blocker + auth worker + heartbeat.
+- `src/ruijie_auth/guardian.py`
+  - Zero-dependency loopback MCP client (`initialize` + `guardian_status`).
+  - Restricts URLs to `http://127.0.0.1:<port>/mcp` (or localhost), ignores
+    environment proxies.
+  - `select_probe` matches the auth NPF GUID to Guardian `adapterGuid`, then
+    falls back to expected outlet/default route/global probe.
 - `src/ruijie_auth/storage.py`
   - `%APPDATA%\RuijieCampusAuth` accounts/settings, Windows DPAPI passwords.
   - `ServerStore` persists learned authenticators to `servers.json`; discovery
@@ -185,7 +200,8 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 - A ~40 ms delay before EAP responses matches the official client.
 - Duplicate EAP requests are ignored to avoid flooding the server.
 - GUI settings persistence: every strategy switch (preempt/block/auto-start/
-  start-minimized/close-minimize/verbose/logoff) and every connection field
+  start-minimized/close-minimize/verbose/logoff), server lock, Guardian linkage
+  (`guardian_enabled/url/interval/failures`), and every connection field
   (interface, intervals, timeout, start/repeat counts, connectivity URL) is
   saved on change and restored by `_apply_settings`.
 - Auto-detect uses `DiscoveryCache`: probe once, cache the interface/server MAC
