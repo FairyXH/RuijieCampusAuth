@@ -101,7 +101,10 @@ RuijieCampusAuth.Cli.exe service uninstall
 
 ### 冰点还原与更新
 
-- 仅冻结 C:、D: 为可写时，程序更新只需替换
+- 当前已完成一次“C: 冻结 + 重启”验收：VBS 哈希、`RunHXXYNet`、服务
+  `depend=npcap`/恢复策略、7 个 IFEO 标记、`RJSuService` 状态和 D: 配置均保留；
+  服务/GUI 自动启动并认证成功。
+- C: 冻结、D: 可写时，程序更新只需替换
   `D:\Storageredirect\Program\RuijieCampusAuth` 下的文件；先停服务和 GUI，
   再启动即可，不需要解冻。
 - `C:\Program Files\restart_ruijie.vbs`、计划任务 `RunHXXYNet`、服务注册、
@@ -134,8 +137,32 @@ RuijieCampusAuth.Cli.exe service uninstall
 
 ### GUI
 
-Avalonia 跨平台 GUI，包含账号、认证、服务、设置四个页签；服务页支持安装/卸载/
-启动/停止和接管模式开关。Windows 启动使用 `--tray --auto`，支持托盘。
+Avalonia 跨平台 GUI，包含五个页签：
+
+- **账号**：账号池、添加/更新/删除、启用/停用、设为当前账号。
+- **认证**：开始/停止、抢占保活、实时日志。
+- **服务器**：自动学习的认证服务器、成功后计数、锁定/解锁、删除。
+- **服务**：接管开关、安装/启动/停止/卸载、应用服务配置。
+- **设置**：网卡、服务名、静态 ID、Start 参数、DHCP/学校代码、服务器锁定、
+  发现缓存、Guardian URL/间隔/离线确认。
+
+Windows 启动使用 `--tray --auto`，支持托盘显示/退出。
+
+### 运行数据
+
+GUI、CLI 和服务都直读安装目录，不再使用 `%APPDATA%` 运行：
+
+- `accounts.json` — 账号池，密码使用机器 DPAPI，服务可解密
+- `settings.json` — GUI/服务运行参数
+- `service.json` — 服务回退配置和接管开关
+- `discovery.json`、`servers.json` — 探测缓存和服务器列表
+- `service_status.json`、`takeover.ini`、`takeover_state.json`
+- `logs\service.log`、`logs\csharp-gui.log`、`launcher.log`
+
+### 冻结部署手册
+
+`C:` 冻结、只更新 `D:` 的完整流程、冻结前检查、重启验收、更新步骤和故障
+排查见 [`docs/FROZEN_DEPLOYMENT.md`](docs/FROZEN_DEPLOYMENT.md)。
 
 ## Python 版本
 

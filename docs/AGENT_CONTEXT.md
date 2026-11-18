@@ -93,9 +93,9 @@ to the Python tree under `python/`.
   instead of only `service.json`.
 - 2026-11-18 18:51: launcher hardened for frozen C:. VBS now has a direct IFEO
   cleanup fallback across all seven official exe names when
-  `--restore-client` is unavailable. Deployed VBS SHA256
-  `0EDDD5E5907365104899B5F41D7DDC16DC3C5B68C835EAD96BC0A57ED7501FF0`; direct
-  `cscript` and scheduled-task runs both returned 0 and logged
+  `--restore-client` is unavailable. The final frozen-baseline VBS SHA256 is
+  `7E8258FA0CDAED2D0BF648D30F64745F0AFFE5E299DE92BBFB40C90FDBF3E7C6`;
+  direct `cscript` and scheduled-task runs both returned 0 and logged
   `healthy takeover; skip original`.
 - 2026-11-18 18:57: home-LAN pause verified with a no-authenticator
   `\Device\NPF_Loopback` interface. The service caught the interface exception,
@@ -118,6 +118,16 @@ to the Python tree under `python/`.
   `%LOCALAPPDATA%\NetworkGuardian` (on D:); its `campusAuth` action is
   `schtasks /run /i /tn RunHXXYNet`. DiskGuard (`C:\Program Files (x86)\Laneye\
   DiskGuard`) is the freeze product; D: exclusion must be confirmed in its UI.
+- 2026-11-18 21:04: post-freeze reboot validation passed. Boot
+  `20:54:42`; service PID 8580, GUI PID 21820, `HXXY-CampusAuth` Running,
+  `npcap` Running, `RJSuService` Stopped/Disabled. Frozen C: baseline retained
+  VBS hash `7E8258...E7C6`, `RunHXXYNet` action/principal/rules, service
+  `depend=npcap` and recovery 5s/10s/30s, and all seven IFEO markers. D:
+  `accounts.json`/`settings.json`/`service.json`/`takeover_state.json`
+  persisted; service started `20:55:07`, authenticated `20:57:09`
+  (`00:1a:a9:17:ff:ff`), GUI loaded account/server, `launcher.log` logged
+  `healthy takeover; skip original`, `baidu HTTP 200`. The detailed runbook is
+  `docs/FROZEN_DEPLOYMENT.md`.
 
 ## Official Client Configuration Surface
 
