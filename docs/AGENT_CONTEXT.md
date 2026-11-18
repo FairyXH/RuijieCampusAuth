@@ -52,7 +52,8 @@ to the Python tree under `python/`.
   Pin the interface for probes: binding the source address alone still lets the
   WLAN default route win.
 - 0.6.0: server list learned from live EAP responses and a lock-server switch.
-  `%APPDATA%\RuijieCampusAuth\servers.json` stores MAC/name/interface,
+  0.6.0 stored it at `%APPDATA%\RuijieCampusAuth\servers.json`; current C# and
+  frozen Python builds use `<install_dir>\servers.json` with MAC/name/interface,
   first/last-seen, last-success, and success count.
 - 2026-11-18 08:49: locked unicast authentication validated live on HXXY:
   group Logoff → unicast EAPOL-Start to `00:1a:a9:17:ff:ff` → EAP-MD5 →
@@ -78,6 +79,13 @@ to the Python tree under `python/`.
   loaded the account pool and learned-server list; `baidu HTTP 200`. Service
   logs include `已成功阻止原版进程运行: <exe> (PID <pid>)` and
   `已成功阻止原版服务运行: <service>`.
+- 2026-11-18 18:35: unified all runtime config under
+  `D:\Storageredirect\Program\RuijieCampusAuth`. GUI `--tray --auto` loaded
+  `accounts.json`/`settings.json` from the install dir, read the service's
+  `discovery.json`/`servers.json` directly, and wrote `logs\csharp-gui.log`
+  there; the old `%APPDATA%` log stopped updating. CLI `config path/show` reads
+  the same install-dir `service.json`. Service stayed authenticated and
+  `baidu HTTP 200`.
 
 ## Official Client Configuration Surface
 
@@ -171,20 +179,21 @@ Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
   - `select_probe` matches the auth NPF GUID to Guardian `adapterGuid`, then
     falls back to expected outlet/default route/global probe.
 - `src/ruijie_auth/storage.py`
-  - `%APPDATA%\RuijieCampusAuth` accounts/settings, Windows DPAPI passwords.
+  - Frozen builds store accounts/settings in the install directory; source-tree
+    development uses `%APPDATA%\RuijieCampusAuth`. Windows DPAPI passwords.
   - `ServerStore` persists learned authenticators to `servers.json`; discovery
     cache seeds it on first launch.
-  - `program_data_dir()` for machine-wide state.
+  - `install_dir()` for machine-wide state; `program_data_dir()` is legacy only.
 - `src/ruijie_auth/blocker.py`
   - Kills 8021x.exe in a watchdog loop.
   - Writes 64/32-bit IFEO `Debugger` + `HXXYTakeover` marker.
   - Saves/restores previous values; cleans legacy markerless policies.
 - `src/ruijie_auth/handoff.py`
-  - `%ProgramData%\RuijieCampusAuth\takeover.ini` heartbeat every second.
+  - Writes `takeover.ini` heartbeat every second in the install directory.
 - `src/ruijie_auth/storage.py` (DiscoveryCache)
-  - `%APPDATA%\RuijieCampusAuth\discovery.json` caches interface/description/
-    MAC/server MAC after any server EAP response; clears when the channel does
-    not respond. The GUI exposes a force-rediscover button.
+  - `discovery.json` caches interface/description/MAC/server MAC after any
+    server EAP response; clears when the channel does not respond. Frozen builds
+    use the install directory; the GUI exposes a force-rediscover button.
 - `packaging/restart_ruijie.vbs`
   - Original-client launcher with four-check takeover health and stale/legacy
     recovery.
@@ -194,9 +203,10 @@ Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
   - Passive 15-minute sampler; never sends EAPOL frames. Records USB NIC
     link/IP, source-bound egress probes, GUI/8021x/Supplicant processes,
     takeover/IFEO state, and app.log auth events. Writes
-    `%APPDATA%\RuijieCampusAuth\campus_status.json` plus
-    `logs/campus_status.jsonl`. Supports `--once`, `--interval`, `--until`,
-    `--reset`. Probes pin egress with `IP_UNICAST_IF`.
+    `campus_status.json` in `default_data_dir()` (install dir for frozen
+    builds, `%APPDATA%` for source runs) plus `logs/campus_status.jsonl`.
+    Supports `--once`, `--interval`, `--until`, `--reset`. Probes pin egress
+    with `IP_UNICAST_IF`.
 - `tests/test_api.py`, `test_private.py`, `test_storage.py`, `test_handoff.py`,
   `test_gui.py`
   - API status, private tail, storage/DPAPI, heartbeat, offscreen GUI smoke.
@@ -291,12 +301,20 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   before user login and keeps the 802.1X session alive.
 - Data root is the exe directory
   `D:\Storageredirect\Program\RuijieCampusAuth` (not `%ProgramData%`):
-  `service.json`, `service_status.json`, `discovery.json`, `servers.json`,
-  `logs\service.log`, `takeover_state.json`, `takeover.ini`.
-- GUI user data remains `%APPDATA%\RuijieCampusAuth`:
-  `accounts.json`, `settings.json`, `discovery.json`, `servers.json`. The GUI
-  reads the newest discovery cache from either location and reads service
-  servers when the user copy is empty.
+  `service.json`, `service_status.json`, `accounts.json`, `settings.json`,
+  `discovery.json`, `servers.json`, `logs\service.log`, `logs\csharp-gui.log`,
+  `takeover_state.json`, `takeover.ini`.
+- GUI, CLI, and service all read/write the same install-directory files; there
+  is no `%APPDATA%` runtime split. `UserStore` defaults to
+  `AppContext.BaseDirectory`; the CLI uses `ServiceConfig.ServiceRoot`; the
+  service already used the install directory.
+- One-time migration: on first GUI/CLI start, missing `accounts.json`,
+  `settings.json`, `discovery.json`, or `servers.json` are copied from the old
+  `%APPDATA%\RuijieCampusAuth` location. Existing target files are never
+  overwritten; after migration all reads are direct from the install dir.
+- The frozen Python build follows the same rule: `default_data_dir()` returns
+  `install_dir()` when `sys.frozen` is set. Source-tree Python development still
+  uses `%APPDATA%` to avoid polluting the repository.
 - `service.json` stores the password with **LocalMachine DPAPI** and is ACLed to
   SYSTEM / Administrators only. Machine-wide state must survive the frozen C:
   volume; keep it on D:.
@@ -359,16 +377,13 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   message is a possible next improvement.
 - 0.5.0 discovery-cache behavior and the new layout were unit/offscreen tested;
   a fresh live cache regression was not possible after the window closed.
-- Machine-wide takeover state lives in the install directory on D:
-  (`takeover_state.json`, `takeover.ini`); the GUI must run elevated. Accounts
-  and settings remain per-user under `%APPDATA%\RuijieCampusAuth`.
+- Machine-wide takeover state and all runtime config live in the install
+  directory on D: (`takeover_state.json`, `takeover.ini`, `service.json`,
+  `accounts.json`, `settings.json`, `discovery.json`, `servers.json`); the GUI
+  must run elevated.
 - The service uses the single account in `service.json`; GUI multi-account
   rotation is not yet applied inside the Windows service. Applying service
   config writes the GUI-selected account.
-- The service writes `discovery.json`/`servers.json` under the install
-  directory, while GUI auth writes them under `%APPDATA%`. The GUI reads the
-  newest discovery cache and falls back to service servers when the user list
-  is empty; the two stores are not yet merged automatically.
 - Linux `ServiceInstaller.Install` only writes the systemd unit; start/stop are
   left to `systemctl`. macOS launchd is not implemented.
 - The analysis artifacts (IDA database, pcaps, Frida logs) are local temporary
@@ -378,6 +393,6 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 
 No test account or password is stored in the repository. Tests use dummy
 credentials. The README does not contain captured credentials. The GUI account
-store lives in `%APPDATA%\RuijieCampusAuth\accounts.json`; passwords are
+store lives in the install directory (`accounts.json`); passwords are
 DPAPI-encrypted and are not committed. The validation account was supplied by
-the user and is stored only in that local per-user file.
+the user and is stored only in that local file.

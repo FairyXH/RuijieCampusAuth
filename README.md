@@ -56,7 +56,7 @@ dotnet test RuijieCampusAuth.Core.Tests/RuijieCampusAuth.Core.Tests.csproj -c Re
 ### CLI
 
 ```powershell
-# 直接认证（Windows 上会读取现有 Python 账号库；也可显式传参数）
+# 直接认证（读取安装目录 accounts.json/settings.json；也可显式传参数）
 RuijieCampusAuth.Cli.exe auth --interface "\Device\NPF_{GUID}"
 
 # 初始化服务配置（写入程序目录 service.json）
@@ -76,7 +76,9 @@ RuijieCampusAuth.Cli.exe service uninstall
 ### 系统服务
 
 - **Windows**：服务名 `HXXY-CampusAuth`，`LocalSystem`，自动启动，登录前运行。
-  服务配置在程序目录 `service.json`，密码使用 LocalMachine DPAPI 加密。
+  服务配置、GUI 账号、设置、发现缓存和服务器列表全部在程序目录直读：
+  `service.json`、`accounts.json`、`settings.json`、`discovery.json`、
+  `servers.json`。`service.json` 密码使用 LocalMachine DPAPI 加密。
 - **Linux**：`service install` 写入
   `/etc/systemd/system/hxxy-campus-auth.service`，`Type=notify`，由
   `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。

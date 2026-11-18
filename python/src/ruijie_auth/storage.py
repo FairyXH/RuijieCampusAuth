@@ -128,6 +128,8 @@ def unprotect_password_machine(value: str) -> str:
 
 
 def default_data_dir() -> Path:
+    if getattr(sys, "frozen", False):
+        return install_dir()
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
     else:

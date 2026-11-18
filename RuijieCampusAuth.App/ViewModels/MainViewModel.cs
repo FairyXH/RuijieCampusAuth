@@ -12,7 +12,6 @@ namespace RuijieCampusAuth.App.ViewModels;
 public partial class MainViewModel : ViewModelBase
 {
     private readonly UserStore _store = new();
-    private readonly UserStore _serviceStore = new(ServiceConfig.ServiceRoot);
     private CancellationTokenSource? _cancellation;
     private bool _applyingSettings;
     private Supplicant? _activeSupplicant;
@@ -181,7 +180,7 @@ public partial class MainViewModel : ViewModelBase
         GuardianInterval = settings.GuardianInterval;
         GuardianFailures = settings.GuardianFailures;
 
-        var discovery = LoadLatestDiscovery();
+        var discovery = _store.LoadDiscovery();
         if (!string.IsNullOrWhiteSpace(settings.Interface))
         {
             SelectedInterface = Interfaces.FirstOrDefault(item =>
@@ -320,12 +319,6 @@ public partial class MainViewModel : ViewModelBase
     private void ForceRediscover()
     {
         _store.ClearDiscovery();
-        if (!_serviceStore.BaseDirectory.Equals(
-                _store.BaseDirectory,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            _serviceStore.ClearDiscovery();
-        }
         DiscoveryStatus = "已清除发现缓存，下次认证重新探测";
         AppendLog(DiscoveryStatus);
         if (IsBusy)
@@ -334,35 +327,9 @@ public partial class MainViewModel : ViewModelBase
         }
     }
 
-    private DiscoveryInfo? LoadLatestDiscovery()
-    {
-        var local = _store.LoadDiscovery();
-        var service = _serviceStore.LoadDiscovery();
-        if (local is null)
-        {
-            return service;
-        }
-        if (service is null)
-        {
-            return local;
-        }
-        var localTime = DateTimeOffset.TryParse(local.UpdatedAt, out var parsedLocal)
-            ? parsedLocal
-            : DateTimeOffset.MinValue;
-        var serviceTime = DateTimeOffset.TryParse(service.UpdatedAt, out var parsedService)
-            ? parsedService
-            : DateTimeOffset.MinValue;
-        return serviceTime > localTime ? service : local;
-    }
-
     private void LoadServerList()
     {
-        var records = _serviceStore.LoadServers();
-        if (records.Count == 0)
-        {
-            records = _store.LoadServers();
-        }
-        records = records
+        var records = _store.LoadServers()
             .OrderByDescending(item => item.SuccessCount)
             .ThenByDescending(item => item.LastSuccess)
             .ToList();
@@ -370,6 +337,10 @@ public partial class MainViewModel : ViewModelBase
         foreach (var record in records)
         {
             Servers.Add(record);
+        }
+        if (SelectedServer is not null && !Servers.Contains(SelectedServer))
+        {
+            SelectedServer = null;
         }
         SelectedServer ??= Servers.FirstOrDefault();
         if (Servers.Count == 0)
@@ -429,19 +400,9 @@ public partial class MainViewModel : ViewModelBase
             return;
         }
         var mac = SelectedServer.Mac;
-        var records = _serviceStore.LoadServers();
-        if (records.Count == 0)
-        {
-            records = _store.LoadServers();
-        }
+        var records = _store.LoadServers();
         records.RemoveAll(item =>
             item.Mac.Equals(mac, StringComparison.OrdinalIgnoreCase));
-        if (!_serviceStore.BaseDirectory.Equals(
-                _store.BaseDirectory,
-                StringComparison.OrdinalIgnoreCase))
-        {
-            _serviceStore.SaveServers(records);
-        }
         _store.SaveServers(records);
         if (LockedServer.Equals(mac, StringComparison.OrdinalIgnoreCase))
         {

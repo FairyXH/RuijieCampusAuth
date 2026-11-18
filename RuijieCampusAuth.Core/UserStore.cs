@@ -154,10 +154,54 @@ public sealed class UserStore
 
     public UserStore(string? baseDirectory = null)
     {
-        BaseDirectory = baseDirectory ?? Path.Combine(
+        BaseDirectory = string.IsNullOrWhiteSpace(baseDirectory)
+            ? AppContext.BaseDirectory
+            : baseDirectory;
+        Directory.CreateDirectory(BaseDirectory);
+    }
+
+    public static void MigrateLegacy(string targetDirectory)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        var legacyDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
             "RuijieCampusAuth");
-        Directory.CreateDirectory(BaseDirectory);
+        if (!Directory.Exists(legacyDirectory))
+        {
+            return;
+        }
+        if (Path.GetFullPath(legacyDirectory).Equals(
+                Path.GetFullPath(targetDirectory),
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        try
+        {
+            Directory.CreateDirectory(targetDirectory);
+            foreach (var name in new[]
+                     {
+                         "accounts.json",
+                         "settings.json",
+                         "discovery.json",
+                         "servers.json",
+                     })
+            {
+                var source = Path.Combine(legacyDirectory, name);
+                var destination = Path.Combine(targetDirectory, name);
+                if (File.Exists(source) && !File.Exists(destination))
+                {
+                    File.Copy(source, destination);
+                }
+            }
+        }
+        catch
+        {
+            // A failed migration must not prevent startup with a fresh store.
+        }
     }
 
     public string BaseDirectory { get; }

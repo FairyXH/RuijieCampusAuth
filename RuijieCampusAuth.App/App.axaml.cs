@@ -5,6 +5,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using RuijieCampusAuth.App.ViewModels;
 using RuijieCampusAuth.App.Views;
+using RuijieCampusAuth.Core;
 
 namespace RuijieCampusAuth.App;
 
@@ -21,6 +22,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            UserStore.MigrateLegacy(AppContext.BaseDirectory);
             var viewModel = new MainViewModel();
             var window = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = window;

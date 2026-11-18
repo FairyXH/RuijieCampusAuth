@@ -4,6 +4,7 @@ using System.Text.Json;
 using RuijieCampusAuth.Core;
 
 Console.OutputEncoding = Encoding.UTF8;
+UserStore.MigrateLegacy(ServiceConfig.ServiceRoot);
 
 var options = Parse(args);
 if (options.ContainsKey("--list-devices"))
@@ -129,7 +130,7 @@ if (command == "config")
     return 2;
 }
 
-var context = LegacyStore.Load(
+var context = ConfigStore.Load(
     options.GetValueOrDefault("--interface"),
     options.GetValueOrDefault("--username"),
     options.GetValueOrDefault("--password"),
@@ -244,7 +245,7 @@ internal sealed record LegacyContext(
     double StartTimeout,
     string? LockedServer);
 
-internal static class LegacyStore
+internal static class ConfigStore
 {
     public static LegacyContext Load(
         string? interfaceOverride,
@@ -258,9 +259,7 @@ internal static class LegacyStore
         int? retriesOverride,
         int? repeatsOverride)
     {
-        var root = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-            "RuijieCampusAuth");
+        var root = ServiceConfig.ServiceRoot;
         var settingsRoot = LoadRoot(Path.Combine(root, "settings.json"));
         var accountsRoot = LoadRoot(Path.Combine(root, "accounts.json"));
         var settings = settingsRoot ?? default;
@@ -289,7 +288,7 @@ internal static class LegacyStore
                 : "");
         if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
         {
-            throw new InvalidOperationException("没有可用账号；请用 --username --password 或先写入 Python 账号库");
+            throw new InvalidOperationException("没有可用账号；请用 --username --password 或先写入安装目录账号库");
         }
         var interfaceName = interfaceOverride
             ?? (settingsRoot is null ? "" : GetString(settings, "interface"));
