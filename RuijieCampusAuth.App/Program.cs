@@ -1,5 +1,6 @@
 ﻿using Avalonia;
 using System;
+using System.Threading;
 
 namespace RuijieCampusAuth.App;
 
@@ -9,8 +10,15 @@ sealed class Program
     // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
     // yet and stuff might break.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static void Main(string[] args)
+    {
+        using var mutex = new Mutex(true, "HXXY-CampusAuth-GUI", out var createdNew);
+        if (!createdNew)
+        {
+            return;
+        }
+        BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
