@@ -94,6 +94,28 @@ def test_select_probe_falls_back_to_expected_outlet() -> None:
     assert probe.source == "默认出口"
 
 
+def test_paused_guardian_returns_unknown() -> None:
+    snapshot = make_snapshot()
+    snapshot["isPaused"] = True
+    probe = select_probe(
+        snapshot,
+        r"\Device\NPF_{6BD35C5E-C108-4C32-90D2-33B1AC4B9273}",
+    )
+    assert probe.online is None
+    assert "暂停" in probe.detail
+
+
+def test_non_authoritative_probe_returns_unknown() -> None:
+    snapshot = make_snapshot()
+    snapshot["interfaces"][0]["probe"]["isAuthoritative"] = False
+    probe = select_probe(
+        snapshot,
+        r"\Device\NPF_{6BD35C5E-C108-4C32-90D2-33B1AC4B9273}",
+    )
+    assert probe.online is None
+    assert "权威" in probe.detail
+
+
 def test_select_probe_uses_global_probe_for_matching_interface() -> None:
     snapshot = make_snapshot()
     snapshot["interfaces"][0]["probe"] = None

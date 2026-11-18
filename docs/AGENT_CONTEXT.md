@@ -53,7 +53,8 @@ Windows client. It is a compatibility client, not an authentication bypass.
   `http://127.0.0.1:18765/mcp` (stateless HTTP, protocol `2025-11-25`) with
   `guardian_status`, matches the auth NIC by NPF GUID to `adapterGuid`, and
   treats `isOnline=false` or `captivePortalSuspected=true` as offline after N
-  confirmations. MCP errors fall back to the local TCP check.
+  confirmations. MCP errors, paused Guardian state, and non-authoritative
+  probes fall back to the local TCP check.
 - 2026-11-18 09:17: live query returned `NG-TMP-0000 | 172.18.28.6 |
   online/stable | source=认证网卡` for the USB NIC.
 

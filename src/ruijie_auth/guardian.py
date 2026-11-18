@@ -269,7 +269,7 @@ def _probe_from_interface(
         else:
             probe = {}
     online = probe.get("isOnline")
-    return GuardianProbe(
+    result = GuardianProbe(
         online=bool(online) if online is not None else None,
         stable_online=bool(probe.get("stableOnline")),
         captive_portal=bool(probe.get("captivePortalSuspected")),
@@ -284,6 +284,13 @@ def _probe_from_interface(
         timestamp=str(probe.get("timestampUtc") or ""),
         detail="" if probe else "该接口没有独立探测数据，回退到本机检测",
     )
+    if snapshot.get("isPaused"):
+        result.online = None
+        result.detail = "网络管家已暂停探测，回退到本机检测"
+    elif probe.get("isAuthoritative") is False:
+        result.online = None
+        result.detail = "网络管家探测不是权威结果，回退到本机检测"
+    return result
 
 
 def select_probe(
