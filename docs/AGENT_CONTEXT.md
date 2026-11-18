@@ -91,6 +91,12 @@ to the Python tree under `python/`.
   `账号池加载: 1 个可用账号`, tried `S12016004`, and authenticated live
   (`00:1a:a9:17:ff:ff`). Service now reads `settings.json` for runtime settings
   instead of only `service.json`.
+- 2026-11-18 18:51: launcher hardened for frozen C:. VBS now has a direct IFEO
+  cleanup fallback across all seven official exe names when
+  `--restore-client` is unavailable. Deployed VBS SHA256
+  `0EDDD5E5907365104899B5F41D7DDC16DC3C5B68C835EAD96BC0A57ED7501FF0`; direct
+  `cscript` and scheduled-task runs both returned 0 and logged
+  `healthy takeover; skip original`.
 
 ## Official Client Configuration Surface
 
@@ -290,12 +296,39 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   removes the state/heartbeat files, and exits. If the state file is missing it
   removes markerless `cmd.exe /c exit` policies from the official client
   directory.
+- VBS post-restore fallback: if `--restore-client` is missing, fails, or D: is
+  offline, `AnyIfeoPolicyPresent` + `ClearIfeoPolicy` directly remove the
+  `HXXYTakeover`/`Debugger` values for the seven official exe names
+  (`8021x`, `RuijieSupplicant`, `NetworkDetect`, `snetcfg`, `SoftwareManager`,
+  `SuInstaller`, `suservice`). Legitimate third-party Debugger values are not
+  removed.
+- `RunHXXYNet` scheduled task verified: action
+  `wscript.exe "C:\Program Files\restart_ruijie.vbs"`, logon trigger for
+  `ZHANGWINDOWS\Zhang`, `InteractiveToken`, `HighestAvailable`, no execution
+  time limit, `IgnoreNew`, `StartWhenAvailable`. Last run returned 0 and the
+  VBS logged `healthy takeover; skip original`.
 - Deploy path: `D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe`;
   the launcher and shortcuts point there. `build-csharp.ps1 -Deploy` copies the
   published GUI/CLI/service, backs up and updates `C:\Program Files\restart_ruijie.vbs`,
   and creates `HXXY-CampusAuth.lnk` in the deploy dir and on the desktop.
 - GUI / tray launch command (do not change):
   `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`.
+
+### Deep Freeze / Long-Term Frozen C:
+
+- If only C: is frozen and D: is thawed, normal binary/config updates under
+  `D:\Storageredirect\Program\RuijieCampusAuth` persist without unfreezing.
+  Stop the GUI and service, replace files, restart service and GUI.
+- C: owns the service registration, `RunHXXYNet` task,
+  `C:\Program Files\restart_ruijie.vbs`, shortcuts, .NET runtime, and Npcap.
+  Changes there require thawing or must be in the frozen baseline.
+- Do not run `build-csharp.ps1 -Deploy` while C: is frozen: it rewrites the VBS
+  and desktop shortcut on C:, and those changes revert at reboot. Copy only the
+  published files to D:.
+- If takeover should always be on, set `RJSuService` to Disabled in the frozen
+  baseline to avoid it starting before `HXXY-CampusAuth` at boot. If takeover
+  must remain toggleable, freeze with takeover off (so IFEO is not in the
+  baseline) and let the service reapply it at boot.
 
 ## Windows System Service (C#)
 

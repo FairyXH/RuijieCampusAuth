@@ -131,18 +131,22 @@ Function ProcessPidRunning(name, expectedPid)
     Err.Clear
 End Function
 
-Function MarkerPresent()
+Function IfeoKeyFor(name)
+    IfeoKeyFor = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\" & name
+End Function
+
+Function MarkerForName(name)
     Dim views, view, cmd, exec, output
-    MarkerPresent = False
+    MarkerForName = False
     On Error Resume Next
     views = Array("64", "32")
     For Each view In views
-        cmd = """" & RegExe() & """ query """ & IFEO_KEY & """ /v " & MARKER_NAME & " /reg:" & view
+        cmd = """" & RegExe() & """ query """ & IfeoKeyFor(name) & """ /v " & MARKER_NAME & " /reg:" & view
         Set exec = shell.Exec(cmd)
         If Err.Number = 0 Then
             output = exec.StdOut.ReadAll
             If exec.ExitCode = 0 And InStr(1, output, MARKER_VALUE, vbTextCompare) > 0 Then
-                MarkerPresent = True
+                MarkerForName = True
                 Exit Function
             End If
         End If
@@ -150,27 +154,87 @@ Function MarkerPresent()
     Next
 End Function
 
+Function MarkerPresent()
+    MarkerPresent = MarkerForName("8021x.exe")
+End Function
+
 ' Older builds wrote only the Debugger value, without HXXYTakeover.
 ' Treat that as a stale policy so the transition cannot leave 8021x blocked.
-Function LegacyDebuggerPresent()
+Function LegacyDebuggerForName(name)
     Dim views, view, cmd, exec, output, text
-    LegacyDebuggerPresent = False
+    LegacyDebuggerForName = False
     On Error Resume Next
     views = Array("64", "32")
     For Each view In views
-        cmd = """" & RegExe() & """ query """ & IFEO_KEY & """ /v Debugger /reg:" & view
+        cmd = """" & RegExe() & """ query """ & IfeoKeyFor(name) & """ /v Debugger /reg:" & view
         Set exec = shell.Exec(cmd)
         If Err.Number = 0 Then
             output = exec.StdOut.ReadAll
             text = LCase(output)
             If exec.ExitCode = 0 And InStr(1, text, "cmd.exe", vbTextCompare) > 0 And InStr(1, text, "/c exit", vbTextCompare) > 0 Then
-                LegacyDebuggerPresent = True
+                LegacyDebuggerForName = True
                 Exit Function
             End If
         End If
         Err.Clear
     Next
 End Function
+
+Function LegacyDebuggerPresent()
+    LegacyDebuggerPresent = LegacyDebuggerForName("8021x.exe")
+End Function
+
+Function OfficialExeNames()
+    ' Same set the C# TakeoverGuard enumerates, excluding 7z/uninstaller.
+    OfficialExeNames = Array( _
+        "8021x.exe", _
+        "RuijieSupplicant.exe", _
+        "NetworkDetect.exe", _
+        "snetcfg.exe", _
+        "SoftwareManager.exe", _
+        "SuInstaller.exe", _
+        "suservice.exe")
+End Function
+
+Function AnyIfeoPolicyPresent()
+    Dim names, name
+    AnyIfeoPolicyPresent = False
+    names = OfficialExeNames()
+    For Each name In names
+        If MarkerForName(name) Or LegacyDebuggerForName(name) Then
+            AnyIfeoPolicyPresent = True
+            Exit Function
+        End If
+    Next
+End Function
+
+Sub DeleteIfeoValue(name, valueName)
+    Dim views, view, cmd
+    On Error Resume Next
+    views = Array("64", "32")
+    For Each view In views
+        cmd = """" & RegExe() & """ delete """ & IfeoKeyFor(name) & """ /v " & valueName & " /f /reg:" & view
+        shell.Run cmd, 0, True
+        Err.Clear
+    Next
+End Sub
+
+' Last-resort recovery if --restore-client is missing, hung, or D: is offline.
+' Only removes values written by this tool; a real third-party Debugger is kept.
+Sub ClearIfeoPolicy()
+    Dim names, name
+    On Error Resume Next
+    names = OfficialExeNames()
+    For Each name In names
+        If MarkerForName(name) Then
+            DeleteIfeoValue name, MARKER_NAME
+            DeleteIfeoValue name, "Debugger"
+        ElseIf LegacyDebuggerForName(name) Then
+            DeleteIfeoValue name, "Debugger"
+        End If
+    Next
+    Err.Clear
+End Sub
 
 Function IsHealthy()
     Dim state, pid
@@ -204,7 +268,7 @@ End If
 stateOn = False
 Set state = ReadIni(StatePath())
 stateOn = StateEnabled(state)
-markerOn = MarkerPresent()
+markerOn = AnyIfeoPolicyPresent()
 legacyOn = LegacyDebuggerPresent()
 processOn = ProcessPidRunning(TAKEOVER_PROCESS, "") Or ProcessPidRunning(SERVICE_PROCESS, "")
 
@@ -224,7 +288,15 @@ If stateOn Or markerOn Or legacyOn Then
             Err.Clear
         End If
         On Error GoTo 0
+    Else
+        Log "takeover exe missing; using direct IFEO cleanup"
     End If
+End If
+
+' Do not leave the official client blocked when the exe/restore path failed.
+If AnyIfeoPolicyPresent() Then
+    Log "restore incomplete; clearing IFEO directly"
+    ClearIfeoPolicy()
 End If
 
 If IsHealthy() Then

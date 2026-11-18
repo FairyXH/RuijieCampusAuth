@@ -86,6 +86,19 @@ RuijieCampusAuth.Cli.exe service uninstall
   `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。
 - **macOS**：尚未实现 launchd 包装，CLI/服务 Core 可运行，GUI 使用 Avalonia。
 
+### 冰点还原与更新
+
+- 仅冻结 C:、D: 为可写时，程序更新只需替换
+  `D:\Storageredirect\Program\RuijieCampusAuth` 下的文件；先停服务和 GUI，
+  再启动即可，不需要解冻。
+- `C:\Program Files\restart_ruijie.vbs`、计划任务 `RunHXXYNet`、服务注册、
+  .NET 10、Npcap 和快捷方式都在 C: 上；修改这些内容需要解冻，或在冻结前
+  写入基线。
+- 冻结期间不要运行 `build-csharp.ps1 -Deploy`（它会改写 C: 上的 VBS 和
+  快捷方式）；只复制 `publish` 目录到 D:。
+- 若长期开启接管，建议冻结前把 `RJSuService` 的基线启动类型设为 Disabled，
+  避免开机时它先于 `HXXY-CampusAuth` 启动。
+
 ### 接管模式
 
 开启后由服务层临时执行：
