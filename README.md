@@ -86,6 +86,19 @@ RuijieCampusAuth.Cli.exe service uninstall
   `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。
 - **macOS**：尚未实现 launchd 包装，CLI/服务 Core 可运行，GUI 使用 Avalonia。
 
+### 家庭网络 / 无认证 LAN
+
+认证失败且完全没有收到认证服务器响应（`Supplicant.Connected == false`）时，
+服务会用 Guardian（启用时）或 TCP 连通性检测判断当前网络是否已经在线：
+
+- 在线：进入 `paused`，日志为
+  `未检测到认证服务器，当前网络在线，暂停认证`，每 30 秒复查一次，不再持续
+  发送 EAPOL。
+- 离线：恢复自动认证，回到校园网后会重新探测并认证。
+- 暂停期间接管仍然生效，原版锐捷继续被阻止；需要在家庭网络使用原版客户端时，
+  先关闭接管或停止服务。
+- USB 网卡被拔掉导致的网卡异常也会被捕获，不会让服务退出。
+
 ### 冰点还原与更新
 
 - 仅冻结 C:、D: 为可写时，程序更新只需替换

@@ -6,6 +6,7 @@ namespace RuijieCampusAuth.Service;
 public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
 {
     private readonly UserStore _store = new(ServiceConfig.ServiceRoot);
+    private static readonly TimeSpan PausedProbeInterval = TimeSpan.FromSeconds(30);
     private GuardianClient? _guardian;
     private string _guardianKey = "";
     private int _guardianFailures;
@@ -58,18 +59,38 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     break;
                 }
                 logger.LogInformation("尝试账号: {Account}", account.Username);
-                var result = await Task.Run(
-                    () => Authenticate(
-                        settings,
-                        account.Username,
-                        account.Password,
-                        stoppingToken),
-                    stoppingToken);
+                (bool ok, bool connected, string? server, string interfaceName) result;
+                try
+                {
+                    result = await Task.Run(
+                        () => Authenticate(
+                            settings,
+                            account.Username,
+                            account.Password,
+                            stoppingToken),
+                        stoppingToken);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "认证过程异常");
+                    ServiceStatus.Write("error", $"认证异常: {ex.Message}");
+                    result = (false, false, null, settings.Interface);
+                }
                 if (!result.ok)
                 {
                     logger.LogWarning(
                         "账号 {Account} 认证失败，尝试下一个账号",
                         account.Username);
+                    if (!result.connected &&
+                        await OnlineAsync(settings, stoppingToken))
+                    {
+                        await PauseForHomeNetworkAsync(settings, stoppingToken);
+                        break;
+                    }
                     continue;
                 }
                 authenticated = true;
@@ -108,6 +129,31 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         _guardian = null;
         ServiceStatus.Write("stopped", "服务停止");
         logger.LogInformation("认证服务停止");
+    }
+
+    private async Task PauseForHomeNetworkAsync(
+        ServiceSettings settings,
+        CancellationToken stoppingToken)
+    {
+        ServiceStatus.Write(
+            "paused",
+            "未检测到认证服务器，当前网络在线，暂停认证");
+        logger.LogWarning(
+            "未检测到认证服务器，当前网络在线，暂停认证；每 {Interval} 秒复查",
+            (int)PausedProbeInterval.TotalSeconds);
+        _guardianFailures = 0;
+        _nextGuardianCheck = DateTimeOffset.MinValue;
+        _lastGuardianDecision = null;
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            await Task.Delay(PausedProbeInterval, stoppingToken);
+            if (!await OnlineAsync(settings, stoppingToken))
+            {
+                ServiceStatus.Write("retrying", "网络已离线，恢复认证");
+                logger.LogInformation("网络已离线，恢复自动认证");
+                return;
+            }
+        }
     }
 
     private ServiceSettings ResolveSettings(ServiceConfig config)
@@ -194,7 +240,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         }
     }
 
-    private (bool ok, string? server, string interfaceName) Authenticate(
+    private (bool ok, bool connected, string? server, string interfaceName) Authenticate(
         ServiceSettings settings,
         string username,
         string password,
@@ -242,7 +288,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         {
             _store.ClearDiscovery();
         }
-        return (ok, supplicant.ServerMac, interfaceName);
+        return (ok, supplicant.Connected, supplicant.ServerMac, interfaceName);
     }
 
     private string ResolveInterface(ServiceSettings settings)

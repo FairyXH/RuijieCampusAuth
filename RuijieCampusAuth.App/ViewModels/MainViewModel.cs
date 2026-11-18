@@ -12,6 +12,7 @@ namespace RuijieCampusAuth.App.ViewModels;
 public partial class MainViewModel : ViewModelBase
 {
     private readonly UserStore _store = new();
+    private static readonly TimeSpan PausedProbeInterval = TimeSpan.FromSeconds(30);
     private CancellationTokenSource? _cancellation;
     private bool _applyingSettings;
     private Supplicant? _activeSupplicant;
@@ -501,7 +502,27 @@ public partial class MainViewModel : ViewModelBase
                         Status = message;
                     });
                 _activeSupplicant = supplicant;
-                var ok = await Task.Run(supplicant.Authenticate, _cancellation.Token);
+                bool ok;
+                try
+                {
+                    ok = await Task.Run(
+                        supplicant.Authenticate,
+                        _cancellation.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _activeSupplicant = null;
+                    Status = $"认证异常: {ex.Message}";
+                    AppendLog(Status);
+                    await Task.Delay(
+                        TimeSpan.FromSeconds(Math.Max(1, settings.RetryInterval)),
+                        _cancellation.Token);
+                    continue;
+                }
                 _activeSupplicant = null;
                 if (supplicant.Connected)
                 {
@@ -527,6 +548,12 @@ public partial class MainViewModel : ViewModelBase
                 }
                 if (!ok)
                 {
+                    if (!supplicant.Connected &&
+                        await OnlineAsync(settings, _cancellation.Token))
+                    {
+                        await PauseForHomeNetworkAsync(settings, _cancellation.Token);
+                        continue;
+                    }
                     Status = "认证失败，等待重试";
                     await Task.Delay(
                         TimeSpan.FromSeconds(Math.Max(1, settings.RetryInterval)),
@@ -759,6 +786,27 @@ public partial class MainViewModel : ViewModelBase
             GuardianInterval = settings.GuardianInterval,
             GuardianFailures = settings.GuardianFailures,
         };
+    }
+
+    private async Task PauseForHomeNetworkAsync(
+        UserSettings settings,
+        CancellationToken token)
+    {
+        Status = "未检测到认证服务器，当前网络在线，暂停认证";
+        AppendLog(Status);
+        _guardianFailureCount = 0;
+        _nextGuardianCheck = DateTimeOffset.MinValue;
+        _lastGuardianDecision = null;
+        while (!token.IsCancellationRequested)
+        {
+            await Task.Delay(PausedProbeInterval, token);
+            if (!await OnlineAsync(settings, token))
+            {
+                Status = "网络已离线，恢复认证";
+                AppendLog(Status);
+                return;
+            }
+        }
     }
 
     private async Task<bool> OnlineAsync(UserSettings settings, CancellationToken token)

@@ -97,6 +97,13 @@ to the Python tree under `python/`.
   `0EDDD5E5907365104899B5F41D7DDC16DC3C5B68C835EAD96BC0A57ED7501FF0`; direct
   `cscript` and scheduled-task runs both returned 0 and logged
   `healthy takeover; skip original`.
+- 2026-11-18 18:57: home-LAN pause verified with a no-authenticator
+  `\Device\NPF_Loopback` interface. The service caught the interface exception,
+  saw Guardian online, wrote `state=paused` and
+  `未检测到认证服务器，当前网络在线，暂停认证`, then rechecked every 30 s.
+  Restoring the USB NPF interface and restarting re-authenticated successfully
+  (`00:1a:a9:17:ff:ff`); `baidu HTTP 200`. AuthWorker and GUI both wrap each
+  auth attempt so a missing/unplugged NIC cannot terminate the loop.
 
 ## Official Client Configuration Surface
 
@@ -429,6 +436,12 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   enabled accounts, and falls back to `service.json` when the pool is empty.
   Account passwords are machine-DPAPI encrypted so LocalSystem can decrypt
   them; GUI startup upgrades old user-DPAPI `accounts.json` entries in place.
+- Home/non-802.1X LAN behavior: if authentication fails with no server
+  response (`Supplicant.Connected == false`) and Guardian/TCP reports the
+  network online, the service enters `paused` instead of retrying 802.1X. It
+  rechecks every 30 seconds and resumes authentication when the network goes
+  offline (campus return). Takeover remains active while paused; disable
+  takeover or stop the service to run the official client on a home LAN.
 - Linux `ServiceInstaller.Install` only writes the systemd unit; start/stop are
   left to `systemctl`. macOS launchd is not implemented.
 - The analysis artifacts (IDA database, pcaps, Frida logs) are local temporary
