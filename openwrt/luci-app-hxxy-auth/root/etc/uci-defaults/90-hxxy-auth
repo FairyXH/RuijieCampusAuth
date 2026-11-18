@@ -1,0 +1,3 @@
+#!/bin/sh
+[ -f /etc/config/hxxy-auth ] || touch /etc/config/hxxy-auth
+exit 0

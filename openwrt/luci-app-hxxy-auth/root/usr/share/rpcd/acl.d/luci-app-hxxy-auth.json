@@ -1,0 +1,19 @@
+{
+	"luci-app-hxxy-auth": {
+		"description": "HXXY Auth management",
+		"read": {
+			"file": {
+				"/usr/sbin/hxxy-auth": [ "exec" ],
+				"/var/run/hxxy-auth/status.json": [ "read" ],
+				"/var/log/hxxy-auth.log": [ "read" ]
+			},
+			"uci": [ "hxxy-auth" ]
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/hxxy-auth": [ "exec" ]
+			},
+			"uci": [ "hxxy-auth" ]
+		}
+	}
+}
