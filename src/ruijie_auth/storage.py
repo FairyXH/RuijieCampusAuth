@@ -20,6 +20,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from .private import normalize_mac
+
 LOG = logging.getLogger("ruijie-auth")
 APP_DIR_NAME = "RuijieCampusAuth"
 FILE_VERSION = 1
@@ -143,6 +145,8 @@ class AppSettings:
     verbose: bool = False
     logoff_on_stop: bool = False
     block_official_client: bool = False
+    server_lock: bool = False
+    locked_server: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -155,6 +159,7 @@ class AppSettings:
         settings.timeout = max(5.0, float(settings.timeout))
         settings.retries = max(1, int(settings.retries))
         settings.repeats = max(1, int(settings.repeats))
+        settings.locked_server = normalize_mac(settings.locked_server)
         return settings
 
     def to_dict(self) -> dict[str, Any]:
@@ -231,6 +236,186 @@ class DiscoveryCache:
                 pass
             except OSError as exc:
                 LOG.warning("清除认证通道缓存失败: %s", exc)
+
+
+@dataclass
+class ServerRecord:
+    mac: str
+    name: str = ""
+    note: str = ""
+    interface: str = ""
+    description: str = ""
+    first_seen: str = ""
+    last_seen: str = ""
+    last_success: str = ""
+    success_count: int = 0
+
+    @property
+    def label(self) -> str:
+        return self.name or self.description or self.mac
+
+
+class ServerStore:
+    """Authenticator list learned from live EAP responses.
+
+    Every server that answers EAPOL is recorded; a successful EAP-MD5 exchange
+    also increments ``success_count``. The GUI can lock one MAC so EAPOL-Start
+    and Logoff are sent unicast to that authenticator instead of the group MAC.
+    """
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+        self._lock = threading.Lock()
+
+    def _load_unlocked(self) -> list[ServerRecord]:
+        if not self.path.exists():
+            return []
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return []
+        records: list[ServerRecord] = []
+        seen: set[str] = set()
+        for item in data.get("servers", []):
+            if not isinstance(item, dict):
+                continue
+            mac = normalize_mac(str(item.get("mac", "")))
+            if not mac or mac in seen:
+                continue
+            seen.add(mac)
+            records.append(
+                ServerRecord(
+                    mac=mac,
+                    name=str(item.get("name", "") or ""),
+                    note=str(item.get("note", "") or ""),
+                    interface=str(item.get("interface", "") or ""),
+                    description=str(item.get("description", "") or ""),
+                    first_seen=str(item.get("first_seen", "") or ""),
+                    last_seen=str(item.get("last_seen", "") or ""),
+                    last_success=str(item.get("last_success", "") or ""),
+                    success_count=max(0, int(item.get("success_count", 0) or 0)),
+                )
+            )
+        return records
+
+    def _save_unlocked(self, records: list[ServerRecord]) -> None:
+        payload = {
+            "version": FILE_VERSION,
+            "servers": [asdict(record) for record in records],
+        }
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temp = self.path.with_suffix(self.path.suffix + ".tmp")
+        temp.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        os.replace(temp, self.path)
+
+    def load(self) -> list[ServerRecord]:
+        with self._lock:
+            return self._load_unlocked()
+
+    def save(self, records: list[ServerRecord]) -> None:
+        with self._lock:
+            self._save_unlocked(records)
+
+    def get(self, mac: str) -> ServerRecord | None:
+        target = normalize_mac(mac)
+        if not target:
+            return None
+        return next((item for item in self.load() if item.mac == target), None)
+
+    def upsert(
+        self,
+        mac: str,
+        *,
+        name: str | None = None,
+        note: str | None = None,
+        interface: str | None = None,
+        description: str | None = None,
+        success: bool = False,
+        seen_at: str | None = None,
+    ) -> ServerRecord | None:
+        target = normalize_mac(mac)
+        if not target:
+            return None
+        stamp = seen_at or datetime.now().astimezone().isoformat(
+            timespec="seconds"
+        )
+        with self._lock:
+            records = self._load_unlocked()
+            record = next((item for item in records if item.mac == target), None)
+            if record is None:
+                record = ServerRecord(mac=target, first_seen=stamp)
+                records.append(record)
+            if not record.first_seen or stamp < record.first_seen:
+                record.first_seen = stamp
+            if stamp > (record.last_seen or ""):
+                record.last_seen = stamp
+            if name is not None:
+                record.name = name
+            if note is not None:
+                record.note = note
+            if interface:
+                record.interface = interface
+            if description:
+                record.description = description
+            if success:
+                record.success_count += 1
+                if stamp > (record.last_success or ""):
+                    record.last_success = stamp
+            self._save_unlocked(records)
+        return record
+
+    def rename(self, mac: str, name: str) -> bool:
+        target = normalize_mac(mac)
+        if not target:
+            return False
+        with self._lock:
+            records = self._load_unlocked()
+            record = next((item for item in records if item.mac == target), None)
+            if record is None:
+                return False
+            record.name = name.strip()
+            self._save_unlocked(records)
+            return True
+
+    def remove(self, mac: str) -> bool:
+        target = normalize_mac(mac)
+        if not target:
+            return False
+        with self._lock:
+            records = self._load_unlocked()
+            kept = [item for item in records if item.mac != target]
+            if len(kept) == len(records):
+                return False
+            self._save_unlocked(kept)
+            return True
+
+    def import_discovery(self, path: Path) -> ServerRecord | None:
+        """Seed the list from discovery.json without overwriting known servers."""
+        try:
+            data = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        mac = normalize_mac(str(data.get("server_mac", "")))
+        if not mac:
+            return None
+        stamp = str(data.get("updated_at", "") or "")
+        with self._lock:
+            records = self._load_unlocked()
+            existing = next((item for item in records if item.mac == mac), None)
+            if existing is not None:
+                return existing
+            record = ServerRecord(
+                mac=mac,
+                interface=str(data.get("interface", "") or ""),
+                description=str(data.get("description", "") or ""),
+                first_seen=stamp,
+                last_seen=stamp,
+            )
+            records.append(record)
+            self._save_unlocked(records)
+            return record
 
 
 class AccountStore:

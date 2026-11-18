@@ -7,6 +7,7 @@ from ruijie_auth.storage import (
     Account,
     AccountStore,
     AppSettings,
+    ServerStore,
     protect_password,
     unprotect_password,
 )
@@ -51,6 +52,8 @@ def test_settings_roundtrip(tmp_path) -> None:
         repeats=4,
         connectivity_url="http://example.test/",
         block_official_client=True,
+        server_lock=True,
+        locked_server="00:1A:A9:17:FF:FF",
     )
     store.save_settings(settings)
     loaded = store.load_settings()
@@ -60,6 +63,8 @@ def test_settings_roundtrip(tmp_path) -> None:
     assert loaded.timeout == 25.0
     assert loaded.connectivity_url == "http://example.test/"
     assert loaded.block_official_client is True
+    assert loaded.server_lock is True
+    assert loaded.locked_server == "00:1a:a9:17:ff:ff"
 
 
 def test_settings_clamped(tmp_path) -> None:
@@ -72,3 +77,50 @@ def test_settings_clamped(tmp_path) -> None:
     assert loaded.check_interval >= 0.5
     assert loaded.retry_interval >= 0.5
     assert loaded.timeout >= 5.0
+
+
+def test_server_store_learns_and_updates(tmp_path) -> None:
+    store = ServerStore(tmp_path / "servers.json")
+    record = store.upsert(
+        "00-1A-A9-17-FF-FF",
+        interface="npf",
+        description="Realtek USB GbE",
+        success=True,
+    )
+    assert record is not None
+    assert record.mac == "00:1a:a9:17:ff:ff"
+    assert record.success_count == 1
+    assert record.last_success
+
+    store.upsert("00:1a:a9:17:ff:ff", success=True, name="HXXY")
+    loaded = store.get("00:1a:a9:17:ff:ff")
+    assert loaded is not None
+    assert loaded.success_count == 2
+    assert loaded.name == "HXXY"
+
+    assert store.rename("00:1a:a9:17:ff:ff", "主认证服务器")
+    assert store.get("00:1a:a9:17:ff:ff").name == "主认证服务器"
+    assert store.remove("00:1a:a9:17:ff:ff")
+    assert store.get("00:1a:a9:17:ff:ff") is None
+
+
+def test_server_store_imports_discovery(tmp_path) -> None:
+    discovery = tmp_path / "discovery.json"
+    discovery.write_text(
+        json.dumps(
+            {
+                "interface": "\\Device\\NPF_TEST",
+                "description": "Realtek USB GbE Family Controller",
+                "server_mac": "00:1A:A9:17:FF:FF",
+                "updated_at": "2026-11-18T06:02:30+08:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+    store = ServerStore(tmp_path / "servers.json")
+    record = store.import_discovery(discovery)
+    assert record is not None
+    assert record.mac == "00:1a:a9:17:ff:ff"
+    assert record.last_seen == "2026-11-18T06:02:30+08:00"
+    assert store.import_discovery(discovery) is not None
+    assert len(store.load()) == 1

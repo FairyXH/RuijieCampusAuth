@@ -9,9 +9,19 @@ from __future__ import annotations
 import hashlib
 import ipaddress
 import os
+import re
 from dataclasses import dataclass, field
 
 MARKER = b"\x00\x00\x13\x11"
+MAC_PATTERN = re.compile(r"^(?:[0-9a-f]{2}:){5}[0-9a-f]{2}$")
+
+
+def normalize_mac(value: str | None) -> str:
+    """Return a lowercase colon-separated MAC, or '' when invalid."""
+    text = str(value or "").strip().lower().replace("-", ":")
+    if re.fullmatch(r"[0-9a-f]{12}", text):
+        text = ":".join(text[index : index + 2] for index in range(0, 12, 2))
+    return text if MAC_PATTERN.fullmatch(text) else ""
 CLIENT_NAME = b"8021x.exe"
 CLIENT_VERSION = b"\x06\x56\x00\x00"
 CLIENT_FLAG = b"\x01"

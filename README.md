@@ -369,6 +369,19 @@ client.logout()
 - 若更换学校或服务器策略，建议先用 `--verbose` 抓取一次原客户端和本工具的
   EAPOL 流程进行对比。
 
+## 0.6.0 改动
+
+- 新增“服务器”页：服务器应答 EAPOL 后自动入库，记录 MAC、名称/描述、发现时间、
+  最近成功时间和成功次数；
+- 服务器列表持久化到 `%APPDATA%\RuijieCampusAuth\servers.json`；发现缓存中的
+  服务器会在首次启动时自动导入；
+- 新增“锁定服务器发包”：锁定后 EAPOL-Start 单播到锁定服务器，并忽略其他服务器
+  返回的 EAP 帧；Logoff 仍发往标准 PAE 组播（单播 Logoff 无法清理交换机会话）；
+- 锁定配置写入 `settings.json`（`server_lock` / `locked_server`），支持手动添加、
+  重命名、删除和刷新；
+- `Supplicant` 新增 `locked_server` 参数；CLI 新增 `--server MAC`，API
+  `RuijieClient(..., locked_server=...)` 同步支持。
+
 ## 0.5.1 改动
 
 - 窗口固定为 880×620，禁止改变大小和最大化；左侧配置栏固定 440px，取消可拖动分割条；

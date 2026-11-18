@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 __all__ = ["RuijieClient", "login"]
-__version__ = "0.5.1"
+__version__ = "0.6.0"
 
 
 def __getattr__(name: str) -> Any:

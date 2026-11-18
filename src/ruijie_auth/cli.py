@@ -25,7 +25,13 @@ try:
 except ImportError as exc:  # pragma: no cover - dependency error path
     raise SystemExit("缺少依赖 Scapy，请执行: python -m pip install scapy") from exc
 
-from .private import NetworkInfo, TailOptions, build_tail, collect_network_info
+from .private import (
+    NetworkInfo,
+    TailOptions,
+    build_tail,
+    collect_network_info,
+    normalize_mac,
+)
 
 
 EAP_REQUEST = 1
@@ -444,6 +450,7 @@ class Supplicant:
         network: NetworkInfo | None = None,
         tail_options: TailOptions | None = None,
         source_mac: str | None = None,
+        locked_server: str | None = None,
     ) -> None:
         self.interface = interface
         self.identity = identity
@@ -459,6 +466,12 @@ class Supplicant:
         self._session_nonce = os.urandom(16).hex().upper().encode()
         self._stop_event = threading.Event()
         self.source = source_mac or get_if_hwaddr(interface)
+        self.locked_server = normalize_mac(locked_server) or None
+        if self.locked_server:
+            LOG.info(
+                "已锁定认证服务器 %s，EAPOL-Start 将单播发送",
+                self.locked_server,
+            )
         self.packets: queue.Queue[Ether] = queue.Queue()
         self.server_mac: str | None = None
         self.connected = False
@@ -469,7 +482,12 @@ class Supplicant:
         self._stop_event.set()
 
     def logoff(self) -> None:
-        """Send a private-tail EAPOL-Logoff for the current account."""
+        """Send a private-tail EAPOL-Logoff for the current account.
+
+        Logoff always goes to the standard PAE group. A unicast Logoff to the
+        authenticator does not clear the switch session on HXXY, which makes the
+        next Start fail with EAP-Failure.
+        """
         frame = (
             Ether(src=self.source, dst=STANDARD_GROUP)
             / EAPOL(version=1, type=2, len=0)
@@ -520,12 +538,15 @@ class Supplicant:
 
     def send_start(self) -> None:
         frame = (
-            Ether(src=self.source, dst=RUIJIE_GROUP)
+            Ether(src=self.source, dst=self.locked_server or RUIJIE_GROUP)
             / EAPOL(version=1, type=1, len=0)
             / self._control_tail()
         )
         self.send(frame, count=self.repeats)
-        LOG.info("正在寻找认证服务器...")
+        if self.locked_server:
+            LOG.info("正在请求锁定的认证服务器 %s ...", self.locked_server)
+        else:
+            LOG.info("正在寻找认证服务器...")
 
     def authenticate(self) -> bool:
         self.connected = False
@@ -575,7 +596,11 @@ class Supplicant:
                     packet = self.packets.get(timeout=min(0.5, deadline - now))
                 except queue.Empty:
                     continue
-                if packet[Ether].src.lower() == self.source.lower():
+                source = packet[Ether].src.lower()
+                if source == self.source.lower():
+                    continue
+                if self.locked_server and source != self.locked_server:
+                    LOG.debug("忽略非锁定服务器 %s 的 EAP 帧", source)
                     continue
                 parsed = parse_eap(packet)
                 if parsed is None:
@@ -583,13 +608,13 @@ class Supplicant:
                 code, identifier, eap = parsed
                 self.connected = True
                 self.connected_at = time.monotonic()
-                self.server_mac = packet[Ether].src
+                self.server_mac = source
                 LOG.debug(
                     "RX EAP code=%d id=%d length=%d from=%s",
                     code,
                     identifier,
                     len(eap),
-                    packet[Ether].src,
+                    source,
                 )
 
                 if code == EAP_SUCCESS:
@@ -610,7 +635,7 @@ class Supplicant:
                     continue
 
                 eap_type = eap[4]
-                destination = packet[Ether].src
+                destination = source
                 self.server_mac = destination
                 key = (identifier, eap_type, eap[5:])
                 response = handled.get(key)
@@ -656,7 +681,10 @@ class Supplicant:
                 )
 
             if self.server_mac is None:
-                LOG.error("网卡连接失败或未找到认证服务器")
+                if self.locked_server:
+                    LOG.error("锁定的认证服务器 %s 未响应", self.locked_server)
+                else:
+                    LOG.error("网卡连接失败或未找到认证服务器")
             else:
                 LOG.error("认证超时，服务器未返回最终结果")
             return False
@@ -699,6 +727,10 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="不附加锐捷私有尾，仅发送标准 EAP-MD5（调试用）",
     )
     parser.add_argument("--log-file", type=Path, default=Path("ruijie-auth.log"))
+    parser.add_argument(
+        "--server",
+        help="锁定认证服务器 MAC，EAPOL-Start 单播发往该地址（Logoff 仍用标准组播）",
+    )
     parser.add_argument("--logoff", action="store_true", help="仅注销当前 802.1X 会话")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
@@ -751,6 +783,7 @@ def main(argv: Iterable[str] | None = None) -> int:
         retries=max(1, args.retries),
         repeats=max(1, args.repeats),
         private=not args.no_private,
+        locked_server=args.server,
     )
     try:
         return 0 if supplicant.authenticate() else 1

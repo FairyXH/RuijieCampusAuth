@@ -22,6 +22,7 @@ import subprocess
 import sys
 import threading
 from dataclasses import replace
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Callable, Iterable
@@ -47,6 +48,7 @@ from PySide6.QtGui import (
     QFont,
     QIcon,
     QPainter,
+    QPalette,
     QPen,
     QPixmap,
 )
@@ -66,6 +68,7 @@ from PySide6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
+    QInputDialog,
     QLabel,
     QLineEdit,
     QMainWindow,
@@ -95,12 +98,19 @@ from .cli import (
     probe_authenticator,
 )
 from .handoff import TakeoverState
-from .private import TailOptions, build_tail, collect_network_info
+from .private import (
+    TailOptions,
+    build_tail,
+    collect_network_info,
+    normalize_mac,
+)
 from .storage import (
     Account,
     AccountStore,
     AppSettings,
     DiscoveryCache,
+    ServerRecord,
+    ServerStore,
     default_data_dir,
     program_data_dir,
 )
@@ -224,10 +234,13 @@ QLineEdit, QComboBox, QSpinBox, QDoubleSpinBox {
 QComboBox::drop-down { border: none; width: 22px; }
 QComboBox QAbstractItemView {
     background: #ffffff;
+    color: #1c1c1e;
     border: 1px solid #e5e5ea;
+    outline: 0;
     selection-background-color: #e5efff;
     selection-color: #1c1c1e;
 }
+QComboBox QAbstractItemView::item { min-height: 28px; padding: 4px 8px; }
 QTableWidget {
     background: #ffffff;
     border: none;
@@ -272,6 +285,19 @@ QScrollBar::handle:vertical {
 }
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical { background: transparent; }
+QScrollBar:horizontal {
+    background: transparent;
+    height: 8px;
+    margin: 2px;
+}
+QScrollBar::handle:horizontal {
+    background: #c7c7cc;
+    border-radius: 4px;
+    min-width: 24px;
+}
+QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal { width: 0; }
+QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal { background: transparent; }
+QTableCornerButton::section { background: #ffffff; border: none; }
 QCheckBox { spacing: 8px; color: #1c1c1e; }
 QCheckBox::indicator {
     width: 20px;
@@ -286,6 +312,23 @@ QCheckBox::indicator:checked {
 }
 QStatusBar { color: #8e8e93; background: transparent; }
 QSplitter::handle { background: transparent; width: 10px; }
+QDialog, QMessageBox, QInputDialog { background: #ffffff; }
+QDialog QLabel, QMessageBox QLabel, QInputDialog QLabel { color: #1c1c1e; }
+QMenu {
+    background: #ffffff;
+    border: 1px solid #e5e5ea;
+    border-radius: 10px;
+    padding: 6px;
+    color: #1c1c1e;
+}
+QMenu::item {
+    background: transparent;
+    padding: 7px 24px 7px 12px;
+    border-radius: 6px;
+}
+QMenu::item:selected { background: #e5efff; color: #1c1c1e; }
+QMenu::item:disabled { color: #c7c7cc; }
+QMenu::separator { height: 1px; background: #e5e5ea; margin: 5px 8px; }
 QToolTip {
     background: #1c1c1e;
     color: #ffffff;
@@ -294,6 +337,35 @@ QToolTip {
     border-radius: 8px;
 }
 """
+
+
+def apply_light_palette(app: QApplication) -> None:
+    """Force light colors for native popups/dialogs under Windows dark mode."""
+    palette = QPalette()
+    role = QPalette.ColorRole
+    group = QPalette.ColorGroup
+    palette.setColor(role.Window, QColor("#ffffff"))
+    palette.setColor(role.WindowText, QColor("#1c1c1e"))
+    palette.setColor(role.Base, QColor("#ffffff"))
+    palette.setColor(role.AlternateBase, QColor("#f7f7fa"))
+    palette.setColor(role.ToolTipBase, QColor("#ffffff"))
+    palette.setColor(role.ToolTipText, QColor("#1c1c1e"))
+    palette.setColor(role.Text, QColor("#1c1c1e"))
+    palette.setColor(role.Button, QColor("#ffffff"))
+    palette.setColor(role.ButtonText, QColor("#1c1c1e"))
+    palette.setColor(role.BrightText, QColor("#ff3b30"))
+    palette.setColor(role.Highlight, QColor("#007aff"))
+    palette.setColor(role.HighlightedText, QColor("#ffffff"))
+    palette.setColor(role.PlaceholderText, QColor("#8e8e93"))
+    palette.setColor(role.Light, QColor("#ffffff"))
+    palette.setColor(role.Midlight, QColor("#f2f2f7"))
+    palette.setColor(role.Mid, QColor("#e5e5ea"))
+    palette.setColor(role.Dark, QColor("#d1d1d6"))
+    palette.setColor(role.Shadow, QColor("#c7c7cc"))
+    for disabled_role in (role.WindowText, role.Text, role.ButtonText):
+        palette.setColor(group.Disabled, disabled_role, QColor("#c7c7cc"))
+    palette.setColor(group.Disabled, role.Base, QColor("#fafafa"))
+    app.setPalette(palette)
 
 
 def is_admin() -> bool:
@@ -562,6 +634,7 @@ class AuthWorker(QThread):
         account: Account,
         settings: AppSettings,
         discovery: DiscoveryCache | None = None,
+        servers: ServerStore | None = None,
         parent=None,
     ):
         super().__init__(parent)
@@ -570,6 +643,7 @@ class AuthWorker(QThread):
         self.discovery = discovery or DiscoveryCache(
             default_data_dir() / "discovery.json"
         )
+        self.servers = servers or ServerStore(default_data_dir() / "servers.json")
         self._stop = threading.Event()
         self._force_rediscover = threading.Event()
         self._supp: Supplicant | None = None
@@ -637,6 +711,11 @@ class AuthWorker(QThread):
             except Exception:  # noqa: BLE001 - details are best effort
                 pass
 
+        locked_server = (
+            self.settings.locked_server if self.settings.server_lock else None
+        )
+        if locked_server:
+            self.channel.emit(f"锁定认证服务器: {locked_server}")
         self.state.emit("authenticating", f"正在认证 {self.account.username} ...")
         supp = Supplicant(
             interface=self._resolved,
@@ -647,6 +726,7 @@ class AuthWorker(QThread):
             repeats=self.settings.repeats,
             private=True,
             logoff_first=True,
+            locked_server=locked_server,
         )
         self._supp = supp
         try:
@@ -670,6 +750,19 @@ class AuthWorker(QThread):
                 mac=mac,
                 server_mac=supp.server_mac or "",
             )
+            record = self.servers.upsert(
+                supp.server_mac or "",
+                interface=self._resolved,
+                description=description,
+                success=ok,
+            )
+            if record is not None and ok:
+                LOG.info(
+                    "已记录认证服务器: %s | %s | 成功 %d 次",
+                    record.mac,
+                    record.label,
+                    record.success_count,
+                )
             suffix = f" → {supp.server_mac}" if supp.server_mac else ""
             self.channel.emit(f"已缓存通道: {description}{suffix}")
             LOG.info(
@@ -885,6 +978,10 @@ class MainWindow(QMainWindow):
         self.args = args
         self.accounts = store.load_accounts()
         self.discovery = DiscoveryCache(store.base_dir / "discovery.json")
+        self.servers = ServerStore(store.base_dir / "servers.json")
+        self.servers.import_discovery(self.discovery.path)
+        self._server_records: list[ServerRecord] = []
+        self._updating_server_table = False
         self.worker: AuthWorker | None = None
         self.one_shot: OneShotWorker | None = None
         self.tray: QSystemTrayIcon | None = None
@@ -963,6 +1060,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._build_accounts_page(), "账号")
         self.tabs.addTab(self._build_auth_page(), "认证")
         self.tabs.addTab(self._build_connection_page(), "连接")
+        self.tabs.addTab(self._build_server_page(), "服务器")
         self.tabs.addTab(self._build_debug_page(), "调试")
         body.addWidget(self.tabs, 0)
         body.addWidget(self._build_log_page(), 1)
@@ -1213,6 +1311,89 @@ class MainWindow(QMainWindow):
         scroll.setWidget(page)
         return scroll
 
+    def _build_server_page(self) -> QWidget:
+        page = QWidget()
+        self.server_page = page
+        layout = QVBoxLayout(page)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
+
+        hint = QLabel("认证服务器列表 · 应答过的服务器会自动记录")
+        hint.setObjectName("muted")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        self.server_table = QTableWidget(0, 4)
+        self.server_table.setHorizontalHeaderLabels(
+            ["锁定", "服务器 MAC", "名称 / 描述", "成功"]
+        )
+        self.server_table.verticalHeader().setVisible(False)
+        self.server_table.setShowGrid(False)
+        self.server_table.setMinimumHeight(190)
+        self.server_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self.server_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.server_table.setEditTriggers(
+            QAbstractItemView.EditTrigger.NoEditTriggers
+        )
+        self.server_table.setWordWrap(False)
+        self.server_table.setHorizontalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.server_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded
+        )
+        self.server_table.setHorizontalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel
+        )
+        self.server_table.setVerticalScrollMode(
+            QAbstractItemView.ScrollMode.ScrollPerPixel
+        )
+        header_view = self.server_table.horizontalHeader()
+        header_view.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+        header_view.setStretchLastSection(False)
+        self.server_table.setColumnWidth(0, 40)
+        self.server_table.setColumnWidth(1, 150)
+        self.server_table.setColumnWidth(2, 130)
+        self.server_table.setColumnWidth(3, 80)
+        layout.addWidget(self.server_table, 1)
+
+        self.server_add_button = QPushButton("添加")
+        self.server_rename_button = QPushButton("重命名")
+        self.server_delete_button = QPushButton("删除")
+        self.server_refresh_button = QPushButton("刷新")
+        buttons = QGridLayout()
+        buttons.setHorizontalSpacing(6)
+        buttons.setVerticalSpacing(6)
+        buttons.addWidget(self.server_add_button, 0, 0)
+        buttons.addWidget(self.server_rename_button, 0, 1)
+        buttons.addWidget(self.server_delete_button, 0, 2)
+        buttons.addWidget(self.server_refresh_button, 0, 3)
+        layout.addLayout(buttons)
+
+        lock_group = QGroupBox("服务器锁定")
+        lock_layout = QVBoxLayout(lock_group)
+        lock_layout.setContentsMargins(4, 0, 4, 4)
+        lock_layout.setSpacing(2)
+        self.server_lock_check = ToggleSwitch()
+        lock_layout.addWidget(
+            self._switch_row(
+                "锁定服务器发包",
+                "EAPOL-Start 单播到选中服务器，忽略其他服务器；Logoff 仍走标准组播",
+                self.server_lock_check,
+            )
+        )
+        self.server_status = QLabel("未锁定: 自动发现，EAPOL 发往组播地址")
+        self.server_status.setObjectName("muted")
+        self.server_status.setWordWrap(True)
+        self.server_status.setContentsMargins(50, 0, 4, 2)
+        lock_layout.addWidget(self.server_status)
+        layout.addWidget(lock_group)
+        return page
+
     def _build_debug_page(self) -> QWidget:
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
@@ -1298,6 +1479,14 @@ class MainWindow(QMainWindow):
         self.toggle_button.clicked.connect(self.toggle_auth)
         self.interface_refresh.clicked.connect(self.refresh_interfaces)
         self.rediscover_button.clicked.connect(self.force_rediscover)
+        self.server_table.itemSelectionChanged.connect(self._on_server_selected)
+        self.server_table.doubleClicked.connect(lambda _index: self.rename_server())
+        self.server_add_button.clicked.connect(self.add_server)
+        self.server_rename_button.clicked.connect(self.rename_server)
+        self.server_delete_button.clicked.connect(self.delete_server)
+        self.server_refresh_button.clicked.connect(self._refresh_servers)
+        self.server_lock_check.toggled.connect(self._on_server_lock_toggled)
+        self.tabs.currentChanged.connect(self._on_tab_changed)
         self.clear_log_button.clicked.connect(self.log_view.clear)
         self.open_log_button.clicked.connect(self.open_log_dir)
         for widget in (
@@ -1335,7 +1524,9 @@ class MainWindow(QMainWindow):
         self.verbose_check.setChecked(self.settings.verbose)
         self.logoff_on_stop_check.setChecked(self.settings.logoff_on_stop)
         self.block_check.setChecked(self.settings.block_official_client)
+        self.server_lock_check.setChecked(self.settings.server_lock)
         self._select_interface(self.settings.interface)
+        self._refresh_servers()
         self._update_cache_label()
 
     def _save_settings_from_ui(self) -> None:
@@ -1354,6 +1545,7 @@ class MainWindow(QMainWindow):
         self.settings.verbose = self.verbose_check.isChecked()
         self.settings.logoff_on_stop = self.logoff_on_stop_check.isChecked()
         self.settings.block_official_client = self.block_check.isChecked()
+        self.settings.server_lock = self.server_lock_check.isChecked()
         self.settings.interface = str(self.interface_combo.currentData() or "")
         self.log_handler.setLevel(
             logging.DEBUG if self.settings.verbose else logging.INFO
@@ -1365,16 +1557,25 @@ class MainWindow(QMainWindow):
         self._update_cache_label()
 
     def _update_cache_label(self) -> None:
+        lock_suffix = (
+            f" | 锁定服务器 {self.settings.locked_server}"
+            if self.settings.server_lock and self.settings.locked_server
+            else ""
+        )
         if self.settings.interface:
-            self.cache_label.setText("认证通道: 指定网卡（不使用自动探测缓存）")
+            self.cache_label.setText(
+                "认证通道: 指定网卡（不使用自动探测缓存）" + lock_suffix
+            )
             return
         info = self.discovery.load()
         if info:
             description = info.description or info.interface
             suffix = f" → {info.server_mac}" if info.server_mac else ""
-            self.cache_label.setText(f"已缓存通道: {description}{suffix}")
+            self.cache_label.setText(
+                f"已缓存通道: {description}{suffix}{lock_suffix}"
+            )
         else:
-            self.cache_label.setText("认证通道: 自动探测")
+            self.cache_label.setText("认证通道: 自动探测" + lock_suffix)
 
     def force_rediscover(self) -> None:
         if self.worker and self.worker.isRunning():
@@ -1385,6 +1586,179 @@ class MainWindow(QMainWindow):
             self.discovery.clear()
             self._update_cache_label()
             LOG.info("已清除认证通道缓存")
+
+    @staticmethod
+    def _short_time(value: str) -> str:
+        if not value:
+            return ""
+        try:
+            return datetime.fromisoformat(value).strftime("%m-%d %H:%M")
+        except ValueError:
+            return value[:16]
+
+    def _refresh_servers(self) -> None:
+        try:
+            records = self.servers.load()
+        except OSError as exc:
+            LOG.warning("读取服务器列表失败: %s", exc)
+            records = []
+        self._server_records = records
+        self._updating_server_table = True
+        self.server_table.blockSignals(True)
+        self.server_table.setRowCount(len(records))
+        locked_mac = self.settings.locked_server if self.settings.server_lock else ""
+        for row, record in enumerate(records):
+            lock_item = QTableWidgetItem("✓" if record.mac == locked_mac else "")
+            lock_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            lock_item.setFlags(
+                Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsSelectable
+            )
+            self.server_table.setItem(row, 0, lock_item)
+            self.server_table.setItem(row, 1, QTableWidgetItem(record.mac))
+            self.server_table.setItem(
+                row,
+                2,
+                QTableWidgetItem(record.name or record.description or "—"),
+            )
+            success = f"{record.success_count} 次" if record.success_count else "发现"
+            success_item = QTableWidgetItem(success)
+            if record.last_success:
+                success_item.setToolTip(
+                    f"最近成功: {self._short_time(record.last_success)}"
+                )
+            elif record.last_seen:
+                success_item.setToolTip(
+                    f"最近发现: {self._short_time(record.last_seen)}"
+                )
+            self.server_table.setItem(row, 3, success_item)
+        if records:
+            target = 0
+            for row, record in enumerate(records):
+                if record.mac == locked_mac:
+                    target = row
+                    break
+            self.server_table.setCurrentCell(target, 0)
+        self.server_table.blockSignals(False)
+        self._updating_server_table = False
+        self._update_server_status()
+
+    def _selected_server(self) -> ServerRecord | None:
+        row = self.server_table.currentRow()
+        if 0 <= row < len(self._server_records):
+            return self._server_records[row]
+        return None
+
+    def _update_server_status(self) -> None:
+        record = next(
+            (
+                item
+                for item in self._server_records
+                if item.mac == self.settings.locked_server
+            ),
+            None,
+        )
+        if self.settings.server_lock and record is not None:
+            self.server_status.setText(
+                f"已锁定: {record.mac} | {record.label} | 成功 {record.success_count} 次"
+            )
+        elif self.settings.server_lock:
+            self.server_status.setText(f"已锁定: {self.settings.locked_server}")
+        else:
+            self.server_status.setText("未锁定: 自动发现，EAPOL 发往组播地址")
+
+    def _on_server_selected(self) -> None:
+        if self._updating_server_table:
+            return
+        record = self._selected_server()
+        if record is not None and self.settings.server_lock:
+            if record.mac != self.settings.locked_server:
+                self.settings.locked_server = record.mac
+                self.store.save_settings(self.settings)
+                self._refresh_servers()
+                self._update_cache_label()
+                return
+        self._update_server_status()
+
+    def _on_server_lock_toggled(self, checked: bool) -> None:
+        if self._loading or self._updating_server_table:
+            return
+        if checked:
+            record = self._selected_server()
+            if record is None:
+                record = next(
+                    (
+                        item
+                        for item in self._server_records
+                        if item.mac == self.settings.locked_server
+                    ),
+                    None,
+                )
+            if record is None:
+                self.server_lock_check.blockSignals(True)
+                self.server_lock_check.setChecked(False)
+                self.server_lock_check.blockSignals(False)
+                QMessageBox.information(self, "服务器锁定", "请先在列表中选择一个服务器")
+                return
+            self.settings.server_lock = True
+            self.settings.locked_server = record.mac
+        else:
+            self.settings.server_lock = False
+        self.store.save_settings(self.settings)
+        self._refresh_servers()
+        self._update_cache_label()
+
+    def _on_tab_changed(self, index: int) -> None:
+        if self.tabs.widget(index) is getattr(self, "server_page", None):
+            self._refresh_servers()
+
+    def add_server(self) -> None:
+        mac_text, ok = QInputDialog.getText(
+            self, "添加服务器", "服务器 MAC（如 00:1a:a9:17:ff:ff）"
+        )
+        if not ok:
+            return
+        mac = normalize_mac(mac_text)
+        if not mac:
+            QMessageBox.warning(self, "添加服务器", "MAC 地址格式无效")
+            return
+        name, ok = QInputDialog.getText(self, "服务器名称", "名称（可留空）")
+        self.servers.upsert(mac, name=name.strip() if ok else None)
+        self._refresh_servers()
+        LOG.info("已添加认证服务器: %s", mac)
+
+    def rename_server(self) -> None:
+        record = self._selected_server()
+        if record is None:
+            QMessageBox.information(self, "重命名", "请先选择一个服务器")
+            return
+        name, ok = QInputDialog.getText(
+            self, "重命名服务器", "名称", text=record.name
+        )
+        if not ok:
+            return
+        self.servers.rename(record.mac, name)
+        self._refresh_servers()
+
+    def delete_server(self) -> None:
+        record = self._selected_server()
+        if record is None:
+            QMessageBox.information(self, "删除服务器", "请先选择一个服务器")
+            return
+        answer = QMessageBox.question(
+            self, "删除服务器", f"从列表中删除 {record.mac}？"
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.servers.remove(record.mac)
+        if self.settings.locked_server == record.mac:
+            self.settings.server_lock = False
+            self.settings.locked_server = ""
+            self.store.save_settings(self.settings)
+            self.server_lock_check.blockSignals(True)
+            self.server_lock_check.setChecked(False)
+            self.server_lock_check.blockSignals(False)
+        self._refresh_servers()
+        self._update_cache_label()
 
     def open_log_dir(self) -> None:
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.store.logs_dir)))
@@ -1588,8 +1962,16 @@ class MainWindow(QMainWindow):
             repeats=settings.repeats,
             private=True,
             logoff_first=True,
+            locked_server=(
+                settings.locked_server if settings.server_lock else None
+            ),
         )
-        return "认证成功" if supp.authenticate() else "认证失败（详见运行日志）"
+        ok = supp.authenticate()
+        if supp.server_mac:
+            self.servers.upsert(
+                supp.server_mac, interface=interface, success=ok
+            )
+        return "认证成功" if ok else "认证失败（详见运行日志）"
 
     def toggle_auth(self) -> None:
         if self.worker and self.worker.isRunning():
@@ -1614,7 +1996,13 @@ class MainWindow(QMainWindow):
         self._save_settings_from_ui()
         self._last_account = account
         self._last_state = "starting"
-        self.worker = AuthWorker(account, self.settings, self.discovery, self)
+        self.worker = AuthWorker(
+            account,
+            self.settings,
+            discovery=self.discovery,
+            servers=self.servers,
+            parent=self,
+        )
         self.worker.state.connect(self.on_worker_state)
         self.worker.details.connect(self.on_worker_details)
         self.worker.channel.connect(self.on_worker_channel)
@@ -1652,6 +2040,8 @@ class MainWindow(QMainWindow):
 
     def on_worker_state(self, code: str, text: str) -> None:
         self._last_state = code
+        if code == "authenticated" and text == "认证成功":
+            self._refresh_servers()
         colors = {
             "authenticated": "#34d399",
             "authenticating": "#38bdf8",
@@ -1745,6 +2135,9 @@ class MainWindow(QMainWindow):
             retries=settings.retries,
             repeats=settings.repeats,
             private=True,
+            locked_server=(
+                settings.locked_server if settings.server_lock else None
+            ),
         ).logoff()
         return "已发送注销"
 
@@ -1758,11 +2151,17 @@ class MainWindow(QMainWindow):
             action.setText("停止认证" if running else "开始认证")
         self.settings_group.setEnabled(not running)
         self.account_table.setEnabled(not running)
+        self.server_table.setEnabled(not running)
+        self.server_lock_check.setEnabled(not running)
         for widget in (
             self.add_button,
             self.edit_button,
             self.delete_button,
             self.test_button,
+            self.server_add_button,
+            self.server_rename_button,
+            self.server_delete_button,
+            self.server_refresh_button,
         ):
             widget.setEnabled(not running)
         self.debug_panel.set_running(running)
@@ -1806,6 +2205,9 @@ class MainWindow(QMainWindow):
             repeats=self.settings.repeats,
             private=self.debug_panel.private_check.isChecked(),
             source_mac=source_mac,
+            locked_server=(
+                self.settings.locked_server if self.settings.server_lock else None
+            ),
         )
 
     def debug_logoff(self) -> None:
@@ -2208,6 +2610,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     app.setApplicationVersion(APP_VERSION)
     app.setQuitOnLastWindowClosed(False)
     app.setStyle("Fusion")
+    apply_light_palette(app)
     app.setFont(QFont(UI_FONT, 9))
     app.setStyleSheet(STYLE)
 

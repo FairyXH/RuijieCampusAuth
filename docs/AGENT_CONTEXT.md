@@ -41,6 +41,14 @@ Windows client. It is a compatibility client, not an authentication bypass.
   session; "link egress" and "fresh 802.1X auth" must be reported separately.
   Pin the interface for probes: binding the source address alone still lets the
   WLAN default route win.
+- 0.6.0: server list learned from live EAP responses and a lock-server switch.
+  `%APPDATA%\RuijieCampusAuth\servers.json` stores MAC/name/interface,
+  first/last-seen, last-success, and success count.
+- 2026-11-18 08:49: locked unicast authentication validated live on HXXY:
+  group Logoff → unicast EAPOL-Start to `00:1a:a9:17:ff:ff` → EAP-MD5 →
+  EAP-Success. A **unicast Logoff** to the authenticator does not clear the
+  switch session and makes the next Start fail with EAP-Failure; Logoff must
+  stay on the standard PAE group `01:80:c2:00:00:03`.
 
 ## Architecture
 
@@ -58,10 +66,13 @@ Windows client. It is a compatibility client, not an authentication bypass.
   - `RuijieClient` and `ruijie_hxxy.login()`.
 - `src/ruijie_auth/gui.py`
   - PySide6 main window, account manager, tray, debug tools.
+  - Server tab: learned authenticators, manual add/rename/delete, lock switch.
   - Preempt auth worker and TCP connectivity monitor.
   - Takeover switch wiring: blocker + auth worker + heartbeat.
 - `src/ruijie_auth/storage.py`
   - `%APPDATA%\RuijieCampusAuth` accounts/settings, Windows DPAPI passwords.
+  - `ServerStore` persists learned authenticators to `servers.json`; discovery
+    cache seeds it on first launch.
   - `program_data_dir()` for machine-wide state.
 - `src/ruijie_auth/blocker.py`
   - Kills 8021x.exe in a watchdog loop.
@@ -95,6 +106,10 @@ Wired HXXY flow: EAP-MD5.
 
 - Control frames: EAPOL-Logoff / Start are 587 bytes: 14-byte Ethernet header,
   4-byte EAPOL header with length 0, then a 569-byte private tail.
+- EAPOL-Start may be unicast to a learned authenticator MAC and is accepted.
+  EAPOL-Logoff must stay on the standard PAE group `01:80:c2:00:00:03`: a
+  unicast Logoff does not clear the switch session, and the next Start then
+  receives EAP-Failure without an Identity request.
 - Identity response: 601 bytes: EAPOL length field is 14 (the EAP length);
   the 569-byte tail is appended outside the EAPOL length.
 - MD5 response: 618 bytes: EAPOL length field is 31; the tail is outside it.

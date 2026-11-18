@@ -43,6 +43,7 @@ class RuijieClient:
         log_file: str | Path | None = "ruijie-auth.log",
         verbose: bool = False,
         private_tail: bool = True,
+        locked_server: str | None = None,
     ) -> None:
         self.username = username
         self._password = password
@@ -52,6 +53,7 @@ class RuijieClient:
         self.retries = max(1, retries)
         self.repeats = max(1, repeats)
         self.private_tail = private_tail
+        self.locked_server = locked_server
         self.logs: list[str] = []
         self._handler = _MemoryLogHandler(self.logs)
         self._interface: str | None = None
@@ -112,6 +114,7 @@ class RuijieClient:
                 retries=self.retries,
                 repeats=self.repeats,
                 private=self.private_tail,
+                locked_server=self.locked_server,
             ).authenticate()
             self._status.update(
                 state="authenticated" if ok else "failed",
@@ -142,6 +145,7 @@ class RuijieClient:
                 retries=self.retries,
                 repeats=self.repeats,
                 private=self.private_tail,
+                locked_server=self.locked_server,
             ).logoff()
             self._status.update(
                 state="logged_out", authenticated=False, message="已注销"
