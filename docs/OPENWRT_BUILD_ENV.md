@@ -92,7 +92,7 @@ bin/targets/ramips/mt7621/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squa
 `files/etc/`，重新构建后 `unsquashfs -l root.squashfs` 能看到
 `squashfs-root/etc/hxxy-smoke`，LuCI 静态资源也正常。测试 marker 已删除。
 
-### 自定义 R3G 镜像（2026-11-18）
+### 自定义 R3G 镜像（2026-11-19）
 
 源码树里的脚本会先交叉编译 mipsle，再组装 `files/` 覆盖并调用 Image Builder：
 
@@ -104,28 +104,31 @@ sh scripts/build-image.sh
 结果：
 
 - `openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin`
-  约 7.9MB
-- SHA256 `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`
+  约 8.1MB
+- SHA256 `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`
 - `root.squashfs` 已确认包含：
-  - `/usr/sbin/hxxy-auth`
+  - `/usr/sbin/hxxy-auth`（4.06MB，mipsle）
   - `/etc/config/hxxy-auth`
+  - `/etc/init.d/hxxy-auth`
+  - `/etc/hotplug.d/iface/90-hxxy-auth`
   - `/etc/uci-defaults/90-hxxy-auth`
+  - `/etc/rc.d/S95hxxy-auth`（uci-defaults 已 enable）
   - `/usr/share/luci/menu.d/luci-app-hxxy-auth.json`
   - `/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json`
-  - `/www/luci-static/resources/view/hxxy-auth/{overview,settings,logs}.js`
+  - `/www/luci-static/resources/view/hxxy-auth/{overview,accounts,servers,settings,logs}.js`
 
-这是第一版“CLI + LuCI 壳”，还没有常驻 supplicant/daemon、procd init
-和 UA3F 伪装；LUCI 概览页会显示 `stopped`。
+这一版已经包含常驻 daemon、raw socket、账号池、服务器/探测缓存、
+procd init/hotplug。`disguise=full` 的 UA3F 脚本还没实现，目前只是配置项；
+概览页在无认证服务器且外网在线时会显示 `paused`。
 
-后续 `files/` 计划放：
+`files/` 当前/计划：
 
 ```text
-files/usr/sbin/hxxy-auth
+files/usr/sbin/hxxy-auth                 # 构建时生成，不入库
 files/etc/init.d/hxxy-auth
-files/etc/config/hxxy-auth
+files/etc/config/hxxy-auth               # config auth + config account（明文，0600）
 files/etc/hotplug.d/iface/90-hxxy-auth
-files/etc/hxxy-auth/accounts.json
-files/etc/init.d/hxxy-disguise
+files/etc/init.d/hxxy-disguise           # 待实现（UA3F）
 files/usr/share/luci/menu.d/luci-app-hxxy-auth.json
 files/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
 files/www/luci-static/resources/view/hxxy-auth/*.js
@@ -158,16 +161,22 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
 
 `Size`/`SHA256sum` 对上即可。重跑 `make image` 会直接命中缓存。
 
-## 3. 构建验证记录（2026-11-18）
+## 3. 构建验证记录（2026-11-19）
 
 - stock R3G 镜像构建成功，sha256 全过。
 - `FILES=files/` 覆盖构建成功，marker 和 LuCI 静态资源进入 squashfs。
 - Go 协议核心：`go test ./...`、`go vet ./...` 通过；569 字节私有尾
   SHA256 与 C#/Python 一致
   `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`。
-- 自定义 R3G 镜像构建成功（7.9MB，SHA256
-  `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`），
-  squashfs 内含 CLI、LuCI 视图/菜单/ACL、UCI 配置。
+- 自定义 R3G 镜像构建成功（8.1MB，SHA256
+  `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`），
+  squashfs 内含 daemon、procd init、hotplug、UCI 配置、五个 LuCI 视图、
+  menu/ACL，`etc/rc.d/S95hxxy-auth` 已 enable。
+- Go 功能测试：UCI/账号池上限、服务器/探测缓存、控制 socket、
+  supplicant 假认证器全链路、网关解析、`go vet` 全通过。
+- x86_64 QEMU daemon 实测：`br-lan` 上打开 AF_PACKET；无认证服务器且
+  localhost 探测在线时进入 `paused`，概览页显示账号/接口；Resume 按钮
+  能拉回认证流程并再次暂停；账号页、服务器/缓存页、设置页均正常渲染。
 - Go mipsle smoke：1.7MB 静态 ELF，`qemu-mipsel` 输出 `mipsle ok`。
 - Go GB18030：`x/text` 编码 `电信宽带服务` 输出
   `b5e7d0c5bfedb4f8b7fecef1`，与 Python `gb18030` 一致；解码回原文正常。
@@ -235,10 +244,15 @@ kill "$(cat /tmp/socat-http.pid)" "$(cat /tmp/socat-https.pid)"
 
 - VM 上 `bettercap` 占用了 `8081`，所以用 `18080/18443`。
 - 没有 `/dev/kvm`，QEMU 走 TCG；OpenWrt 启动约 30–60 秒。
-- x86 测试镜像（2026-11-18）：已注入 amd64 CLI + 同一套 LuCI 文件，
-  实测 Services → HXXY Auth 概览页显示 `stopped`/`服务未运行`，设置页
-  正确回显 UCI 配置。注入前的 stock 镜像备份在
+- x86 测试镜像（2026-11-19）：已注入完整 amd64 daemon + LuCI + procd
+  init + 测试配置（`device=br-lan`、localhost 探测、一个测试账号）。
+  实测 daemon 在 `br-lan` 上打开 AF_PACKET；无认证服务器时自动进入
+  `paused`（“未检测到认证服务器，当前网络在线，暂停认证”），概览页
+  显示账号/接口；Resume 按钮能把 paused 拉回认证并再次暂停；账号池、
+  服务器/缓存、设置页均正常渲染。注入前的 stock 镜像备份在
   `/opt/openwrt/qemu/openwrt-x86-64.img.bak`。
+- 注意：x86 测试配置里有一个 dummy 账号，仅存在于 QEMU 测试镜像；
+  R3G 镜像不包含任何账号，`device=wan`。
 - 快速迭代方式：
   1. 用 x86_64 Image Builder 重新构建带 `files/` 的 x86 镜像；
   2. 给 QEMU 加 SSH hostfwd（例如 `12222->22`），把 `files/` 直接

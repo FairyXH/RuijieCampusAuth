@@ -317,11 +317,12 @@ NFQUEUE 吞吐是主要风险。**
 不能再使用 exe 目录（`/usr/sbin` 在 squashfs 上只读）。建议：
 
 ```
-/etc/config/hxxy-auth              UCI 配置（0600）
-/etc/hxxy-auth/accounts.json       账号池（0600）
+/etc/config/hxxy-auth              UCI 配置（含 config account，明文 0600）
+/etc/hxxy-auth/servers.json        学习到的服务器 + locked
+/etc/hxxy-auth/discovery.json      探测缓存
 /var/run/hxxy-auth/status.json     运行状态
-/var/run/hxxy-auth/pid             进程锁
-/var/log/hxxy-auth.log             日志（或 syslog）
+/var/run/hxxy-auth.sock            控制 socket（0600）
+/var/log/hxxy-auth.log             日志（1MB 轮转）
 ```
 
 现有 `ServiceConfig.ServiceRoot`、`UserStore.BaseDirectory`、
@@ -336,10 +337,10 @@ NFQUEUE 吞吐是主要风险。**
 ### 5.5 密码保护
 
 - DPAPI 在 Linux 不可用；现有 `machine-dpapi:` 账号无法在路由器解密。
-- 方案：`accounts.json` 0600 + root only；或 UCI `list account`。
-  如果担心备份泄露，可用 age/openssl 加密，但密钥仍在路由器上，收益有限。
-- 迁移时在路由器上重新录入账号，或从 Windows 导出明文再导入；
-  不要把凭据写进仓库。
+- 账号池使用 UCI `config account`，密码明文保存，文件 0600。按当前部署
+  要求不做 DPAPI/加密；路由器是单用户 root 环境，加密收益有限。
+- 迁移时在路由器 LuCI 账号页重新录入，或从 Windows 导出明文再导入；
+  不要把真实凭据写进仓库。
 
 ### 5.6 GUI 与管理面
 
@@ -379,14 +380,16 @@ NFQUEUE 吞吐是主要风险。**
 | 账号 | 账号列表：用户名、备注、启用、当前；增删改、设当前 | `hxxy-auth accounts ... --json` |
 | 服务器 | 学习到的认证服务器：MAC、名称、成功次数、最后成功；锁定/解锁/删除 | `hxxy-auth servers ... --json` |
 | 设置 | device、服务名、静态 ID、timeout/retries/repeats/start_timeout、重认证间隔、家庭网络暂停、伪装等级、连接检测 URL、日志级别 | `L.uci` 的 `hxxy-auth` 配置 |
-| 日志 | 最近 200 行，自动刷新 | `hxxy-auth log --lines 200` |
+| 日志 | 最近内容，自动刷新 | `fs.read('/var/log/hxxy-auth.log')` |
 
 **配置分层：**
 
-- `/etc/config/hxxy-auth`（UCI，非敏感）：认证参数、伪装等级、日志级别。
-- `/etc/hxxy-auth/accounts.json`（0600，CLI 管理）：账号池 + active id。
-- `/etc/hxxy-auth/servers.json`（CLI 管理）：学习到的服务器 + locked 标记。
+- `/etc/config/hxxy-auth`（UCI，0600）：认证参数、`config account` 账号池
+  （明文）、伪装等级、日志级别。
+- `/etc/hxxy-auth/servers.json`（daemon/CLI 管理）：学习到的服务器 + locked。
+- `/etc/hxxy-auth/discovery.json`：探测缓存。
 - `/var/run/hxxy-auth/status.json`：运行状态。
+- `/var/run/hxxy-auth.sock`：控制 socket（0600）。
 - `/var/log/hxxy-auth.log`：日志（1MB 轮转）。
 
 UCI：
@@ -402,23 +405,27 @@ config auth 'main'
     option repeats '3'
     option start_timeout '3'
     option reauth_interval '21600'
+    option check_interval '2'
+    option retry_interval '3'
+    option autoguard '1'
+    option preempt '1'
+    option discovery_cache '1'
+    option logoff_on_stop '0'
     option pause_on_home '1'
     option connectivity_url 'http://www.baidu.com/'
     option disguise 'basic'        # off | basic | full
     option log_level 'info'
+
+config account 'a1'
+    option username 'S12016004'
+    option password '...'
+    option note '主账号'
+    option enabled '1'
+    option active '1'
 ```
 
-`accounts.json`：
-
-```json
-{
-  "version": 1,
-  "active": "a1",
-  "accounts": [
-    {"id": "a1", "username": "S12016004", "password": "...", "note": "主账号", "enabled": true}
-  ]
-}
-```
+账号池最多 5 个；`active` 的账号优先，失败后按顺序尝试其他 `enabled`
+账号。密码明文保存，文件 0600。
 
 `servers.json`：
 
@@ -455,7 +462,7 @@ hxxy-auth servers list --json
 hxxy-auth accounts list --json
 [{"id":"a1","username":"S12016004","note":"主账号","enabled":true,"active":true}]
 
-hxxy-auth log --lines 200
+# 日志页直接 fs.read('/var/log/hxxy-auth.log')
 hxxy-auth auth|logoff|pause|resume|reload
 ```
 
@@ -584,9 +591,10 @@ rpcd ACL：
 /usr/sbin/hxxy-auth                 Go 静态二进制（协议 + 守护进程）
 /etc/init.d/hxxy-auth               procd 脚本
 /etc/hotplug.d/iface/90-hxxy-auth   WAN up/down 通知
-/etc/config/hxxy-auth               UCI 配置（非敏感）
-/etc/hxxy-auth/accounts.json        账号池（0600）
+/etc/config/hxxy-auth               UCI 配置（含 config account，明文 0600）
 /etc/hxxy-auth/servers.json         学习到的服务器（含 locked）
+/etc/hxxy-auth/discovery.json       探测缓存
+/var/run/hxxy-auth.sock             控制 socket（0600）
 /etc/init.d/hxxy-disguise           伪装层（TTL/MSS/IPv6/UA3F）
 /var/run/hxxy-auth/status.json      状态
 /var/log/hxxy-auth.log              日志（1MB 轮转）
@@ -635,7 +643,7 @@ hxxy-auth status [--json]
 hxxy-auth auth|logoff|pause|resume|reload
 hxxy-auth accounts list|add|update|remove|use [--json]
 hxxy-auth servers list|lock|unlock|remove [--json]
-hxxy-auth log [--lines N] [-f]
+hxxy-auth discovery show|clear
 hxxy-auth config show
 ```
 

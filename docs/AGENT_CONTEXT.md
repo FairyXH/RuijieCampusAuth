@@ -474,31 +474,33 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   The clean R3G sysupgrade image SHA256 is
   `c4742ea371e7053933a308e1ef92761dad2dfd77aa4f13fc58992d10ec133e4a`.
   Credentials for the VM itself are not stored here.
-- `openwrt/` — R3G source tree, added 2026-11-18. `hxxy-auth/` is the Go
-  module: `internal/protocol` has the private tail, CRC16/XMODEM, bit
-  obfuscation, MD5-chained credentials, EAPOL framing, EAP-MD5, and GB18030
-  server-message parsing. The 569-byte golden test passes with SHA256
-  `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`.
-  The CLI supports `version`, `status [--json]`, `tail`, and `selftest`.
-  `luci-app-hxxy-auth/` contains the menu, rpcd ACL, overview/settings/logs
-  views; `files/etc/config/hxxy-auth` holds UCI defaults;
-  `scripts/build-go.sh` cross-compiles mipsle and `scripts/build-image.sh`
-  assembles the Image Builder overlay. Source lives in the Windows repo;
-  compile/test/image work happens only on the Ubuntu VM (see
-  `docs/OPENWRT_BUILD_ENV.md`). A custom R3G image (7.9MB, SHA256
-  `a7af74eae303ef8234ab3eb14bd97a49abf60fcadc69ac4669f7966021a66bdd`)
-  contains `/usr/sbin/hxxy-auth`, the LuCI views/menu/ACL, and the UCI config.
-  MD5 is protocol-mandated for EAP-MD5 and the private tail; it is documented
-  as wire compatibility, not password storage. The source is generic OpenWrt,
-  not R3G-specific: only the Image Builder `PROFILE`/device packages, the
-  target `GOARCH`, the UCI `device`, and UA3F's kmod dependencies are target
-  related. LuCI was verified in the x86 QEMU guest by injecting the amd64 CLI
-  and the same LuCI files: Services → HXXY Auth shows `stopped`/`服务未运行`
-  and the settings page loads the UCI values. The pre-injection x86 image is
-  backed up as `/opt/openwrt/qemu/openwrt-x86-64.img.bak`. Source is on
-  branch `feat/openwrt-r3g`, commits `da8f56e` (docs) and `6683ac0` (code),
-  pushed to GitHub. The daemon/supplicant, raw socket, procd init, hotplug,
-  account pool, and UA3F disguise are next.
+- `openwrt/` — OpenWrt source tree (current validation target R3G). The
+  `hxxy-auth/` Go module has the full protocol core (private tail,
+  CRC16/XMODEM, bit obfuscation, MD5-chained credentials, EAPOL, EAP-MD5,
+  GB18030 messages; golden test
+  `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`), a
+  resident AF_PACKET supplicant, and a daemon with UCI `config account`
+  account pool (max 5, active-first failover), server learning,
+  `servers.json`/`discovery.json`, auto guard (offline re-auth), continuous
+  preemption (periodic re-auth), pause-on-home, Unix control socket, and
+  1MB log rotation. CLI: `version`, `status`, `tail`, `selftest`, `daemon`,
+  `auth/logoff/pause/resume/reload`, `accounts`, `servers`,
+  `discovery`. LuCI has five pages (overview/accounts/servers/settings/logs)
+  with UCI accounts, server/cache management, and control buttons; procd
+  init/hotplug/uci-defaults are included. Account passwords are plaintext in
+  `/etc/config/hxxy-auth` (0600) per the user's deployment decision; no DPAPI.
+  A custom R3G image (8.1MB, SHA256
+  `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`)
+  contains the daemon, init/hotplug, UCI config, and five LuCI views.
+  x86 QEMU verification: the daemon opens AF_PACKET on `br-lan`, enters
+  `paused` when no authenticator exists and the localhost probe is online,
+  the overview shows account/interface, Resume re-runs auth and pauses again,
+  and the accounts/servers/settings pages render. Source lives in the Windows
+  repo; compile/test/image work happens only on the Ubuntu VM (see
+  `docs/OPENWRT_BUILD_ENV.md`). Source is generic OpenWrt: only the Image
+  Builder `PROFILE`/device packages, `GOARCH`, UCI `device`, and UA3F kmods are
+  target-specific. Next: live R3G validation (`wan` DSA, DHCP timing,
+  100Mbps iperf3) and the UA3F disguise script.
 - `docs/OPENWRT_FEASIBILITY.md` — OpenWrt soft-router port assessment, updated
   for the Xiaomi R3G target. The auth algorithm is fully portable; account
   pool, failover, discovery, server lock, logging, status, and home-network
