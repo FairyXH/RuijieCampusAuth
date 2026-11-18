@@ -5,22 +5,30 @@ namespace RuijieCampusAuth.Service;
 
 public sealed class FileLoggerProvider : ILoggerProvider
 {
-    private readonly StreamWriter _writer;
+    private const long MaxBytes = 10 * 1024 * 1024;
     private readonly object _gate = new();
+    private readonly string _path;
+    private StreamWriter _writer;
 
     public FileLoggerProvider(string path)
     {
+        _path = path;
         var directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
         }
+        _writer = OpenWriter(path);
+    }
+
+    private static StreamWriter OpenWriter(string path)
+    {
         var stream = new FileStream(
             path,
             FileMode.Append,
             FileAccess.Write,
             FileShare.ReadWrite);
-        _writer = new StreamWriter(stream, new UTF8Encoding(false))
+        return new StreamWriter(stream, new UTF8Encoding(false))
         {
             AutoFlush = true,
         };
@@ -32,11 +40,52 @@ public sealed class FileLoggerProvider : ILoggerProvider
     {
         lock (_gate)
         {
-            _writer.WriteLine(line);
+            try
+            {
+                RotateIfNeeded();
+                _writer.WriteLine(line);
+            }
+            catch
+            {
+                // Logging must never take down the auth service.
+            }
         }
     }
 
-    public void Dispose() => _writer.Dispose();
+    private void RotateIfNeeded()
+    {
+        try
+        {
+            if (_writer.BaseStream.Length < MaxBytes)
+            {
+                return;
+            }
+            _writer.Dispose();
+            var backup = _path + ".1";
+            File.Delete(backup);
+            File.Move(_path, backup);
+            _writer = OpenWriter(_path);
+        }
+        catch
+        {
+            try
+            {
+                _writer = OpenWriter(_path);
+            }
+            catch
+            {
+                // Keep the service alive even if logging is unavailable.
+            }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_gate)
+        {
+            _writer.Dispose();
+        }
+    }
 
     private sealed class FileLogger(FileLoggerProvider owner, string category) : ILogger
     {

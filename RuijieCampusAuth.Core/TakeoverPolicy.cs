@@ -92,6 +92,15 @@ public static class TakeoverPolicy
         }
     }
 
+    public static void CleanupOwnedIfeo()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+        CleanupMarkerlessIfeo();
+    }
+
     private static void CleanupMarkerlessIfeo()
     {
         if (!Directory.Exists(OfficialDirectory))

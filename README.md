@@ -111,6 +111,11 @@ RuijieCampusAuth.Cli.exe service uninstall
   快捷方式）；只复制 `publish` 目录到 D:。
 - 若长期开启接管，建议冻结前把 `RJSuService` 的基线启动类型设为 Disabled，
   避免开机时它先于 `HXXY-CampusAuth` 启动。
+- 服务已配置 `depend= npcap` 和崩溃恢复（5s/10s/30s）；服务日志 10MB、
+  GUI 日志 5MB、VBS `launcher.log` 1MB 自动轮转。
+- 冻结前建议做一次重启验收：在 D: 和 C: 各放一个标记文件，冻结重启后确认
+  D: 文件保留、C: 文件消失，服务/GUI 正常，`launcher.log` 有
+  `healthy takeover; skip original`。同时在 DiskGuard 界面确认 D: 未被保护。
 
 ### 接管模式
 

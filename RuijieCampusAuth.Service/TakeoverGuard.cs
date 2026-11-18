@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.ServiceProcess;
 using System.Text.Json;
 using Microsoft.Win32;
+using RuijieCampusAuth.Core;
 
 namespace RuijieCampusAuth.Service;
 
@@ -267,6 +268,8 @@ public sealed class TakeoverGuard
 
             if (!File.Exists(StatePath))
             {
+                // A frozen C: baseline may already contain our IFEO values.
+                TakeoverPolicy.CleanupOwnedIfeo();
                 _active = false;
                 DeleteHeartbeat();
                 return;
@@ -290,6 +293,7 @@ public sealed class TakeoverGuard
                 _logger.LogWarning("接管模式已关闭，原版进程/服务策略已恢复");
             }
             File.Delete(StatePath);
+            TakeoverPolicy.CleanupOwnedIfeo();
             DeleteHeartbeat();
             _active = false;
         }
@@ -313,7 +317,13 @@ public sealed class TakeoverGuard
     private static string? ReadDebugger(string name, RegistryView view)
     {
         using var key = OpenIfeo(name, view, writable: false);
-        return key?.GetValue("Debugger") as string;
+        var debugger = key?.GetValue("Debugger") as string;
+        if (string.Equals(debugger, DebuggerValue, StringComparison.OrdinalIgnoreCase))
+        {
+            // Our own marker may already be in the frozen C: baseline.
+            return null;
+        }
+        return debugger;
     }
 
     private static void WriteIfeo(string name, RegistryView view)

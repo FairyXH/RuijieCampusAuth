@@ -104,6 +104,20 @@ to the Python tree under `python/`.
   Restoring the USB NPF interface and restarting re-authenticated successfully
   (`00:1a:a9:17:ff:ff`); `baidu HTTP 200`. AuthWorker and GUI both wrap each
   auth attempt so a missing/unplugged NIC cannot terminate the loop.
+- 2026-11-18 19:22: freeze-readiness audit. D: is fixed disk 1 (WD 1TB, NTFS,
+  basic data), not the system volume; .NET 10.0.9/10.0.10 and Npcap
+  `wpcap.dll` are installed on C:; `HXXY-CampusAuth` has `depend= npcap`,
+  auto-start, LocalSystem, and SCM recovery `restart/5s,10s,30s` (verified by
+  killing the service process; SCM restarted it and auth recovered). VBS hash
+  `7E8258FA0CDAED2D0BF648D30F64745F0AFFE5E299DE92BBFB40C90FDBF3E7C6`;
+  task/VBS runs return 0. IFEO baseline test: with `takeover_state.json`
+  removed and markers pre-seeded, the service saved `Debugger64/32 = null`,
+  re-applied markers, and cleared them on takeover stop. Service logs rotate at
+  10 MB, GUI at 5 MB, VBS launcher at 1 MB.
+- NetworkGuardian is `C:\Windows\Protect\NetworkGuardian.exe` with config under
+  `%LOCALAPPDATA%\NetworkGuardian` (on D:); its `campusAuth` action is
+  `schtasks /run /i /tn RunHXXYNet`. DiskGuard (`C:\Program Files (x86)\Laneye\
+  DiskGuard`) is the freeze product; D: exclusion must be confirmed in its UI.
 
 ## Official Client Configuration Surface
 
@@ -335,7 +349,27 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 - If takeover should always be on, set `RJSuService` to Disabled in the frozen
   baseline to avoid it starting before `HXXY-CampusAuth` at boot. If takeover
   must remain toggleable, freeze with takeover off (so IFEO is not in the
-  baseline) and let the service reapply it at boot.
+  baseline) and let the service reapply it at boot. The service now also
+  recognizes its own IFEO values when `takeover_state.json` is missing, so a
+  frozen marker baseline is cleared on a takeover-off startup.
+
+### Frozen-C Acceptance Checklist
+
+1. Confirm DiskGuard/Laneye excludes D: (and any other volume holding the
+   install directory); the current D: is fixed disk 1, not C:.
+2. Confirm D: is not encrypted/locked before Windows auto-start services run.
+3. Confirm `net start HXXY-CampusAuth` works and `sc qc` shows
+   `DEPENDENCIES: npcap`, `AUTO_START`, LocalSystem.
+4. Confirm `sc qfailure HXXY-CampusAuth` shows restart actions 5s/10s/30s.
+5. Confirm `RunHXXYNet` still has the VBS action and `HighestAvailable`, and
+   `cscript` returns 0 with `healthy takeover; skip original`.
+6. Create a marker file on D: and one on C:, freeze/reboot, then verify the D:
+   marker persists, the C: marker is gone, service/GUI are running, and the
+   launcher skipped the original client.
+7. After reboot, check `logs\service.log` for successful auth and
+   `logs\launcher.log` for a healthy takeover decision. NetworkGuardian's own
+   config is on D: (`%LOCALAPPDATA%`) and its action remains
+   `schtasks /run /i /tn RunHXXYNet`.
 
 ## Windows System Service (C#)
 

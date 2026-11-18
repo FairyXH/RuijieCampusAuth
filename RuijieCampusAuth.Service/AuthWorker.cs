@@ -59,7 +59,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     break;
                 }
                 logger.LogInformation("尝试账号: {Account}", account.Username);
-                (bool ok, bool connected, string? server, string interfaceName) result;
+                (bool ok, bool attempted, bool connected, string? server, string interfaceName) result;
                 try
                 {
                     result = await Task.Run(
@@ -78,14 +78,15 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 {
                     logger.LogError(ex, "认证过程异常");
                     ServiceStatus.Write("error", $"认证异常: {ex.Message}");
-                    result = (false, false, null, settings.Interface);
+                    result = (false, false, false, null, settings.Interface);
                 }
                 if (!result.ok)
                 {
                     logger.LogWarning(
                         "账号 {Account} 认证失败，尝试下一个账号",
                         account.Username);
-                    if (!result.connected &&
+                    if (result.attempted &&
+                        !result.connected &&
                         await OnlineAsync(settings, stoppingToken))
                     {
                         await PauseForHomeNetworkAsync(settings, stoppingToken);
@@ -240,7 +241,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         }
     }
 
-    private (bool ok, bool connected, string? server, string interfaceName) Authenticate(
+    private (bool ok, bool attempted, bool connected, string? server, string interfaceName) Authenticate(
         ServiceSettings settings,
         string username,
         string password,
@@ -288,7 +289,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         {
             _store.ClearDiscovery();
         }
-        return (ok, supplicant.Connected, supplicant.ServerMac, interfaceName);
+        return (ok, true, supplicant.Connected, supplicant.ServerMac, interfaceName);
     }
 
     private string ResolveInterface(ServiceSettings settings)

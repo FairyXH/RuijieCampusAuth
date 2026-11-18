@@ -13,6 +13,7 @@ public partial class MainViewModel : ViewModelBase
 {
     private readonly UserStore _store = new();
     private static readonly TimeSpan PausedProbeInterval = TimeSpan.FromSeconds(30);
+    private const long GuiLogMaxBytes = 5 * 1024 * 1024;
     private CancellationTokenSource? _cancellation;
     private bool _applyingSettings;
     private Supplicant? _activeSupplicant;
@@ -886,8 +887,16 @@ public partial class MainViewModel : ViewModelBase
         {
             var logDir = Path.Combine(_store.BaseDirectory, "logs");
             Directory.CreateDirectory(logDir);
+            var logPath = Path.Combine(logDir, "csharp-gui.log");
+            var info = new FileInfo(logPath);
+            if (info.Exists && info.Length > GuiLogMaxBytes)
+            {
+                var backup = logPath + ".1";
+                File.Delete(backup);
+                File.Move(logPath, backup);
+            }
             File.AppendAllText(
-                Path.Combine(logDir, "csharp-gui.log"),
+                logPath,
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{Environment.NewLine}");
         }
         catch

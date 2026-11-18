@@ -47,6 +47,13 @@ Sub Log(msg)
     On Error Resume Next
     Dim path, file
     path = StateDir() & "\launcher.log"
+    If fso.FileExists(path) Then
+        If fso.GetFile(path).Size > 1048576 Then
+            If fso.FileExists(path & ".1") Then fso.DeleteFile path & ".1", True
+            fso.MoveFile path, path & ".1"
+            Err.Clear
+        End If
+    End If
     Set file = fso.OpenTextFile(path, 8, True)
     If Err.Number <> 0 Then
         Err.Clear
