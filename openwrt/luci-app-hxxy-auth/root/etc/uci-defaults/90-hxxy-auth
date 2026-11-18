@@ -2,6 +2,27 @@
 
 chmod 600 /etc/config/hxxy-auth 2>/dev/null
 
+# USB tethering backup WAN. The netdev is filled in by
+# /etc/hotplug.d/net/90-hxxy-usbwan when a phone is plugged in;
+# usb0 is only a sane default so the section is valid at boot.
+if ! uci -q get network.usbwan >/dev/null 2>&1; then
+	uci set network.usbwan=interface
+	uci set network.usbwan.proto='dhcp'
+	uci set network.usbwan.device='usb0'
+	uci set network.usbwan.metric='100'
+	uci -q commit network
+fi
+
+# Put usbwan into the WAN firewall zone (masq/forward) once.
+wan_zone=$(uci show firewall 2>/dev/null | sed -n "s/^firewall\.\([^.=]*\)\.name='wan'$/\1/p" | head -n1)
+if [ -n "$wan_zone" ]; then
+	case " $(uci -q get firewall.$wan_zone.network) " in
+		*" usbwan "*) ;;
+		*) uci add_list firewall.$wan_zone.network='usbwan' >/dev/null 2>&1 || true ;;
+	esac
+fi
+uci -q commit firewall
+
 # UA3F L3 rewrite needs the normal netfilter path.
 uci -q set firewall.@defaults[0].flow_offloading='0'
 uci -q set firewall.@defaults[0].flow_offloading_hw='0'

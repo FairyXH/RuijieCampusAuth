@@ -1,0 +1,6 @@
+# Shell scripts and OpenWrt init/hotplug files are executed on Linux and
+# OpenWrt. Keep them LF even when the repository is checked out on Windows.
+*.sh text eol=lf
+openwrt/files/etc/init.d/* text eol=lf
+openwrt/files/etc/hotplug.d/** text eol=lf
+openwrt/luci-app-hxxy-auth/root/etc/uci-defaults/* text eol=lf

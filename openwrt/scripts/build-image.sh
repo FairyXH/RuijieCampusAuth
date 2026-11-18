@@ -6,6 +6,7 @@ OUT=${OUT_DIR:-"$ROOT/build"}
 IB=${IB_DIR:-/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64}
 PROFILE=${PROFILE:-xiaomi_mi-router-3g}
 JOBS=${JOBS:-4}
+VERSION=${VERSION:-0.1.0}
 
 UA3F_VERSION=3.7.0
 UA3F_SHA256=a1d710233ab69af2e127193d7de81d7fd7c400294dc2147368694f2fd56e073f
@@ -13,7 +14,7 @@ UA3F_URL="https://github.com/SunBK201/UA3F/releases/download/v${UA3F_VERSION}/ua
 UA3F_DIR="$OUT/ua3f"
 UA3F_IPK="$UA3F_DIR/ua3f.ipk"
 
-DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-zh-cn kmod-nft-queue kmod-nft-tproxy kmod-nfnetlink-queue kmod-nf-conntrack-netlink iptables iptables-mod-tproxy iptables-mod-extra iptables-mod-ipopt iptables-mod-nfqueue iptables-mod-conntrack-extra ipset luci-compat"
+DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-zh-cn kmod-nft-queue kmod-nft-tproxy kmod-nfnetlink-queue kmod-nf-conntrack-netlink iptables iptables-mod-tproxy iptables-mod-extra iptables-mod-ipopt iptables-mod-nfqueue iptables-mod-conntrack-extra ipset luci-compat kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether kmod-usb-net-cdc-ncm kmod-usb-net-cdc-subset kmod-usb-net-ipheth"
 PACKAGES=${PACKAGES:-$DEFAULT_PACKAGES}
 
 if [ ! -d "$IB" ]; then
@@ -21,7 +22,8 @@ if [ ! -d "$IB" ]; then
 	exit 2
 fi
 
-sh "$ROOT/scripts/build-go.sh"
+VERSION="$VERSION" sh "$ROOT/scripts/build-ipk.sh"
+APP_IPK="$OUT/ipk/hxxy-auth_${VERSION}_mipsel_24kc.ipk"
 
 mkdir -p "$UA3F_DIR"
 if [ ! -f "$UA3F_IPK" ]; then
@@ -41,35 +43,22 @@ fi
 
 STAGE="$OUT/files"
 rm -rf "$STAGE"
-mkdir -p "$STAGE"
-cp -a "$ROOT/files/." "$STAGE/"
-mkdir -p "$STAGE/usr/sbin"
-cp "$OUT/hxxy-auth" "$STAGE/usr/sbin/hxxy-auth"
+mkdir -p "$STAGE/etc/config"
+# hxxy-auth itself is installed from the ipk below, so opkg owns those
+# files and a newer build can replace them without reflashing. Only the
+# third-party service configs stay in the FILES overlay.
+cp "$ROOT/files/etc/config/ua3f" "$STAGE/etc/config/ua3f"
+cp "$ROOT/files/etc/config/https-dns-proxy" "$STAGE/etc/config/https-dns-proxy"
+
 mkdir -p "$STAGE/usr/bin" "$STAGE/etc/init.d"
 cp "$UA3F_DIR/root/usr/bin/ua3f" "$STAGE/usr/bin/ua3f"
 cp "$UA3F_DIR/root/etc/init.d/ua3f" "$STAGE/etc/init.d/ua3f"
-
-mkdir -p "$STAGE/www/luci-static/resources/view/hxxy-auth"
-cp "$ROOT/luci-app-hxxy-auth/htdocs/luci-static/resources/view/hxxy-auth/"*.js \
-	"$STAGE/www/luci-static/resources/view/hxxy-auth/"
-
-mkdir -p "$STAGE/usr/share/luci/menu.d" "$STAGE/usr/share/rpcd/acl.d"
-cp "$ROOT/luci-app-hxxy-auth/root/usr/share/luci/menu.d/"*.json \
-	"$STAGE/usr/share/luci/menu.d/"
-cp "$ROOT/luci-app-hxxy-auth/root/usr/share/rpcd/acl.d/"*.json \
-	"$STAGE/usr/share/rpcd/acl.d/"
-
-mkdir -p "$STAGE/etc/uci-defaults"
-cp "$ROOT/luci-app-hxxy-auth/root/etc/uci-defaults/"* "$STAGE/etc/uci-defaults/"
-chmod 0755 "$STAGE/usr/sbin/hxxy-auth" "$STAGE/usr/bin/ua3f"
-chmod 0755 "$STAGE/etc/init.d/hxxy-auth" "$STAGE/etc/init.d/hxxy-disguise"
-chmod 0755 "$STAGE/etc/init.d/ua3f" "$STAGE/etc/hotplug.d/iface/90-hxxy-auth"
-chmod 0755 "$STAGE/etc/uci-defaults/"*
+chmod 0755 "$STAGE/usr/bin/ua3f" "$STAGE/etc/init.d/ua3f"
 
 cd "$IB"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \
 	PROFILE="$PROFILE" \
-	PACKAGES="$PACKAGES" \
+	PACKAGES="$PACKAGES $APP_IPK" \
 	FILES="$STAGE" \
 	-j"$JOBS"
 
