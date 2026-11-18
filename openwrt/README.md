@@ -55,18 +55,34 @@ sh scripts/build-image.sh
   `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`。
 - `hxxy-auth` CLI：`version`、`status [--json]`、`tail`、`selftest`、
   `daemon`、`auth/logoff/pause/resume/reload`、`accounts`、
-  `servers list/lock/unlock/remove/rename`、`discovery show/clear`。
+  `servers list/lock/unlock/remove/rename`、`discovery show/clear`、
+  `mac show/set/random/clear`。
 - 常驻 daemon：Linux AF_PACKET raw socket、Start/Identity/MD5/Success、
   账号轮换（UCI `config account`，最多 5 个）、服务器学习、探测缓存、
   自动守护（掉线重认证）、持续抢占/定时重认证、家庭网络暂停、
   Unix socket 控制接口、1MB 日志轮转。
-- LuCI 五页：概览（状态 + 控制按钮）、账号池、服务器/探测缓存、设置、日志。
-- procd init、WAN hotplug、UCI defaults（0600、enable、start）。
+- LuCI 六页：概览（状态 + 控制按钮）、账号池、服务器/探测缓存、MAC、
+  设置、日志。
+- 默认校园网防检测（`disguise=full`）：
+  - `hxxy-disguise` 设置 nft TTL 128 + MSS 1460；
+  - UA3F 3.7.0 mipsel 以 NFQUEUE 运行，L3 改写 TTL/IPID/TCP timestamp/
+    TCP initial window；
+  - UA 改写**默认关闭**（`rewrite_mode DIRECT`），不触碰微信/企业微信 UA；
+  - sysctl `ip_default_ttl=128`、`tcp_timestamps=0`、`tcp_ecn=0`、
+    IPv6 关闭；flow offload 关闭。
+- 内置 `https-dns-proxy` + `luci-app-https-dns-proxy` +
+  `luci-i18n-https-dns-proxy-zh-cn` + `luci-i18n-base-zh-cn`；
+  默认 AliDNS + Tencent DoH，IPv4 bootstrap，`force_dns` 开启。
+- MAC 快捷修改：CLI `hxxy-auth mac ...` + LuCI MAC 页；写
+  `network.wan.macaddr`、`ifup wan`、reload daemon。
+- procd init、WAN hotplug、UCI defaults（0600、enable、flow offload 关闭）。
 - 测试：协议 golden vector、UCI/账号池上限、服务器/缓存、控制 socket、
   supplicant 假认证器全链路、网关解析、`go vet`。
 - 2026-11-19 已验证：`go test ./...`、`go vet ./...`、mipsle 交叉编译、
-  `qemu-mipsel selftest`；R3G 自定义镜像 8.1MB，
-  SHA256 `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`。
+  `qemu-mipsel selftest`；完整 R3G 固件 14MB，
+  SHA256 `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`，
+  rootfs 约 10MB，含 UA3F 17MB、https-dns-proxy、LuCI 中文包、
+  nft/iptables/ipset 依赖。
 - x86_64 OpenWrt QEMU 实测：daemon 在 `br-lan` 上真实打开 AF_PACKET，
   无认证服务器时自动进入 `paused`（“未检测到认证服务器，当前网络在线，
   暂停认证”），概览页显示账号/接口；Resume 按钮能把 paused 拉回认证流程；
@@ -75,7 +91,8 @@ sh scripts/build-image.sh
 待验证：
 
 - R3G 真机：`wan` AF_PACKET、DSA/MT7530、DHCP 时序、100Mbps `iperf3`。
-- UA3F/UA2F 伪装脚本（`disguise=full` 目前只是配置项，脚本未实现）。
+- UA3F NFQUEUE 在 MT7621 100Mbps 下的实际吞吐。
+- MAC 页在真机 `wan` 上的 ifup/重认证时序。
 - 可选：malta/le MIPS QEMU、EAPOL tap/veth 真实传输模拟。
 
 ## 构建
@@ -85,7 +102,8 @@ sh scripts/build-image.sh
 cd openwrt
 sh scripts/build-go.sh
 
-# 构建 R3G 镜像（默认 luci-ssl + files/ + LuCI 应用）
+# 构建完整 R3G 固件（UA3F + https-dns-proxy + LuCI 中文 + kmods）
+# 脚本会自动下载/校验 UA3F 3.7.0 mipsel 包并抽取二进制
 IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
   sh scripts/build-image.sh
 ```

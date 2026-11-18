@@ -485,13 +485,19 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   preemption (periodic re-auth), pause-on-home, Unix control socket, and
   1MB log rotation. CLI: `version`, `status`, `tail`, `selftest`, `daemon`,
   `auth/logoff/pause/resume/reload`, `accounts`, `servers`,
-  `discovery`. LuCI has five pages (overview/accounts/servers/settings/logs)
-  with UCI accounts, server/cache management, and control buttons; procd
+  `discovery`, `mac`. LuCI has six pages
+  (overview/accounts/servers/mac/settings/logs) with UCI accounts,
+  server/cache management, MAC quick change, and control buttons; procd
   init/hotplug/uci-defaults are included. Account passwords are plaintext in
   `/etc/config/hxxy-auth` (0600) per the user's deployment decision; no DPAPI.
-  A custom R3G image (8.1MB, SHA256
-  `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`)
-  contains the daemon, init/hotplug, UCI config, and five LuCI views.
+  A full R3G firmware (14MB, SHA256
+  `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`)
+  contains the daemon, UA3F 3.7.0 mipsel (NFQUEUE L3: TTL 128/IPID 0/
+  TCP timestamp removed/SYN window 65535; UA rewriting OFF),
+  https-dns-proxy + luci-app/i18n zh-cn (AliDNS/Tencent DoH),
+  iptables/nft kmods, MAC page, disguise script, init/hotplug, UCI config,
+  and six LuCI views. Default `disguise=full`; sysctl TTL 128/timestamps
+  off/ECN off/IPv6 off; flow offload off.
   x86 QEMU verification: the daemon opens AF_PACKET on `br-lan`, enters
   `paused` when no authenticator exists and the localhost probe is online,
   the overview shows account/interface, Resume re-runs auth and pauses again,
@@ -500,7 +506,7 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   `docs/OPENWRT_BUILD_ENV.md`). Source is generic OpenWrt: only the Image
   Builder `PROFILE`/device packages, `GOARCH`, UCI `device`, and UA3F kmods are
   target-specific. Next: live R3G validation (`wan` DSA, DHCP timing,
-  100Mbps iperf3) and the UA3F disguise script.
+  100Mbps iperf3), UA3F NFQUEUE throughput, and MAC ifup/re-auth timing.
 - `docs/OPENWRT_FEASIBILITY.md` — OpenWrt soft-router port assessment, updated
   for the Xiaomi R3G target. The auth algorithm is fully portable; account
   pool, failover, discovery, server lock, logging, status, and home-network

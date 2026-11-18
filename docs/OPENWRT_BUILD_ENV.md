@@ -104,31 +104,62 @@ sh scripts/build-image.sh
 结果：
 
 - `openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin`
-  约 8.1MB
-- SHA256 `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`
+  约 14MB
+- SHA256 `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`
+- rootfs squashfs 约 10MB（UA3F 17MB 压缩后 + 其他包）
 - `root.squashfs` 已确认包含：
-  - `/usr/sbin/hxxy-auth`（4.06MB，mipsle）
-  - `/etc/config/hxxy-auth`
+  - `/usr/sbin/hxxy-auth`（3.9MB，mipsle 静态）
+  - `/usr/bin/ua3f`（17MB，mipsle musl 动态，UA3F 3.7.0）
+  - `/etc/config/ua3f`（NFQUEUE，L3 开，UA 改写关）
+  - `/etc/init.d/ua3f`（来自 UA3F ipk）
+  - `/etc/config/https-dns-proxy`（AliDNS + Tencent DoH，IPv4）
+  - `/etc/init.d/https-dns-proxy`
+  - `/etc/config/hxxy-auth`（`device=wan`、`disguise=full`）
   - `/etc/init.d/hxxy-auth`
+  - `/etc/init.d/hxxy-disguise`（nft TTL 128 + MSS 1460）
+  - `/etc/sysctl.d/90-hxxy.conf`
   - `/etc/hotplug.d/iface/90-hxxy-auth`
   - `/etc/uci-defaults/90-hxxy-auth`
-  - `/etc/rc.d/S95hxxy-auth`（uci-defaults 已 enable）
+  - `/etc/rc.d/S20https-dns-proxy`、`S95hxxy-auth`、`S99hxxy-disguise`
   - `/usr/share/luci/menu.d/luci-app-hxxy-auth.json`
   - `/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json`
-  - `/www/luci-static/resources/view/hxxy-auth/{overview,accounts,servers,settings,logs}.js`
+  - `/www/luci-static/resources/view/hxxy-auth/{overview,accounts,servers,mac,settings,logs}.js`
 
-这一版已经包含常驻 daemon、raw socket、账号池、服务器/探测缓存、
-procd init/hotplug。`disguise=full` 的 UA3F 脚本还没实现，目前只是配置项；
-概览页在无认证服务器且外网在线时会显示 `paused`。
+包清单（manifest）确认包含：
 
-`files/` 当前/计划：
+```text
+https-dns-proxy, luci-app-https-dns-proxy,
+luci-i18n-https-dns-proxy-zh-cn, luci-i18n-base-zh-cn,
+kmod-nft-queue, kmod-nft-tproxy, kmod-nfnetlink-queue,
+kmod-nf-conntrack-netlink, iptables-nft, iptables-mod-tproxy,
+iptables-mod-extra, iptables-mod-ipopt, iptables-mod-nfqueue,
+iptables-mod-conntrack-extra, ipset, luci-compat
+```
+
+默认配置：
+
+- `disguise=full`：`hxxy-disguise` 应用 nft TTL/MSS，并启动 UA3F L3
+  （TTL 128、IPID 0、删除 TCP timestamp、SYN window 65535）。
+- UA 改写关闭（`rewrite_mode DIRECT`），不强制改微信/企业微信 UA。
+- sysctl：`ip_default_ttl=128`、`tcp_timestamps=0`、`tcp_ecn=0`、IPv6 关闭。
+- `https-dns-proxy` 默认 AliDNS `dns.alidns.com` + Tencent `doh.pub`，
+  IPv4 bootstrap，`force_dns` 开启。
+- MAC 页/CLI 可写 `network.wan.macaddr`、`ifup wan` 并 reload daemon。
+- 概览页在无认证服务器且外网在线时显示 `paused`。
+
+`files/` 当前：
 
 ```text
 files/usr/sbin/hxxy-auth                 # 构建时生成，不入库
+files/usr/bin/ua3f                       # 构建时从 UA3F ipk 抽取，不入库
 files/etc/init.d/hxxy-auth
+files/etc/init.d/hxxy-disguise
+files/etc/init.d/ua3f                    # 构建时从 UA3F ipk 抽取
 files/etc/config/hxxy-auth               # config auth + config account（明文，0600）
+files/etc/config/ua3f
+files/etc/config/https-dns-proxy
+files/etc/sysctl.d/90-hxxy.conf
 files/etc/hotplug.d/iface/90-hxxy-auth
-files/etc/init.d/hxxy-disguise           # 待实现（UA3F）
 files/usr/share/luci/menu.d/luci-app-hxxy-auth.json
 files/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
 files/www/luci-static/resources/view/hxxy-auth/*.js
@@ -168,10 +199,14 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
 - Go 协议核心：`go test ./...`、`go vet ./...` 通过；569 字节私有尾
   SHA256 与 C#/Python 一致
   `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`。
-- 自定义 R3G 镜像构建成功（8.1MB，SHA256
-  `08ddc0b19a41e4b582cfab5ef8cc37ffc2c8d619c1e6384a519ebcd8b4c3e39a`），
-  squashfs 内含 daemon、procd init、hotplug、UCI 配置、五个 LuCI 视图、
-  menu/ACL，`etc/rc.d/S95hxxy-auth` 已 enable。
+- 完整 R3G 固件构建成功（14MB，SHA256
+  `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`），
+  含 UA3F 3.7.0 mipsel、https-dns-proxy + LuCI 中文、MAC 页、disguise、
+  DoH 配置、iptables/nft kmods；`rc.d` 有 S20https-dns-proxy、
+  S95hxxy-auth、S99hxxy-disguise。
+- 二进制核对：UA3F 为 mipsle musl 动态（`ld-musl-mipsel-sf.so.1`），
+  hxxy-auth 为 mipsle 静态；nft `ttl set 128` + `maxseg size set 1460`
+  语法在宿主 nft 上验证通过。
 - Go 功能测试：UCI/账号池上限、服务器/探测缓存、控制 socket、
   supplicant 假认证器全链路、网关解析、`go vet` 全通过。
 - x86_64 QEMU daemon 实测：`br-lan` 上打开 AF_PACKET；无认证服务器且
