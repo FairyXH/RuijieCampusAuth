@@ -14,7 +14,7 @@ import struct
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Iterable
@@ -451,6 +451,9 @@ class Supplicant:
         tail_options: TailOptions | None = None,
         source_mac: str | None = None,
         locked_server: str | None = None,
+        service_name: str | None = None,
+        static_id: str | None = None,
+        start_timeout: float = 3.0,
     ) -> None:
         self.interface = interface
         self.identity = identity
@@ -461,7 +464,25 @@ class Supplicant:
         self.private = private
         self.logoff_first = logoff_first
         self.response_delay = max(0.0, response_delay)
-        self.network = network or collect_network_info(interface)
+        self.service_name = (service_name or "").strip()
+        self.static_id = (static_id or "").strip()
+        self.start_timeout = max(0.5, float(start_timeout))
+        self._service_bytes = b""
+        if self.service_name:
+            try:
+                self._service_bytes = self.service_name.encode("gb18030")
+            except UnicodeEncodeError:
+                LOG.warning("服务名无法用 GB18030 编码，使用默认服务名")
+        network_obj = network or collect_network_info(interface)
+        if self.static_id:
+            try:
+                static_bytes = self.static_id.encode("ascii")
+            except UnicodeEncodeError:
+                static_bytes = b""
+                LOG.warning("静态 ID 必须是 ASCII，使用默认值")
+            if static_bytes:
+                network_obj = replace(network_obj, static_id=static_bytes)
+        self.network = network_obj
         self.tail_options = tail_options
         self._session_nonce = os.urandom(16).hex().upper().encode()
         self._stop_event = threading.Event()
@@ -500,8 +521,12 @@ class Supplicant:
         if not self.private:
             return b""
         options = self.tail_options
-        if options is None and nonce is not None:
-            options = TailOptions(nonce=nonce)
+        if options is None:
+            options = TailOptions()
+        if self._service_bytes:
+            options = replace(options, service_name=self._service_bytes)
+        if nonce is not None:
+            options = replace(options, nonce=nonce)
         return build_tail(
             self.identity,
             self.password,
@@ -521,6 +546,8 @@ class Supplicant:
             fingerprint=bytes(128),
             client_flag=b"\x01",
         )
+        if self._service_bytes:
+            options = replace(options, service_name=self._service_bytes)
         return build_tail(
             self.identity,
             self.password,
@@ -578,7 +605,7 @@ class Supplicant:
             self.send_start()
             deadline = time.monotonic() + self.timeout
             starts_sent = 1
-            next_retry = time.monotonic() + 3.0
+            next_retry = time.monotonic() + self.start_timeout
             handled: dict[tuple[int, int, bytes], bytes] = {}
 
             while time.monotonic() < deadline:
@@ -591,7 +618,7 @@ class Supplicant:
                         break
                     self.send_start()
                     starts_sent += 1
-                    next_retry = now + 3.0
+                    next_retry = now + self.start_timeout
                 try:
                     packet = self.packets.get(timeout=min(0.5, deadline - now))
                 except queue.Empty:
@@ -731,6 +758,20 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         "--server",
         help="锁定认证服务器 MAC，EAPOL-Start 单播发往该地址（Logoff 仍用标准组播）",
     )
+    parser.add_argument(
+        "--service-name",
+        help="服务名（私有属性 0x39），默认 电信宽带服务",
+    )
+    parser.add_argument(
+        "--static-id",
+        help="静态 ID（私有属性 0x54），默认 Static:AB45A862",
+    )
+    parser.add_argument(
+        "--start-timeout",
+        type=float,
+        default=3.0,
+        help="Start 重试间隔秒数（默认 3）",
+    )
     parser.add_argument("--logoff", action="store_true", help="仅注销当前 802.1X 会话")
     parser.add_argument("-v", "--verbose", action="store_true")
     return parser.parse_args(argv)
@@ -784,6 +825,9 @@ def main(argv: Iterable[str] | None = None) -> int:
         repeats=max(1, args.repeats),
         private=not args.no_private,
         locked_server=args.server,
+        service_name=args.service_name,
+        static_id=args.static_id,
+        start_timeout=args.start_timeout,
     )
     try:
         return 0 if supplicant.authenticate() else 1

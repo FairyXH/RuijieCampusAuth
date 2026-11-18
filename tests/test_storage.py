@@ -58,6 +58,13 @@ def test_settings_roundtrip(tmp_path) -> None:
         guardian_url="http://127.0.0.1:18765/mcp",
         guardian_interval=7.5,
         guardian_failures=3,
+        service_name="测试服务",
+        static_id="Static:DEADBEEF",
+        start_timeout=4.5,
+        dhcp_mode="after",
+        dhcp_timeout=45.0,
+        dhcp_option82=True,
+        school_code="HPVTC",
     )
     store.save_settings(settings)
     loaded = store.load_settings()
@@ -73,6 +80,13 @@ def test_settings_roundtrip(tmp_path) -> None:
     assert loaded.guardian_url == "http://127.0.0.1:18765/mcp"
     assert loaded.guardian_interval == 7.5
     assert loaded.guardian_failures == 3
+    assert loaded.service_name == "测试服务"
+    assert loaded.static_id == "Static:DEADBEEF"
+    assert loaded.start_timeout == 4.5
+    assert loaded.dhcp_mode == "after"
+    assert loaded.dhcp_timeout == 45.0
+    assert loaded.dhcp_option82 is True
+    assert loaded.school_code == "HPVTC"
 
 
 def test_settings_clamped(tmp_path) -> None:

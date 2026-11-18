@@ -369,6 +369,16 @@ client.logout()
 - 若更换学校或服务器策略，建议先用 `--verbose` 抓取一次原客户端和本工具的
   EAPOL 流程进行对比。
 
+## 0.8.0 改动
+
+- 对齐官方客户端的认证相关配置：服务名（0x39）、静态 ID（0x54）、Start 重试
+  间隔、DHCP 模式/超时/Option 82、学校代码；
+- 服务名和静态 ID 已接入私有尾，覆盖 Identity、MD5、Start、Logoff；
+- DHCP 参数为 OpenWrt 预留，Windows 下只持久化，不改变系统网络配置；
+- CLI 新增 `--service-name` / `--static-id` / `--start-timeout`；
+- API 同步支持 `service_name` / `static_id` / `start_timeout`；
+- 连接页新增“高级认证参数”分组。
+
 ## 0.7.0 改动
 
 - 新增“联动”页：填写本机 Network Guardian MCP 地址，默认

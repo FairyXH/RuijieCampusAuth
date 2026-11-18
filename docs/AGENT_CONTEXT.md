@@ -57,6 +57,34 @@ Windows client. It is a compatibility client, not an authentication bypass.
   probes fall back to the local TCP check.
 - 2026-11-18 09:17: live query returned `NG-TMP-0000 | 172.18.28.6 |
   online/stable | source=认证网卡` for the USB NIC.
+- 0.8.0: aligned auth config with the official client: service name (0x39),
+  static ID (0x54), Start retry interval, DHCP mode/timeout/Option 82, school
+  code. Service name and static ID are applied to Identity/MD5/Start/Logoff
+  private tails.
+
+## Official Client Configuration Surface
+
+Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
+
+- `SuConfig.txt` (plaintext summary): username, client title, Authentication
+  Timeout=3, Start Timeout=3, start attempts=3, DHCP mode=before-auth, DHCP
+  response timeout=30, self-service URL, AD timeout=120, adapter name.
+- `newskin.zip` login layout: username, password, service combo, `CTpasswordEdit`,
+  remember password, auto connect, wired/wireless, NIC name.
+- Settings layout (`layout_softwareconfig.xml`): basic/nic/notice tabs; auto run,
+  auto connect, auto XiaoRui WiFi, NAT/ICS sharing, wired/wireless/auto login,
+  close-to-tray/quit, language, notification switches.
+- Network info layout: IP acquisition mode, IP, mask, gateway, DNS, spare DNS,
+  NIC MAC, OS MAC, HDD serial (display-only).
+- Config keys observed: `AuthMode=EAPMD5`, `MediaType=Wired`,
+  `Service=电信宽带服务`, `Adapter`, `StartNumber`, `StartTimeout`,
+  `EnableBeforeAuth`, `IsSupportOption82`, `SchoolCode`, `CTPassword`,
+  `SelfSvrURL`.
+- Implemented in `AppSettings`: `service_name`, `static_id`, `start_timeout`,
+  `dhcp_mode`, `dhcp_timeout`, `dhcp_option82`, `school_code`.
+- `CTPassword`, client title, self-service URL, WiFi sharing and notification
+  options are not part of the current EAP-MD5 auth path; they are documented but
+  not added to the auth config.
 
 ## Architecture
 
@@ -75,6 +103,8 @@ Windows client. It is a compatibility client, not an authentication bypass.
 - `src/ruijie_auth/gui.py`
   - PySide6 main window, account manager, tray, debug tools.
   - Server tab: learned authenticators, manual add/rename/delete, lock switch.
+  - Connection tab advanced group: service name, static ID, Start interval,
+    DHCP mode/timeout/Option 82, school code.
   - Linkage tab: Guardian MCP URL, enable switch, probe interval, offline count.
   - Preempt auth worker and TCP connectivity monitor.
   - AuthWorker polls Guardian while online; N confirmed failures trigger re-auth.
@@ -144,6 +174,8 @@ Private tail layout:
   Cipher block = plain block XOR MD5(key || previous ciphertext/IV).
 - 0x39 service name: server-provided type 0x66 (`电信宽带服务` on HXXY).
 - 0x54 static ID: `Static:AB45A862` observed on the validation machine.
+  0x39 service name and 0x54 static ID are configurable in 0.8.0; the service
+  name lives in `TailOptions`, the static ID in `NetworkInfo`.
 - Identity fingerprint 0x4D is stable on the validation machine
   (`5dbed5...`); the server accepted random values in the production-path
   test, so it is not strictly validated in the verified environment.

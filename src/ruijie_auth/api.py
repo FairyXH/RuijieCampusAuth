@@ -44,6 +44,9 @@ class RuijieClient:
         verbose: bool = False,
         private_tail: bool = True,
         locked_server: str | None = None,
+        service_name: str | None = None,
+        static_id: str | None = None,
+        start_timeout: float = 3.0,
     ) -> None:
         self.username = username
         self._password = password
@@ -54,6 +57,9 @@ class RuijieClient:
         self.repeats = max(1, repeats)
         self.private_tail = private_tail
         self.locked_server = locked_server
+        self.service_name = service_name
+        self.static_id = static_id
+        self.start_timeout = start_timeout
         self.logs: list[str] = []
         self._handler = _MemoryLogHandler(self.logs)
         self._interface: str | None = None
@@ -115,6 +121,9 @@ class RuijieClient:
                 repeats=self.repeats,
                 private=self.private_tail,
                 locked_server=self.locked_server,
+                service_name=self.service_name,
+                static_id=self.static_id,
+                start_timeout=self.start_timeout,
             ).authenticate()
             self._status.update(
                 state="authenticated" if ok else "failed",
@@ -146,6 +155,9 @@ class RuijieClient:
                 repeats=self.repeats,
                 private=self.private_tail,
                 locked_server=self.locked_server,
+                service_name=self.service_name,
+                static_id=self.static_id,
+                start_timeout=self.start_timeout,
             ).logoff()
             self._status.update(
                 state="logged_out", authenticated=False, message="已注销"

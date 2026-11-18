@@ -151,6 +151,13 @@ class AppSettings:
     guardian_url: str = "http://127.0.0.1:18765/mcp"
     guardian_interval: float = 5.0
     guardian_failures: int = 2
+    service_name: str = "电信宽带服务"
+    static_id: str = "Static:AB45A862"
+    start_timeout: float = 3.0
+    dhcp_mode: str = "before"
+    dhcp_timeout: float = 30.0
+    dhcp_option82: bool = False
+    school_code: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -171,6 +178,21 @@ class AppSettings:
         settings.guardian_failures = min(
             10, max(1, int(settings.guardian_failures))
         )
+        settings.service_name = (
+            str(settings.service_name or "").strip() or "电信宽带服务"
+        )
+        settings.static_id = (
+            str(settings.static_id or "").strip() or "Static:AB45A862"
+        )
+        settings.start_timeout = min(
+            30.0, max(0.5, float(settings.start_timeout))
+        )
+        if settings.dhcp_mode not in ("before", "after", "none"):
+            settings.dhcp_mode = "before"
+        settings.dhcp_timeout = min(
+            300.0, max(5.0, float(settings.dhcp_timeout))
+        )
+        settings.school_code = str(settings.school_code or "").strip()
         return settings
 
     def to_dict(self) -> dict[str, Any]:

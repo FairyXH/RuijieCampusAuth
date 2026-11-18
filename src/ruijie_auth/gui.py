@@ -750,6 +750,9 @@ class AuthWorker(QThread):
             private=True,
             logoff_first=True,
             locked_server=locked_server,
+            service_name=self.settings.service_name,
+            static_id=self.settings.static_id,
+            start_timeout=self.settings.start_timeout,
         )
         self._supp = supp
         try:
@@ -1388,6 +1391,50 @@ class MainWindow(QMainWindow):
         form.addRow("连通检测", self.url_edit)
         layout.addWidget(settings)
 
+        advanced = QGroupBox("高级认证参数")
+        self.advanced_group = advanced
+        advanced_form = QFormLayout(advanced)
+        advanced_form.setContentsMargins(10, 4, 10, 8)
+        advanced_form.setHorizontalSpacing(10)
+        advanced_form.setVerticalSpacing(6)
+        advanced_form.setFieldGrowthPolicy(
+            QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow
+        )
+        self.service_edit = QLineEdit()
+        self.service_edit.setPlaceholderText("电信宽带服务")
+        self.static_id_edit = QLineEdit()
+        self.static_id_edit.setPlaceholderText("Static:AB45A862")
+        self.start_timeout_spin = QDoubleSpinBox()
+        self.start_timeout_spin.setRange(0.5, 30.0)
+        self.start_timeout_spin.setDecimals(1)
+        self.start_timeout_spin.setSuffix(" s")
+        self.dhcp_mode_combo = QComboBox()
+        self.dhcp_mode_combo.addItem("认证前获取", "before")
+        self.dhcp_mode_combo.addItem("认证后获取", "after")
+        self.dhcp_mode_combo.addItem("不使用", "none")
+        self.dhcp_timeout_spin = QDoubleSpinBox()
+        self.dhcp_timeout_spin.setRange(5.0, 300.0)
+        self.dhcp_timeout_spin.setDecimals(0)
+        self.dhcp_timeout_spin.setSuffix(" s")
+        self.dhcp_option82_check = ToggleSwitch()
+        self.school_code_edit = QLineEdit()
+        self.school_code_edit.setPlaceholderText("可选，例如 HPVTC")
+        advanced_form.addRow("服务名", self.service_edit)
+        advanced_form.addRow("静态 ID", self.static_id_edit)
+        advanced_form.addRow("Start 间隔", self.start_timeout_spin)
+        advanced_form.addRow("DHCP 模式", self.dhcp_mode_combo)
+        advanced_form.addRow("DHCP 超时", self.dhcp_timeout_spin)
+        advanced_form.addRow(
+            "DHCP Option 82",
+            self._compact_switch_cell("启用", self.dhcp_option82_check),
+        )
+        advanced_form.addRow("学校代码", self.school_code_edit)
+        advanced_hint = QLabel("DHCP 参数供 OpenWrt 使用；Windows 下仅保存配置。")
+        advanced_hint.setObjectName("muted")
+        advanced_hint.setWordWrap(True)
+        advanced_form.addRow("", advanced_hint)
+        layout.addWidget(advanced)
+
         channel = QGroupBox("认证通道")
         channel_layout = QVBoxLayout(channel)
         channel_layout.setContentsMargins(8, 0, 8, 6)
@@ -1677,10 +1724,20 @@ class MainWindow(QMainWindow):
             self.timeout_spin,
             self.retries_spin,
             self.repeats_spin,
+            self.start_timeout_spin,
+            self.dhcp_timeout_spin,
         ):
             widget.valueChanged.connect(self._save_settings_from_ui)
         self.interface_combo.currentIndexChanged.connect(self._interface_changed)
+        self.dhcp_mode_combo.currentIndexChanged.connect(self._save_settings_from_ui)
         self.url_edit.textChanged.connect(self._save_settings_from_ui)
+        for widget in (
+            self.service_edit,
+            self.static_id_edit,
+            self.school_code_edit,
+        ):
+            widget.textChanged.connect(self._save_settings_from_ui)
+        self.dhcp_option82_check.toggled.connect(self._save_settings_from_ui)
         for check in (
             self.preempt_check,
             self.auto_start_check,
@@ -1713,6 +1770,14 @@ class MainWindow(QMainWindow):
         )
         self.guardian_interval_spin.setValue(self.settings.guardian_interval)
         self.guardian_failures_spin.setValue(self.settings.guardian_failures)
+        self.service_edit.setText(self.settings.service_name)
+        self.static_id_edit.setText(self.settings.static_id)
+        self.start_timeout_spin.setValue(self.settings.start_timeout)
+        dhcp_index = self.dhcp_mode_combo.findData(self.settings.dhcp_mode)
+        self.dhcp_mode_combo.setCurrentIndex(max(0, dhcp_index))
+        self.dhcp_timeout_spin.setValue(self.settings.dhcp_timeout)
+        self.dhcp_option82_check.setChecked(self.settings.dhcp_option82)
+        self.school_code_edit.setText(self.settings.school_code)
         self._select_interface(self.settings.interface)
         self._refresh_servers()
         self._update_cache_label()
@@ -1740,6 +1805,19 @@ class MainWindow(QMainWindow):
         )
         self.settings.guardian_interval = self.guardian_interval_spin.value()
         self.settings.guardian_failures = self.guardian_failures_spin.value()
+        self.settings.service_name = (
+            self.service_edit.text().strip() or "电信宽带服务"
+        )
+        self.settings.static_id = (
+            self.static_id_edit.text().strip() or "Static:AB45A862"
+        )
+        self.settings.start_timeout = self.start_timeout_spin.value()
+        self.settings.dhcp_mode = str(
+            self.dhcp_mode_combo.currentData() or "before"
+        )
+        self.settings.dhcp_timeout = self.dhcp_timeout_spin.value()
+        self.settings.dhcp_option82 = self.dhcp_option82_check.isChecked()
+        self.settings.school_code = self.school_code_edit.text().strip()
         self.settings.interface = str(self.interface_combo.currentData() or "")
         self.log_handler.setLevel(
             logging.DEBUG if self.settings.verbose else logging.INFO
@@ -2185,6 +2263,9 @@ class MainWindow(QMainWindow):
             locked_server=(
                 settings.locked_server if settings.server_lock else None
             ),
+            service_name=settings.service_name,
+            static_id=settings.static_id,
+            start_timeout=settings.start_timeout,
         )
         ok = supp.authenticate()
         if supp.server_mac:
@@ -2362,6 +2443,9 @@ class MainWindow(QMainWindow):
             locked_server=(
                 settings.locked_server if settings.server_lock else None
             ),
+            service_name=settings.service_name,
+            static_id=settings.static_id,
+            start_timeout=settings.start_timeout,
         ).logoff()
         return "已发送注销"
 
@@ -2374,6 +2458,7 @@ class MainWindow(QMainWindow):
         if action is not None:
             action.setText("停止认证" if running else "开始认证")
         self.settings_group.setEnabled(not running)
+        self.advanced_group.setEnabled(not running)
         self.account_table.setEnabled(not running)
         self.guardian_group.setEnabled(not running)
         self.server_table.setEnabled(not running)
@@ -2433,6 +2518,9 @@ class MainWindow(QMainWindow):
             locked_server=(
                 self.settings.locked_server if self.settings.server_lock else None
             ),
+            service_name=self.settings.service_name,
+            static_id=self.settings.static_id,
+            start_timeout=self.settings.start_timeout,
         )
 
     def debug_logoff(self) -> None:
