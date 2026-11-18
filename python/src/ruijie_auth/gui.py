@@ -119,7 +119,19 @@ from .storage import (
     ServerRecord,
     ServerStore,
     default_data_dir,
-    program_data_dir,
+    install_dir,
+)
+from .system_service import (
+    install_service,
+    read_service_status,
+    remove_service_config,
+    service_executable_path,
+    service_running,
+    service_state,
+    start_service,
+    stop_service,
+    uninstall_service,
+    write_service_config,
 )
 
 APP_NAME = "HXXY 校园网认证"
@@ -1079,7 +1091,7 @@ class MainWindow(QMainWindow):
         self.worker: AuthWorker | None = None
         self.one_shot: OneShotWorker | None = None
         self.tray: QSystemTrayIcon | None = None
-        self.blocker = ProcessBlocker(program_data_dir() / "blocker_state.json")
+        self.blocker = ProcessBlocker(install_dir() / "blocker_state.json")
         self.takeover_state = TakeoverState()
         self._last_state = "idle"
         self._last_account: Account | None = None
@@ -1299,6 +1311,20 @@ class MainWindow(QMainWindow):
         self.block_status.setObjectName("muted")
         self.block_status.setContentsMargins(50, 0, 4, 4)
         policy_layout.addWidget(self.block_status)
+
+        self.service_check = ToggleSwitch()
+        policy_layout.addWidget(
+            self._switch_row(
+                "系统服务开机自启",
+                "以 SYSTEM 在登录前启动认证，全局生效",
+                self.service_check,
+            )
+        )
+        self.service_status = QLabel("")
+        self.service_status.setObjectName("muted")
+        self.service_status.setContentsMargins(50, 0, 4, 4)
+        self.service_status.setWordWrap(True)
+        policy_layout.addWidget(self.service_status)
 
         self.auto_start_check = ToggleSwitch()
         self.start_minimized_check = ToggleSwitch()
@@ -1748,6 +1774,7 @@ class MainWindow(QMainWindow):
         ):
             check.toggled.connect(self._save_settings_from_ui)
         self.block_check.toggled.connect(self._on_block_toggled)
+        self.service_check.toggled.connect(self._on_service_toggled)
 
     def _apply_settings(self) -> None:
         self.check_spin.setValue(self.settings.check_interval)
@@ -1780,6 +1807,7 @@ class MainWindow(QMainWindow):
         self.school_code_edit.setText(self.settings.school_code)
         self._select_interface(self.settings.interface)
         self._refresh_servers()
+        self._refresh_service_state()
         self._update_cache_label()
 
     def _save_settings_from_ui(self) -> None:
@@ -2283,6 +2311,13 @@ class MainWindow(QMainWindow):
     def start_auth(self) -> None:
         if self.worker and self.worker.isRunning():
             return
+        if service_running():
+            QMessageBox.information(
+                self,
+                "开始认证",
+                "系统服务正在托管认证，请先在认证页关闭系统服务开机自启",
+            )
+            return
         account = self._selected_account()
         if not account:
             QMessageBox.information(self, "开始认证", "请先添加或选择一个账号")
@@ -2459,6 +2494,7 @@ class MainWindow(QMainWindow):
             action.setText("停止认证" if running else "开始认证")
         self.settings_group.setEnabled(not running)
         self.advanced_group.setEnabled(not running)
+        self.service_check.setEnabled(not running)
         self.account_table.setEnabled(not running)
         self.guardian_group.setEnabled(not running)
         self.server_table.setEnabled(not running)
@@ -2677,6 +2713,99 @@ class MainWindow(QMainWindow):
         else:
             self.block_status.setText("")
             self.block_status.setStyleSheet("")
+
+    def _refresh_service_state(self) -> None:
+        installed, text, state = service_state()
+        self.service_check.blockSignals(True)
+        self.service_check.setChecked(installed)
+        self.service_check.blockSignals(False)
+        if not installed:
+            self.service_status.setText("未安装：登录前不启动")
+            return
+        status = read_service_status() or {}
+        detail = str(status.get("message") or "")
+        if state == 4:
+            self.service_status.setText(
+                "运行中：SYSTEM 服务已接管认证"
+                + (f" · {detail}" if detail else "")
+            )
+        elif state == 1:
+            self.service_status.setText("已安装，当前已停止")
+        else:
+            self.service_status.setText(f"服务状态: {text}")
+
+    def _on_service_toggled(self, checked: bool) -> None:
+        if self._loading:
+            return
+        if checked:
+            if self.worker and self.worker.isRunning():
+                self.service_check.blockSignals(True)
+                self.service_check.setChecked(False)
+                self.service_check.blockSignals(False)
+                QMessageBox.information(
+                    self, "系统服务", "请先停止当前认证任务，再开启系统服务"
+                )
+                return
+            if not getattr(sys, "frozen", False):
+                self.service_check.blockSignals(True)
+                self.service_check.setChecked(False)
+                self.service_check.blockSignals(False)
+                QMessageBox.warning(
+                    self, "系统服务", "系统服务只支持打包后的 exe"
+                )
+                return
+            if os.name != "nt" or not is_admin():
+                self.service_check.blockSignals(True)
+                self.service_check.setChecked(False)
+                self.service_check.blockSignals(False)
+                QMessageBox.warning(
+                    self, "系统服务", "安装系统服务需要 Windows 管理员权限"
+                )
+                return
+            account = self._selected_account()
+            if not account or not account.password or not account.enabled:
+                self.service_check.blockSignals(True)
+                self.service_check.setChecked(False)
+                self.service_check.blockSignals(False)
+                QMessageBox.warning(
+                    self, "系统服务", "请选择一个启用且有密码的账号"
+                )
+                return
+            service_exe = service_executable_path()
+            if not service_exe.exists():
+                self.service_check.blockSignals(True)
+                self.service_check.setChecked(False)
+                self.service_check.blockSignals(False)
+                QMessageBox.warning(
+                    self,
+                    "系统服务",
+                    "服务组件缺失，请重新执行 build.ps1 -Deploy",
+                )
+                return
+            self._save_settings_from_ui()
+            try:
+                write_service_config(account, self.settings)
+                install_service(str(service_exe))
+                start_service()
+            except Exception as exc:  # noqa: BLE001
+                LOG.exception("安装系统服务失败")
+                QMessageBox.critical(self, "系统服务", f"安装/启动失败: {exc}")
+                self._refresh_service_state()
+                return
+            LOG.warning("已启用系统服务开机自启")
+            self._refresh_service_state()
+        else:
+            try:
+                stop_service()
+                uninstall_service()
+                remove_service_config()
+            except Exception as exc:  # noqa: BLE001
+                LOG.exception("停止系统服务失败")
+                QMessageBox.critical(self, "系统服务", f"停止/卸载失败: {exc}")
+                self._refresh_service_state()
+                return
+            LOG.warning("已关闭系统服务开机自启")
+            self._refresh_service_state()
 
     def _sync_takeover(self) -> None:
         active = bool(
@@ -2900,6 +3029,7 @@ def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
         help="恢复被托管模式修改的 8021x.exe 运行策略后退出",
     )
     parser.add_argument("--smoke-test", action="store_true", help=argparse.SUPPRESS)
+    parser.add_argument("--service", action="store_true", help=argparse.SUPPRESS)
     return parser.parse_args(argv)
 
 
@@ -2912,7 +3042,7 @@ def main(argv: Iterable[str] | None = None) -> int:
     if args.restore_client:
         store = AccountStore()
         setup_file_logging(store.logs_dir, args.verbose)
-        state_path = program_data_dir() / "blocker_state.json"
+        state_path = install_dir() / "blocker_state.json"
         try:
             TakeoverState().stop()
             cleaned = ProcessBlocker.cleanup_stale(state_path)
@@ -2921,6 +3051,11 @@ def main(argv: Iterable[str] | None = None) -> int:
             return 1
         print("已恢复原客户端运行策略" if cleaned else "没有需要恢复的策略")
         return 0
+
+    if args.service:
+        from .system_service import run_as_service
+
+        return run_as_service()
 
     arguments = list(argv) if argv is not None else sys.argv[1:]
     app = QApplication([sys.argv[0], *arguments])
@@ -2962,7 +3097,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     store = AccountStore()
     setup_file_logging(store.logs_dir, args.verbose)
-    state_path = program_data_dir() / "blocker_state.json"
+    state_path = install_dir() / "blocker_state.json"
     try:
         if ProcessBlocker.cleanup_stale(state_path):
             LOG.warning("检测到上次未清理的托管策略，已恢复原客户端")
@@ -3007,7 +3142,7 @@ def main(argv: Iterable[str] | None = None) -> int:
 
     if not (args.tray or settings.start_minimized):
         window.show()
-    if args.auto or settings.auto_start:
+    if (args.auto or settings.auto_start) and not service_running():
         QTimer.singleShot(300, window.start_auth)
     return app.exec()
 

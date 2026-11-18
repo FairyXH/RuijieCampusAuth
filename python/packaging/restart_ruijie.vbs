@@ -11,13 +11,15 @@
 
 Option Explicit
 
-Const TAKEOVER_EXE = "D:\Storageredirect\Program\RuijieCampusAuth.exe"
+Const TAKEOVER_DIR = "D:\Storageredirect\Program\RuijieCampusAuth"
+Const TAKEOVER_EXE = "D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe"
 Const ORIGINAL_EXE = "C:\Program Files\Ruijie Networks\Ruijie Supplicant\RuijieSupplicant.exe"
 Const ORIGINAL_DIR = "C:\Program Files\Ruijie Networks\Ruijie Supplicant"
 Const IFEO_KEY = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\8021x.exe"
 Const MARKER_NAME = "HXXYTakeover"
 Const MARKER_VALUE = "RuijieCampusAuth"
 Const TAKEOVER_PROCESS = "RuijieCampusAuth.exe"
+Const SERVICE_PROCESS = "RuijieCampusAuth.Service.exe"
 Const HEARTBEAT_MAX_AGE = 12
 
 Dim shell, fso, wmi
@@ -30,7 +32,7 @@ Err.Clear
 
 Function StateDir()
     Dim dir
-    dir = shell.ExpandEnvironmentStrings("%ProgramData%") & "\RuijieCampusAuth"
+    dir = TAKEOVER_DIR
     On Error Resume Next
     If Not fso.FolderExists(dir) Then fso.CreateFolder(dir)
     Err.Clear
@@ -179,7 +181,7 @@ Function IsHealthy()
     If Not StateEnabled(state) Then Exit Function
     pid = ""
     If state.Exists("pid") Then pid = state("pid")
-    If Not ProcessPidRunning(TAKEOVER_PROCESS, pid) Then Exit Function
+    If Not (ProcessPidRunning(TAKEOVER_PROCESS, pid) Or ProcessPidRunning(SERVICE_PROCESS, pid)) Then Exit Function
     If Not MarkerPresent() Then Exit Function
     IsHealthy = True
 End Function
@@ -204,12 +206,13 @@ Set state = ReadIni(StatePath())
 stateOn = StateEnabled(state)
 markerOn = MarkerPresent()
 legacyOn = LegacyDebuggerPresent()
-processOn = ProcessPidRunning(TAKEOVER_PROCESS, "")
+processOn = ProcessPidRunning(TAKEOVER_PROCESS, "") Or ProcessPidRunning(SERVICE_PROCESS, "")
 
 If stateOn Or markerOn Or legacyOn Then
     If processOn Then
-        Log "stale/hung takeover; terminating GUI"
+        Log "stale/hung takeover; terminating GUI/service"
         shell.Run "taskkill /f /im " & TAKEOVER_PROCESS & " /t", 0, True
+        shell.Run "taskkill /f /im " & SERVICE_PROCESS & " /t", 0, True
         WScript.Sleep 500
     End If
     If fso.FileExists(TAKEOVER_EXE) Then

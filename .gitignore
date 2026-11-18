@@ -11,3 +11,15 @@ logs/
 *.pcap
 *.pcapng
 .mimosa/
+bin/
+obj/
+publish/
+.vs/
+*.user
+RuijieCampusAuth/
+blocker_state.json
+takeover.ini
+service.json
+service_status.json
+discovery_service.json
+servers_service.json

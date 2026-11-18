@@ -1,0 +1,117 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:RuijieCampusAuth.App.ViewModels"
+        xmlns:core="using:RuijieCampusAuth.Core"
+        x:Class="RuijieCampusAuth.App.Views.MainWindow"
+        x:DataType="vm:MainViewModel"
+        Width="920" Height="640"
+        MinWidth="760" MinHeight="520"
+        Title="HXXY 校园网认证"
+        WindowStartupLocation="CenterScreen">
+  <Design.DataContext>
+    <vm:MainViewModel />
+  </Design.DataContext>
+
+  <Grid Margin="18" RowDefinitions="Auto,*,Auto">
+    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="2">
+        <TextBlock Text="校园网认证" FontSize="24" FontWeight="Bold" />
+        <TextBlock Text="HXXY · 锐捷 EAP-MD5 · .NET 10 / Avalonia" Opacity="0.6" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
+        <TextBlock Text="{Binding Status}" FontSize="14" FontWeight="SemiBold" />
+      </StackPanel>
+    </Grid>
+
+    <TabControl Grid.Row="1" Margin="0,14,0,0">
+      <TabItem Header="账号">
+        <Grid Margin="14" ColumnDefinitions="100,360" RowDefinitions="Auto,Auto,Auto,Auto" >
+          <TextBlock Grid.Row="0" Grid.Column="0" Text="用户名" VerticalAlignment="Center" />
+          <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Username}" PlaceholderText="校园网用户名" />
+          <TextBlock Grid.Row="1" Grid.Column="0" Text="密码" VerticalAlignment="Center" Margin="0,10,0,0" />
+          <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Password}" PasswordChar="*" PlaceholderText="校园网密码" Margin="0,10,0,0" />
+          <TextBlock Grid.Row="2" Grid.Column="0" Text="提示" VerticalAlignment="Center" Margin="0,10,0,0" />
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="密码保存在本机，Windows 使用 DPAPI 加密" Opacity="0.6" Margin="0,10,0,0" />
+          <Button Grid.Row="3" Grid.Column="1" Content="保存配置" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="认证">
+        <Grid Margin="14" RowDefinitions="Auto,Auto,*">
+          <StackPanel Orientation="Horizontal" Spacing="10">
+            <Button Content="开始认证" Command="{Binding StartCommand}" />
+            <Button Content="停止" Command="{Binding StopCommand}" />
+            <CheckBox Content="抢占保活" IsChecked="{Binding Preempt}" VerticalAlignment="Center" />
+          </StackPanel>
+          <TextBlock Grid.Row="1" Text="{Binding Status}" Opacity="0.7" Margin="0,10,0,8" />
+          <TextBox Grid.Row="2" Text="{Binding LogText}" IsReadOnly="True"
+                   AcceptsReturn="True" TextWrapping="NoWrap"
+                   FontFamily="Cascadia Mono,Consolas,monospace"
+                   ScrollViewer.VerticalScrollBarVisibility="Auto"
+                   ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+        </Grid>
+      </TabItem>
+
+      <TabItem Header="服务">
+        <StackPanel Margin="14" Spacing="10">
+          <TextBlock Text="Windows 服务 / Linux systemd" FontSize="16" FontWeight="SemiBold" />
+          <TextBlock Text="{Binding ServiceStatus}" Opacity="0.8" />
+          <CheckBox Content="接管模式：临时阻止原版锐捷进程和相关服务"
+                    IsChecked="{Binding TakeoverEnabled}" />
+          <WrapPanel Orientation="Horizontal">
+            <Button Content="应用服务配置" Command="{Binding ApplyServiceConfigCommand}" Margin="0,0,8,8" />
+            <Button Content="安装并启动" Command="{Binding InstallServiceCommand}" Margin="0,0,8,8" />
+            <Button Content="卸载" Command="{Binding UninstallServiceCommand}" Margin="0,0,8,8" />
+            <Button Content="启动" Command="{Binding StartServiceCommand}" Margin="0,0,8,8" />
+            <Button Content="停止" Command="{Binding StopServiceCommand}" Margin="0,0,8,8" />
+            <Button Content="刷新" Command="{Binding RefreshServiceCommand}" Margin="0,0,8,8" />
+          </WrapPanel>
+          <TextBlock Text="服务模式会以系统权限在登录前认证；安装前请先保存账号和网卡配置。"
+                     Opacity="0.6" TextWrapping="Wrap" />
+          <TextBlock Text="接管模式将在服务层阻止官方锐捷认证进程与相关服务。" Opacity="0.6" TextWrapping="Wrap" />
+        </StackPanel>
+      </TabItem>
+
+      <TabItem Header="设置">
+        <ScrollViewer>
+          <Grid Margin="14" ColumnDefinitions="130,380" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+            <TextBlock Grid.Row="0" Grid.Column="0" Text="网卡" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Interfaces}"
+                      SelectedItem="{Binding SelectedInterface}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="core:PcapDeviceInfo">
+                  <TextBlock Text="{Binding Description}" />
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+
+            <TextBlock Grid.Row="1" Grid.Column="0" Text="服务名" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServiceName}" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="2" Grid.Column="0" Text="静态 ID" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding StaticId}" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="3" Grid.Column="0" Text="认证超时" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Timeout}" Minimum="5" Maximum="120" Increment="1" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="4" Grid.Column="0" Text="Start 次数" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding Retries}" Minimum="1" Maximum="10" Increment="1" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="5" Grid.Column="0" Text="应答次数" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Repeats}" Minimum="1" Maximum="10" Increment="1" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="6" Grid.Column="0" Text="Start 间隔" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding StartTimeout}" Minimum="0.5" Maximum="30" Increment="0.5" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="7" Grid.Column="0" Text="掉线检测" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding CheckInterval}" Minimum="0.5" Maximum="120" Increment="0.5" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="8" Grid.Column="0" Text="失败重试" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding RetryInterval}" Minimum="0.5" Maximum="120" Increment="0.5" Margin="0,8,0,0" />
+            <TextBlock Grid.Row="9" Grid.Column="0" Text="连通检测" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding ConnectivityUrl}" Margin="0,8,0,0" />
+            <CheckBox Grid.Row="10" Grid.Column="1" Content="锁定服务器 MAC" IsChecked="{Binding ServerLock}" Margin="0,10,0,0" />
+            <TextBlock Grid.Row="11" Grid.Column="0" Text="服务器 MAC" VerticalAlignment="Center" Margin="0,8,0,0" />
+            <TextBox Grid.Row="11" Grid.Column="1" Text="{Binding LockedServer}" Margin="0,8,0,0" PlaceholderText="00:1a:a9:17:ff:ff" />
+            <Button Grid.Row="12" Grid.Column="1" Content="保存配置" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
+          </Grid>
+        </ScrollViewer>
+      </TabItem>
+    </TabControl>
+
+    <TextBlock Grid.Row="2" Text="数据目录：服务配置与日志位于程序目录；GUI 配置位于用户配置目录。" Opacity="0.5" FontSize="11" />
+  </Grid>
+</Window>

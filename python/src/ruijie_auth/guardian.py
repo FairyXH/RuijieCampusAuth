@@ -210,7 +210,7 @@ class GuardianClient:
                 "capabilities": {},
                 "clientInfo": {
                     "name": "ruijie-campus-auth",
-                    "version": "0.8.0",
+                    "version": "0.9.0",
                 },
             },
         )

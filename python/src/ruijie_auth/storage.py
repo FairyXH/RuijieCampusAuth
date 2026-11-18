@@ -13,6 +13,7 @@ import ctypes
 import json
 import logging
 import os
+import sys
 import threading
 import uuid
 from dataclasses import asdict, dataclass, field
@@ -34,7 +35,7 @@ class _DataBlob(ctypes.Structure):
     ]
 
 
-def _dpapi(data: bytes, protect: bool) -> bytes:
+def _dpapi(data: bytes, protect: bool, machine: bool = False) -> bytes:
     if os.name != "nt":
         raise OSError("DPAPI is only available on Windows")
     crypt32 = ctypes.windll.crypt32
@@ -45,13 +46,14 @@ def _dpapi(data: bytes, protect: bool) -> bytes:
     )
     out_blob = _DataBlob()
     if protect:
+        flags = 0x01 | (0x04 if machine else 0)
         ok = crypt32.CryptProtectData(
             ctypes.byref(in_blob),
             None,
             None,
             None,
             None,
-            0x01,
+            flags,
             ctypes.byref(out_blob),
         )
     else:
@@ -102,6 +104,29 @@ def unprotect_password(value: str) -> str:
     return value
 
 
+def protect_password_machine(password: str) -> str:
+    """Encrypt for a Windows service running as SYSTEM (LocalMachine scope)."""
+    raw = password.encode("utf-8")
+    if os.name != "nt":
+        raise OSError("machine DPAPI is only available on Windows")
+    return "machine-dpapi:" + base64.b64encode(
+        _dpapi(raw, True, machine=True)
+    ).decode("ascii")
+
+
+def unprotect_password_machine(value: str) -> str:
+    if not value:
+        return ""
+    prefix = "machine-dpapi:"
+    if value.startswith(prefix):
+        if os.name != "nt":
+            raise OSError("machine DPAPI is only available on Windows")
+        return _dpapi(
+            base64.b64decode(value[len(prefix) :]), False
+        ).decode("utf-8")
+    return unprotect_password(value)
+
+
 def default_data_dir() -> Path:
     if os.name == "nt":
         base = Path(os.environ.get("APPDATA", Path.home() / "AppData" / "Roaming"))
@@ -110,8 +135,19 @@ def default_data_dir() -> Path:
     return base / APP_DIR_NAME
 
 
+def install_dir() -> Path:
+    """Machine-wide state lives next to the installed exe, not ProgramData.
+
+    The deployment path is D:\\Storageredirect\\Program\\RuijieCampusAuth,
+    which is outside the frozen C: volume.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve().parent
+    return Path(__file__).resolve().parents[2]
+
+
 def program_data_dir() -> Path:
-    """Machine-wide state directory (blocker policy / launcher handoff)."""
+    """Legacy machine-wide directory; runtime state uses install_dir()."""
     if os.name == "nt":
         base = Path(os.environ.get("ProgramData", r"C:\ProgramData"))
     else:

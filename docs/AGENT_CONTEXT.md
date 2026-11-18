@@ -2,12 +2,22 @@
 
 ## Project
 
-`ruijie-campus-auth-hxxy` is a cross-platform (Windows/Linux) Python 802.1X
-supplicant for the Ruijie campus network at Xiamen Huaxia University (HXXY).
+`ruijie-campus-auth-hxxy` is a cross-platform 802.1X supplicant for the Ruijie
+campus network at Xiamen Huaxia University (HXXY). It authenticates with the
+normal campus username/password using EAP-MD5 and reproduces the Ruijie vendor
+private tail used by the official Windows client. It is a compatibility client,
+not an authentication bypass.
 
-The client authenticates with the normal campus username/password using
-EAP-MD5 and reproduces the Ruijie vendor private tail used by the official
-Windows client. It is a compatibility client, not an authentication bypass.
+Two implementations are maintained:
+
+- **Root: C# / .NET 10** — `RuijieCampusAuth.Core`, `.Cli`, `.Service`,
+  `.App` (Avalonia), `.Core.Tests`. Framework-dependent publish; Windows
+  service + Linux systemd + Avalonia GUI.
+- **`python/`** — the complete Python implementation, PySide6 GUI, single-file
+  build, tests, and reference protocol code.
+
+Older sections below that mention `src/ruijie_auth/...` and `tests/...` refer
+to the Python tree under `python/`.
 
 ## Verified State
 
@@ -85,6 +95,37 @@ Source: `C:\Program Files\Ruijie Networks\Ruijie Supplicant`.
 - `CTPassword`, client title, self-service URL, WiFi sharing and notification
   options are not part of the current EAP-MD5 auth path; they are documented but
   not added to the auth config.
+
+## C# Version (root)
+
+- `RuijieCampusAuth.Core/PrivateTail.cs` — CRC16/XMODEM, obfuscation,
+  MD5-chained credential cipher, 0x39 service name, 0x54 static ID.
+  The 569-byte output matches the Python reference byte-for-byte
+  (`RuijieCampusAuth.Core.Tests`, SHA256 check).
+- `RuijieCampusAuth.Core/Eapol.cs` — EAPOL/EAP framing, Identity/MD5,
+  GB18030 server-message extraction.
+- `RuijieCampusAuth.Core/Pcap.cs` — Npcap on Windows, libpcap on Linux/macOS
+  via a DllImport resolver; shared `PcapDevice` send/receive.
+- `RuijieCampusAuth.Core/Supplicant.cs` — EAP-MD5 state machine, private tail,
+  locked-server unicast Start, group Logoff, retries/timeouts.
+- `RuijieCampusAuth.Core/ServiceConfig.cs` — service.json read/write,
+  LocalMachine DPAPI on Windows / 0600 plain on Unix; includes
+  `takeover_enabled`.
+- `RuijieCampusAuth.Core/ServiceInstaller.cs` — Windows `sc.exe` service
+  install/uninstall/start/stop; Linux systemd unit.
+- `RuijieCampusAuth.Cli` — live auth, `config init|show|takeover`,
+  `service install|uninstall|start|stop|status`.
+- `RuijieCampusAuth.Service` — `AddWindowsService` / `AddSystemd` worker;
+  AuthWorker; TakeoverGuard/TakeoverService.
+- `RuijieCampusAuth.App` — Avalonia Fluent light UI, `--tray --auto`, tray icon,
+  account/auth/service/settings tabs.
+- Verified: C# CLI and Windows service both authenticated live as SYSTEM;
+  service install/start via CLI worked. Takeover wrote IFEO markers for
+  enumerated official exe names, stopped/disabled `RJSuService`, and restored
+  both when disabled.
+- Build/publish: `build-csharp.ps1 -Runtime win-x64` (framework-dependent).
+- Deploy path: `D:\Storageredirect\Program\RuijieCampusAuth`; GUI launch:
+  `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`.
 
 ## Architecture
 
@@ -203,7 +244,8 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
 - The app writes `takeover.ini` (`enabled=1`, PID, exe) every second.
 - The blocker writes `Debugger` and `HXXYTakeover=RuijieCampusAuth` to both
   IFEO registry views and saves previous values in
-  `%ProgramData%\RuijieCampusAuth\blocker_state.json`.
+  `<install_dir>\blocker_state.json`
+  (`D:\Storageredirect\Program\RuijieCampusAuth`).
 - `restart_ruijie.vbs` skips the official client only when:
   1. `enabled=1`;
   2. the heartbeat file mtime is <= 12 seconds old;
@@ -214,10 +256,35 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   `RuijieSupplicant.exe` as before.
 - `--restore-client` also removes markerless legacy IFEO policies from older
   builds and writes `enabled=0`.
-- Deploy path: `D:\Storageredirect\Program\RuijieCampusAuth.exe`; the launcher
-  and shortcuts point there. `build.ps1 -Deploy` copies the exe, backs up and
-  updates `C:\Program Files\restart_ruijie.vbs`, and creates
+- Deploy path: `D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe`;
+  the launcher and shortcuts point there. `build.ps1 -Deploy` copies the exe,
+  backs up and updates `C:\Program Files\restart_ruijie.vbs`, and creates
   `HXXY-CampusAuth.lnk` in the deploy dir and on the desktop.
+- GUI / tray launch command (do not change):
+  `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`.
+
+## Windows System Service (0.9.0)
+
+- `RuijieCampusAuth.exe --service` implements the SCM dispatcher in
+  `system_service.py` and runs a headless `SystemAgent`; it never creates a Qt
+  application.
+- Service name `HXXY-CampusAuth`, LocalSystem, auto start. It starts at boot
+  before user login and keeps the 802.1X session alive.
+- Data root is the exe directory
+  `D:\Storageredirect\Program\RuijieCampusAuth` (not `%ProgramData%`):
+  `service.json`, `service_status.json`, `discovery_service.json`,
+  `servers_service.json`, `logs\service.log`, `blocker_state.json`,
+  `takeover.ini`.
+- `service.json` stores the password with **LocalMachine DPAPI** and is ACLed to
+  SYSTEM / Administrators only. Machine-wide state must survive the frozen C:
+  volume; keep it on D:.
+- The GUI exposes “系统服务开机自启”; enabling writes the current account and
+  settings, creates/updates the service, and starts it. When the service is
+  running the GUI skips `--auto` and refuses to start its own AuthWorker.
+- `restart_ruijie.vbs` reads `takeover.ini` and `blocker_state.json` from the
+  install directory, matching `storage.install_dir()`.
+- `service_status.json` is written on state changes and read by the GUI's
+  service status label.
 
 ## Important Implementation Notes
 

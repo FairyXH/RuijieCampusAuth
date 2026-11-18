@@ -14,14 +14,14 @@ import sys
 import threading
 from pathlib import Path
 
-from .storage import program_data_dir
+from .storage import install_dir
 
 LOG = logging.getLogger("ruijie-auth")
 
 
 class TakeoverState:
     def __init__(self, path: Path | None = None) -> None:
-        self.path = Path(path) if path else program_data_dir() / "takeover.ini"
+        self.path = Path(path) if path else install_dir() / "takeover.ini"
         self._lock = threading.Lock()
         self._write_lock = threading.Lock()
         self._stop = threading.Event()

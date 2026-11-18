@@ -1,9 +1,8 @@
 [CmdletBinding()]
 param(
-    [switch]$Clean,
-    [switch]$SkipInstall,
+    [string]$Runtime = "win-x64",
     [switch]$Deploy,
-    [string]$DeployDir = "D:\Storageredirect\Program"
+    [string]$DeployDir = "D:\Storageredirect\Program\RuijieCampusAuth"
 )
 
 $ErrorActionPreference = "Stop"
@@ -23,51 +22,54 @@ function Invoke-Native {
     return $process.ExitCode
 }
 
-if ($Clean) {
-    Remove-Item -Recurse -Force build, dist -ErrorAction SilentlyContinue
-}
+$publishDir = Join-Path $PSScriptRoot "publish\$Runtime"
+Remove-Item $publishDir -Recurse -Force -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
 
-if (-not $SkipInstall) {
-    Write-Host "Installing GUI/build dependencies..."
-    $code = Invoke-Native "python" @("-m", "pip", "install", "-e", ".[gui,build]") `
-        "logs\build-install.out.log" "logs\build-install.err.log"
+$projects = @(
+    "RuijieCampusAuth.Service\RuijieCampusAuth.Service.csproj",
+    "RuijieCampusAuth.Cli\RuijieCampusAuth.Cli.csproj",
+    "RuijieCampusAuth.App\RuijieCampusAuth.App.csproj"
+)
+
+foreach ($project in $projects) {
+    Write-Host "Publishing $project ..."
+    $code = Invoke-Native "dotnet" @(
+        "publish", $project,
+        "-c", "Release",
+        "-r", $Runtime,
+        "--self-contained", "false",
+        "-o", $publishDir,
+        "--nologo"
+    ) "logs\publish.out.log" "logs\publish.err.log"
     if ($code -ne 0) {
-        Get-Content "logs\build-install.out.log" -Tail 80
-        Get-Content "logs\build-install.err.log" -Tail 80
+        Get-Content "logs\publish.out.log" -Tail 100
+        Get-Content "logs\publish.err.log" -Tail 100
         exit $code
     }
 }
 
-if (-not (Test-Path "packaging\icon.ico")) {
-    $code = Invoke-Native "python" @("packaging\make_icon.py") `
-        "logs\build-icon.out.log" "logs\build-icon.err.log"
-    if ($code -ne 0) {
-        Get-Content "logs\build-icon.err.log" -Tail 40
-        exit $code
+$appExe = if ($Runtime.StartsWith("win")) {
+    Join-Path $publishDir "RuijieCampusAuth.exe"
+} else {
+    Join-Path $publishDir "RuijieCampusAuth"
+}
+$serviceExe = if ($Runtime.StartsWith("win")) {
+    Join-Path $publishDir "RuijieCampusAuth.Service.exe"
+} else {
+    Join-Path $publishDir "RuijieCampusAuth.Service"
+}
+foreach ($required in @($appExe, $serviceExe)) {
+    if (-not (Test-Path $required)) {
+        throw "publish output missing: $required"
     }
 }
-
-Write-Host "Building single-file exe..."
-$code = Invoke-Native "python" `
-    @("-m", "PyInstaller", "--noconfirm", "--clean", "packaging\RuijieCampusAuth.spec") `
-    "logs\build.out.log" "logs\build.err.log"
-if ($code -ne 0) {
-    Get-Content "logs\build.out.log" -Tail 100
-    Get-Content "logs\build.err.log" -Tail 100
-    exit $code
-}
-
-$exe = Join-Path $PSScriptRoot "dist\RuijieCampusAuth.exe"
-if (-not (Test-Path $exe)) {
-    Get-Content "logs\build.out.log" -Tail 80
-    Get-Content "logs\build.err.log" -Tail 80
-    throw "exe not found: $exe"
-}
-
-$size = (Get-Item $exe).Length / 1MB
-Write-Host ("Built: {0} ({1:N1} MB)" -f $exe, $size)
+Write-Host "Published to: $publishDir"
 
 if ($Deploy) {
+    if (-not $Runtime.StartsWith("win")) {
+        throw "Deploy is only implemented for the Windows RID"
+    }
     $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
         [Security.Principal.WindowsBuiltInRole]::Administrator
     )
@@ -75,20 +77,18 @@ if ($Deploy) {
         throw "Deploy requires an elevated PowerShell session"
     }
     New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
-    $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
-    $running = Get-Process RuijieCampusAuth -ErrorAction SilentlyContinue
-    if ($running) {
-        Write-Host "Stopping running RuijieCampusAuth..."
-        $running | Stop-Process -Force
-        Start-Sleep -Seconds 2
-        if (Test-Path $target) {
-            & $target --restore-client | Out-Null
-        }
-    }
-    Copy-Item $exe $target -Force
-    Write-Host "Deployed exe: $target"
 
-    $vbsSource = Join-Path $PSScriptRoot "packaging\restart_ruijie.vbs"
+    Get-Service HXXY-CampusAuth -ErrorAction SilentlyContinue |
+        Stop-Service -Force -ErrorAction SilentlyContinue
+    Get-Process RuijieCampusAuth, RuijieCampusAuth.Service -ErrorAction SilentlyContinue |
+        Stop-Process -Force
+    Start-Sleep -Seconds 1
+
+    Copy-Item (Join-Path $publishDir "*") $DeployDir -Recurse -Force
+    $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
+    Write-Host "Deployed GUI: $target"
+
+    $vbsSource = Join-Path $PSScriptRoot "python\packaging\restart_ruijie.vbs"
     $vbsTarget = "C:\Program Files\restart_ruijie.vbs"
     if (Test-Path $vbsTarget) {
         $backup = "$vbsTarget.bak-" + (Get-Date -Format "yyyyMMdd-HHmmss")
@@ -102,6 +102,7 @@ if ($Deploy) {
     $shortcutPath = Join-Path $DeployDir "HXXY-CampusAuth.lnk"
     $shortcut = $ws.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $target
+    $shortcut.Arguments = "--tray --auto"
     $shortcut.WorkingDirectory = $DeployDir
     $shortcut.IconLocation = "$target,0"
     $shortcut.Description = "HXXY Ruijie Campus Auth"
@@ -113,14 +114,16 @@ if ($Deploy) {
         $desktopShortcut = Join-Path $desktop "HXXY-CampusAuth.lnk"
         $shortcut = $ws.CreateShortcut($desktopShortcut)
         $shortcut.TargetPath = $target
+        $shortcut.Arguments = "--tray --auto"
         $shortcut.WorkingDirectory = $DeployDir
         $shortcut.IconLocation = "$target,0"
         $shortcut.Description = "HXXY Ruijie Campus Auth"
         $shortcut.Save()
         Write-Host "Desktop shortcut: $desktopShortcut"
     }
+
+    Write-Host "Launch: `"$target`" --tray --auto"
+    Write-Host "Install service: `"$DeployDir\RuijieCampusAuth.Cli.exe`" service install"
 }
 
-Write-Host "Requires Npcap; the exe requests administrator rights."
-Write-Host "Run with: RuijieCampusAuth.exe --tray --auto"
 exit 0
