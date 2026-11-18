@@ -2,18 +2,27 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
+	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/config"
+	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/control"
+	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/daemon"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/protocol"
+	serverstore "github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/servers"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/status"
 	"github.com/FairyXH/ruijie-campus-auth-hxxy/openwrt/hxxy-auth/internal/version"
 )
+
+const defaultDataDir = "/etc/hxxy-auth"
 
 func main() {
 	if len(os.Args) < 2 {
@@ -30,6 +39,16 @@ func main() {
 		runTail(os.Args[2:])
 	case "selftest":
 		runSelftest()
+	case "daemon":
+		runDaemon(os.Args[2:])
+	case "auth", "logoff", "pause", "resume", "reload":
+		runControl(os.Args[1], os.Args[2:])
+	case "accounts":
+		runAccounts(os.Args[2:])
+	case "servers":
+		runServers(os.Args[2:])
+	case "discovery":
+		runDiscovery(os.Args[2:])
 	case "help", "-h", "--help":
 		usage()
 	default:
@@ -54,8 +73,215 @@ func runStatus(args []string) {
 		fmt.Println(string(data))
 		return
 	}
-	fmt.Printf("%s | %s | %s | %s\n",
-		snapshot.State, snapshot.Message, snapshot.Interface, snapshot.Server)
+	fmt.Printf("%s | %s | %s | %s | %s\n",
+		snapshot.State, snapshot.Message, snapshot.Account, snapshot.Interface, snapshot.Server)
+}
+
+func runDaemon(args []string) {
+	defaults := daemon.DefaultPaths()
+	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
+	configPath := fs.String("config", defaults.Config, "UCI 配置路径")
+	socketPath := fs.String("socket", defaults.Socket, "控制 socket")
+	statusPath := fs.String("status", defaults.Status, "状态文件")
+	dataDir := fs.String("data-dir", defaults.DataDir, "服务器/缓存目录")
+	logPath := fs.String("log", defaults.Log, "日志文件")
+	_ = fs.Parse(args)
+	if err := daemon.Run(context.Background(), daemon.Paths{
+		Config:  *configPath,
+		Socket:  *socketPath,
+		Status:  *statusPath,
+		DataDir: *dataDir,
+		Log:     *logPath,
+	}); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+}
+
+func runControl(command string, args []string) {
+	fs := flag.NewFlagSet(command, flag.ExitOnError)
+	socket := fs.String("socket", control.DefaultSocket, "控制 socket")
+	_ = fs.Parse(args)
+	if err := control.Send(*socket, command); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	fmt.Println("ok")
+}
+
+func runAccounts(args []string) {
+	fs := flag.NewFlagSet("accounts", flag.ExitOnError)
+	asJSON := fs.Bool("json", false, "输出 JSON")
+	configPath := fs.String("config", config.DefaultPath, "UCI 配置路径")
+	_ = fs.Parse(args)
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	type publicAccount struct {
+		Section  string `json:"section"`
+		Username string `json:"username"`
+		Note     string `json:"note"`
+		Enabled  bool   `json:"enabled"`
+		Active   bool   `json:"active"`
+	}
+	list := make([]publicAccount, 0, len(cfg.Accounts))
+	for _, account := range cfg.Accounts {
+		list = append(list, publicAccount{
+			Section:  account.Section,
+			Username: account.Username,
+			Note:     account.Note,
+			Enabled:  account.Enabled,
+			Active:   account.Active,
+		})
+	}
+	if *asJSON {
+		data, _ := json.MarshalIndent(list, "", "  ")
+		fmt.Println(string(data))
+		return
+	}
+	for _, account := range list {
+		flags := ""
+		if account.Enabled {
+			flags += "enabled"
+		} else {
+			flags += "disabled"
+		}
+		if account.Active {
+			flags += ",active"
+		}
+		fmt.Printf("%s | %s | %s | %s\n", account.Section, account.Username, account.Note, flags)
+	}
+}
+
+func runServers(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: servers list|lock|unlock|remove|rename")
+		os.Exit(2)
+	}
+	action := args[0]
+	fs := flag.NewFlagSet("servers "+action, flag.ExitOnError)
+	asJSON := fs.Bool("json", false, "输出 JSON")
+	dataDir := fs.String("dir", defaultDataDir, "数据目录")
+	_ = fs.Parse(args[1:])
+	path := filepath.Join(*dataDir, serverstore.ServersFile)
+	store, err := serverstore.Load(path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	rest := fs.Args()
+	switch action {
+	case "list":
+		list := store.Servers
+		if list == nil {
+			list = []serverstore.Server{}
+		}
+		if *asJSON {
+			data, _ := json.MarshalIndent(list, "", "  ")
+			fmt.Println(string(data))
+			return
+		}
+		for _, record := range store.Servers {
+			lock := ""
+			if record.Locked {
+				lock = " locked"
+			}
+			fmt.Printf("%s | %s | %s | success=%d%s\n",
+				record.MAC, record.Name, record.Description, record.SuccessCount, lock)
+		}
+	case "lock":
+		if len(rest) < 1 {
+			fmt.Fprintln(os.Stderr, "用法: servers lock <mac>")
+			os.Exit(2)
+		}
+		if !store.Lock(rest[0]) {
+			fmt.Fprintln(os.Stderr, "服务器不存在或 MAC 无效")
+			os.Exit(1)
+		}
+		if err := store.Save(path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("locked", rest[0])
+	case "unlock":
+		store.Unlock()
+		if err := store.Save(path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("unlocked")
+	case "remove":
+		if len(rest) < 1 || !store.Remove(rest[0]) {
+			fmt.Fprintln(os.Stderr, "服务器不存在或 MAC 无效")
+			os.Exit(1)
+		}
+		if err := store.Save(path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("removed", rest[0])
+	case "rename":
+		if len(rest) < 2 || !store.Rename(rest[0], strings.Join(rest[1:], " ")) {
+			fmt.Fprintln(os.Stderr, "用法: servers rename <mac> <name>")
+			os.Exit(2)
+		}
+		if err := store.Save(path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("renamed", rest[0])
+	default:
+		fmt.Fprintln(os.Stderr, "用法: servers list|lock|unlock|remove|rename")
+		os.Exit(2)
+	}
+}
+
+func runDiscovery(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "用法: discovery show|clear")
+		os.Exit(2)
+	}
+	action := args[0]
+	fs := flag.NewFlagSet("discovery "+action, flag.ExitOnError)
+	asJSON := fs.Bool("json", false, "输出 JSON")
+	dataDir := fs.String("dir", defaultDataDir, "数据目录")
+	_ = fs.Parse(args[1:])
+	path := filepath.Join(*dataDir, serverstore.DiscoveryFile)
+	switch action {
+	case "show":
+		discovery, err := serverstore.LoadDiscovery(path)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if *asJSON {
+			if discovery == nil {
+				fmt.Println("{}")
+				return
+			}
+			data, _ := json.MarshalIndent(discovery, "", "  ")
+			fmt.Println(string(data))
+			return
+		}
+		if discovery == nil {
+			fmt.Println("no cache")
+			return
+		}
+		fmt.Printf("%s | %s | %s -> %s | %s\n",
+			discovery.Interface, discovery.Description, discovery.MAC,
+			discovery.ServerMAC, discovery.UpdatedAt)
+	case "clear":
+		if err := serverstore.ClearDiscovery(path); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		fmt.Println("cleared")
+	default:
+		fmt.Fprintln(os.Stderr, "用法: discovery show|clear")
+		os.Exit(2)
+	}
 }
 
 func runTail(args []string) {
@@ -164,10 +390,17 @@ func usage() {
 	fmt.Println(`用法: hxxy-auth <command>
 
 命令:
-  version        打印版本
-  status         读取 /var/run/hxxy-auth/status.json
-  status --json  LuCI 使用的 JSON 输出
-  tail           用给定账号/MAC/IP 生成 569 字节私有尾（调试）
-  selftest       跑 569 字节 golden vector
-  help           显示帮助`)
+  version          打印版本
+  daemon           常驻认证守护进程（procd 使用）
+  status --json    读取 /var/run/hxxy-auth/status.json
+  auth|logoff|pause|resume|reload
+                   通过控制 socket 操作守护进程
+  accounts         查看 UCI 账号池（不输出密码）
+  servers list|lock|unlock|remove|rename
+                   查看/管理已学习认证服务器
+  discovery show|clear
+                   查看/清除探测缓存
+  tail             生成 569 字节私有尾（调试）
+  selftest         跑 569 字节 golden vector
+  help             显示帮助`)
 }

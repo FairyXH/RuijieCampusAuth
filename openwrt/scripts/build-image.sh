@@ -35,6 +35,7 @@ cp "$ROOT/luci-app-hxxy-auth/root/usr/share/rpcd/acl.d/"*.json \
 mkdir -p "$STAGE/etc/uci-defaults"
 cp "$ROOT/luci-app-hxxy-auth/root/etc/uci-defaults/"* "$STAGE/etc/uci-defaults/"
 chmod 0755 "$STAGE/etc/uci-defaults/"*
+chmod 0755 "$STAGE/etc/init.d/hxxy-auth" "$STAGE/etc/hotplug.d/iface/90-hxxy-auth"
 
 cd "$IB"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \

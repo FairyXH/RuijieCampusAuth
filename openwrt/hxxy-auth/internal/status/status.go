@@ -3,6 +3,7 @@ package status
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Snapshot struct {
 	Time      string `json:"time"`
 	State     string `json:"state"`
 	Message   string `json:"message"`
+	Account   string `json:"account"`
 	Interface string `json:"interface"`
 	Server    string `json:"server"`
 }
@@ -29,6 +31,25 @@ func Read(path string) (*Snapshot, error) {
 		return nil, err
 	}
 	return &snapshot, nil
+}
+
+// Write atomically updates the status document.
+func Write(path string, snapshot Snapshot) error {
+	if snapshot.Time == "" {
+		snapshot.Time = time.Now().Format(time.RFC3339)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(snapshot, "", "  ")
+	if err != nil {
+		return err
+	}
+	temp := path + ".tmp"
+	if err := os.WriteFile(temp, data, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(temp, path)
 }
 
 // ReadOrDefault loads a status document, or returns a stopped snapshot.

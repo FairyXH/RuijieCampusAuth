@@ -1,6 +1,7 @@
 'use strict';
 'require view';
 'require form';
+'require fs';
 
 return view.extend({
 	render: function() {
@@ -43,6 +44,26 @@ return view.extend({
 		o.datatype = 'uinteger';
 		o.default = '21600';
 
+		o = s.option(form.Value, 'check_interval', _('Online check interval (s)'));
+		o.datatype = 'ufloat';
+		o.default = '2';
+
+		o = s.option(form.Value, 'retry_interval', _('Retry interval (s)'));
+		o.datatype = 'ufloat';
+		o.default = '3';
+
+		o = s.option(form.Flag, 'autoguard', _('Auto guard (re-auth on offline)'));
+		o.default = '1';
+
+		o = s.option(form.Flag, 'preempt', _('Continuous preemption (periodic re-auth)'));
+		o.default = '1';
+
+		o = s.option(form.Flag, 'discovery_cache', _('Discovery cache'));
+		o.default = '1';
+
+		o = s.option(form.Flag, 'logoff_on_stop', _('Send Logoff on stop'));
+		o.default = '0';
+
 		o = s.option(form.Flag, 'pause_on_home', _('Pause on non-802.1X network'));
 		o.default = '1';
 
@@ -62,5 +83,11 @@ return view.extend({
 		o.default = 'info';
 
 		return m.render();
+	},
+
+	handleSaveApply: function(ev, mode) {
+		return this.super('handleSaveApply', [ ev, mode ]).then(function() {
+			return fs.exec('/usr/sbin/hxxy-auth', [ 'reload' ]).catch(function() {});
+		});
 	}
 });
