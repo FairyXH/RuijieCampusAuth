@@ -105,36 +105,90 @@ sh scripts/build-image.sh
 
 - `openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin`
   约 14MB
-- SHA256 `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`
+- SHA256 `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`
+- `kernel1.bin` 3.1MB，SHA256
+  `f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a`
+- `rootfs0.bin` 12MB，SHA256
+  `4aa9a27d571e71f11fba704b1d81fbc71aeda43d3f26986bdba84a76d99f1255`
+- 插件 ipk：`openwrt/build/ipk/hxxy-auth_0.1.0_mipsel_24kc.ipk`
+  （1.4MB，外层 tar.gz 格式）
 - rootfs squashfs 约 10MB（UA3F 17MB 压缩后 + 其他包）
 - `root.squashfs` 已确认包含：
-  - `/usr/sbin/hxxy-auth`（3.9MB，mipsle 静态）
+  - `/usr/sbin/hxxy-auth`（3.9MB，mipsle 静态，opkg 所有）
   - `/usr/bin/ua3f`（17MB，mipsle musl 动态，UA3F 3.7.0）
   - `/etc/config/ua3f`（NFQUEUE，L3 开，UA 改写关）
   - `/etc/init.d/ua3f`（来自 UA3F ipk）
   - `/etc/config/https-dns-proxy`（AliDNS + Tencent DoH，IPv4）
   - `/etc/init.d/https-dns-proxy`
-  - `/etc/config/hxxy-auth`（`device=wan`、`disguise=full`）
+  - `/etc/config/hxxy-auth`（`device=wan`、`disguise=full`，0600）
   - `/etc/init.d/hxxy-auth`
   - `/etc/init.d/hxxy-disguise`（nft TTL 128 + MSS 1460）
   - `/etc/sysctl.d/90-hxxy.conf`
   - `/etc/hotplug.d/iface/90-hxxy-auth`
-  - `/etc/uci-defaults/90-hxxy-auth`
+  - `/etc/hotplug.d/net/90-hxxy-usbwan`（USB 共享自动接管）
+  - `/etc/uci-defaults/90-hxxy-auth`（usbwan + firewall zone）
   - `/etc/rc.d/S20https-dns-proxy`、`S95hxxy-auth`、`S99hxxy-disguise`
   - `/usr/share/luci/menu.d/luci-app-hxxy-auth.json`
   - `/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json`
   - `/www/luci-static/resources/view/hxxy-auth/{overview,accounts,servers,mac,settings,logs}.js`
+  - `/usr/lib/opkg/info/hxxy-auth.{control,list,conffiles}`
+  - `/usr/lib/opkg/status` 中有 `Package: hxxy-auth` +
+    `Status: install ok installed`
 
 包清单（manifest）确认包含：
 
 ```text
-https-dns-proxy, luci-app-https-dns-proxy,
+hxxy-auth, https-dns-proxy, luci-app-https-dns-proxy,
 luci-i18n-https-dns-proxy-zh-cn, luci-i18n-base-zh-cn,
 kmod-nft-queue, kmod-nft-tproxy, kmod-nfnetlink-queue,
 kmod-nf-conntrack-netlink, iptables-nft, iptables-mod-tproxy,
 iptables-mod-extra, iptables-mod-ipopt, iptables-mod-nfqueue,
-iptables-mod-conntrack-extra, ipset, luci-compat
+iptables-mod-conntrack-extra, ipset, luci-compat,
+kmod-usb-net, kmod-usb-net-rndis, kmod-usb-net-cdc-ether,
+kmod-usb-net-cdc-ncm, kmod-usb-net-cdc-subset,
+kmod-usb-net-ipheth
 ```
+
+### 插件 ipk 与免刷更新
+
+`build-image.sh` 先调用 `build-ipk.sh` 生成 `hxxy-auth` 包，再把本地 ipk
+路径放进 `PACKAGES`，Image Builder 用 opkg 安装，所以固件里的应用文件
+由 opkg 拥有。后续更新只需：
+
+```sh
+opkg install --force-reinstall /tmp/hxxy-auth_0.1.0_mipsel_24kc.ipk
+```
+
+`/etc/config/hxxy-auth` 是 conffile，账号和设置保留；`postinst` 重启
+`hxxy-auth` 与 `hxxy-disguise`。
+
+构建 ipk 时踩到一个坑：Image Builder 自带的 host opkg
+（`38eccbb1`, 2024-10-16）读取 GNU `ar` 格式的 ipk 会段错误，
+`opkg install` 直接 core dump。改成和 UA3F 一样的外层 `tar.gz`
+（`./debian-binary`、`./control.tar.gz`、`./data.tar.gz`）后安装和升级
+都正常，conffile 也按预期保留。不要把 `build-ipk.sh` 改回 `ar rc`。
+
+### Breed 镜像
+
+标准 sysupgrade 是 OpenWrt 的 tar，Breed 升级页不认。用
+`eg15/mir3g-breed-image-maker` 重打包：
+
+```sh
+cd /opt/openwrt/breed
+./make_mir3g_breed_image.sh \
+  <...>-squashfs-kernel1.bin <...>-squashfs-rootfs0.bin
+```
+
+产物 `openwrt_for_breed.bin`：
+
+- 大小 20,185,088 B（8MB 头部 + 11,796,480 B rootfs）
+- SHA256 `eb4e152b8412d9af8581ffc3a0bfb17f0ca689140b8ca32e0924514b57249a65`
+- 布局：kernel1 在偏移 0 和 4M，rootfs0 从 8M 开始
+- 输入 kernel1 3,181,020 B，小于 4MB 槽位
+
+Breed 里刷到第二个分区，环境变量设
+`autoboot.command = boot flash 0x600000`。工具脚本来自 Windows 时是
+CRLF，Ubuntu 上先 `sed -i 's/\r$//'`。该镜像尚未在真机验证。
 
 默认配置：
 
@@ -147,22 +201,29 @@ iptables-mod-conntrack-extra, ipset, luci-compat
 - MAC 页/CLI 可写 `network.wan.macaddr`、`ifup wan` 并 reload daemon。
 - 概览页在无认证服务器且外网在线时显示 `paused`。
 
-`files/` 当前：
+构建时 `FILES` 覆盖层只放第三方服务配置：
 
 ```text
-files/usr/sbin/hxxy-auth                 # 构建时生成，不入库
-files/usr/bin/ua3f                       # 构建时从 UA3F ipk 抽取，不入库
+build/files/etc/config/ua3f
+build/files/etc/config/https-dns-proxy
+build/files/usr/bin/ua3f                  # 构建时从 UA3F ipk 抽取
+build/files/etc/init.d/ua3f               # 构建时从 UA3F ipk 抽取
+```
+
+`hxxy-auth` 的二进制、init/hotplug 脚本、UCI 默认配置和 LuCI 文件都在
+`hxxy-auth_<version>_mipsel_24kc.ipk` 里，由 opkg 安装并拥有。源码树对应：
+
+```text
+files/etc/config/hxxy-auth
 files/etc/init.d/hxxy-auth
 files/etc/init.d/hxxy-disguise
-files/etc/init.d/ua3f                    # 构建时从 UA3F ipk 抽取
-files/etc/config/hxxy-auth               # config auth + config account（明文，0600）
-files/etc/config/ua3f
-files/etc/config/https-dns-proxy
 files/etc/sysctl.d/90-hxxy.conf
 files/etc/hotplug.d/iface/90-hxxy-auth
-files/usr/share/luci/menu.d/luci-app-hxxy-auth.json
-files/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
-files/www/luci-static/resources/view/hxxy-auth/*.js
+files/etc/hotplug.d/net/90-hxxy-usbwan
+luci-app-hxxy-auth/root/etc/uci-defaults/90-hxxy-auth
+luci-app-hxxy-auth/root/usr/share/luci/menu.d/luci-app-hxxy-auth.json
+luci-app-hxxy-auth/root/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
+luci-app-hxxy-auth/htdocs/luci-static/resources/view/hxxy-auth/*.js
 ```
 
 ### `ucode` 下载失败的恢复
@@ -200,10 +261,20 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
   SHA256 与 C#/Python 一致
   `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`。
 - 完整 R3G 固件构建成功（14MB，SHA256
-  `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`），
+  `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`），
   含 UA3F 3.7.0 mipsel、https-dns-proxy + LuCI 中文、MAC 页、disguise、
-  DoH 配置、iptables/nft kmods；`rc.d` 有 S20https-dns-proxy、
-  S95hxxy-auth、S99hxxy-disguise。
+  DoH 配置、iptables/nft kmods、USB tethering kmods；`rc.d` 有
+  S20https-dns-proxy、S95hxxy-auth、S99hxxy-disguise。
+- `hxxy-auth` 已改为 opkg 包：manifest 有 `hxxy-auth - 0.1.0`，
+  squashfs 里有 `/usr/lib/opkg/info/hxxy-auth.*`，status 为 installed。
+- host opkg 安装/强制重装 ipk 通过；升级前写入 `/etc/config/hxxy-auth`
+  的 marker 在重装后仍存在，文件权限 0600 保持。
+- 用 qemu-mipsel 跑 Image Builder root 里的真实 MIPS `uci`，执行
+  `uci-defaults`：生成 `network.usbwan`（dhcp/usb0/metric 100），
+  向 `firewall.@zone[1].network` 追加 `usbwan`，重复执行不重复追加。
+- Breed 镜像 20,185,088 B，SHA256
+  `eb4e152b8412d9af8581ffc3a0bfb17f0ca689140b8ca32e0924514b57249a65`；
+  kernel1 在 0/4M、rootfs0 在 8M 的布局已逐段校验。
 - 二进制核对：UA3F 为 mipsle musl 动态（`ld-musl-mipsel-sf.so.1`），
   hxxy-auth 为 mipsle 静态；nft `ttl set 128` + `maxseg size set 1460`
   语法在宿主 nft 上验证通过。

@@ -491,13 +491,18 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   init/hotplug/uci-defaults are included. Account passwords are plaintext in
   `/etc/config/hxxy-auth` (0600) per the user's deployment decision; no DPAPI.
   A full R3G firmware (14MB, SHA256
-  `35f72b0c8504a0b4b79ccea4b3d3081f79e9bd383437c5ea8b22294ff5874476`)
+  `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`)
   contains the daemon, UA3F 3.7.0 mipsel (NFQUEUE L3: TTL 128/IPID 0/
   TCP timestamp removed/SYN window 65535; UA rewriting OFF),
   https-dns-proxy + luci-app/i18n zh-cn (AliDNS/Tencent DoH),
   iptables/nft kmods, MAC page, disguise script, init/hotplug, UCI config,
-  and six LuCI views. Default `disguise=full`; sysctl TTL 128/timestamps
-  off/ECN off/IPv6 off; flow offload off.
+  USB tethering kmods (RNDIS/CDC-ECM/NCM/subset/ipheth), and six LuCI views.
+  Default `disguise=full`; sysctl TTL 128/timestamps off/ECN off/IPv6 off;
+  flow offload off. The app is packaged as
+  `build/ipk/hxxy-auth_0.1.0_mipsel_24kc.ipk` and installed by opkg, so
+  upgrades use `opkg install --force-reinstall` without reflashing;
+  `/etc/config/hxxy-auth` is a conffile. `FILES` now carries only
+  `/etc/config/ua3f` and `/etc/config/https-dns-proxy` plus the UA3F binary.
   x86 QEMU verification: the daemon opens AF_PACKET on `br-lan`, enters
   `paused` when no authenticator exists and the localhost probe is online,
   the overview shows account/interface, Resume re-runs auth and pauses again,
@@ -507,6 +512,21 @@ Linux requires libpcap and root (or equivalent raw-socket permission).
   Builder `PROFILE`/device packages, `GOARCH`, UCI `device`, and UA3F kmods are
   target-specific. Next: live R3G validation (`wan` DSA, DHCP timing,
   100Mbps iperf3), UA3F NFQUEUE throughput, and MAC ifup/re-auth timing.
+- 2026-11-19: OpenWrt app packaging and USB tethering. `hxxy-auth` is now an
+  opkg-owned package (`build/ipk/hxxy-auth_0.1.0_mipsel_24kc.ipk`); the image
+  manifest/status contain it, and `--force-reinstall` preserves the 0600
+  `/etc/config/hxxy-auth` conffile (marker test passed). The host opkg in the
+  Image Builder segfaults on GNU `ar` ipks; `build-ipk.sh` must keep the outer
+  `tar.gz` layout. USB kmods `kmod-usb-net`, `-rndis`, `-cdc-ether`,
+  `-cdc-ncm`, `-cdc-subset`, `-ipheth` are installed;
+  `/etc/hotplug.d/net/90-hxxy-usbwan` adopts `usb*`/`wwan*` into
+  `network.usbwan` (DHCP, metric 100, WAN zone). `uci-defaults` was run
+  against the real MIPS `uci` under qemu-mipsel: usbwan was created and
+  appended once to the wan zone; rerun was idempotent. Breed image
+  `...-squashfs-breed.bin` is 20,185,088 B, SHA256
+  `eb4e152b8412d9af8581ffc3a0bfb17f0ca689140b8ca32e0924514b57249a65`,
+  with kernel1 at 0/4M and rootfs0 at 8M. Untested on real R3G: USB
+  enumeration/DHCP/route switch and Breed flashing.
 - `docs/OPENWRT_FEASIBILITY.md` — OpenWrt soft-router port assessment, updated
   for the Xiaomi R3G target. The auth algorithm is fully portable; account
   pool, failover, discovery, server lock, logging, status, and home-network
