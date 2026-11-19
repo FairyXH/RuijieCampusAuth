@@ -70,15 +70,6 @@ public static class DebugFeatureCatalog
             "EAP-TLS 客户端证书认证实验台。",
             supportsArguments: true),
         new PlannedDebugFeature(
-            "dhcp-client",
-            "DHCP 客户端 / Option 82",
-            "network",
-            "P3",
-            "认证前/后 DHCP、Release/Renew、Option 82。",
-            requiresService: true,
-            requiresConfirmation: true,
-            supportsArguments: true),
-        new PlannedDebugFeature(
             "arp-monitor",
             "ARP 网关监控",
             "network",

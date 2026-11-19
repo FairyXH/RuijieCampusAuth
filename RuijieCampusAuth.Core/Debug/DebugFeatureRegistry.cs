@@ -191,6 +191,7 @@ public static class DebugFeatureFactory
         {
             new SystemInfoDebugFeature(store),
             new PrivatePropertiesDebugFeature(),
+            new DhcpClientDebugFeature(store),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(

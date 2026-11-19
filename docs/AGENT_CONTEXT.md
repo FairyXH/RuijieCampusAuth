@@ -43,7 +43,11 @@ to the Python tree under `python/`.
   RC4 only for 0x5C/0x5D with `com.ruijie.www`, debug viewer, and
   `SU_REAUTH_INTERV`-driven reauth in `AuthWorker` (`use_server_reauth`).
   Tests: Core 15 passed.
-- Next: P3 DHCP client + Option 82.
+- P3: DHCP uses Windows APIs (`GetInterfaceInfo` / `IpReleaseAddress` /
+  `IpRenewAddress`), not raw DHCP. Option 82 is config-only in this engine
+  version. Debug feature supports `status|renew|release|release-renew`; status
+  verified live (adapter index 14, lease read). Tests: Core 16 passed.
+- Next: P4 diagnostics (OUI/NIC/ARP/probe/proxy/dialup).
 
 ## Verified State
 

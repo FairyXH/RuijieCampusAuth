@@ -118,6 +118,21 @@ public sealed class DebugFeatureTests : IDisposable
     }
 
     [Fact]
+    public async Task Dhcp_feature_rejects_unknown_interface()
+    {
+        var store = new UserStore(_root);
+        var settings = new DebugSettings { Enabled = true };
+        settings.SetFeature("dhcp-client", true);
+        var registry = DebugFeatureFactory.Create(store, settings);
+        var result = await registry.RunAsync(
+            "dhcp-client",
+            "{\"interface\":\"definitely-not-a-nic\",\"operation\":\"renew\"}",
+            CancellationToken.None);
+        Assert.False(result.Ok);
+        Assert.Contains("interface not found", result.Message);
+    }
+
+    [Fact]
     public void Settings_roundtrip_preserves_debug_block()
     {
         var store = new UserStore(_root);
