@@ -56,7 +56,12 @@ to the Python tree under `python/`.
   message TLV view, Portal UDP listener. Portal HTTP verified against a local
   TCP fixture. Tests: Core 26 passed. `password-change` and `config-update`
   remain planned (endpoint/format not evidenced).
-- Next: P6 PEAP/MSCHAPv2 + EAP-TLS.
+- P6 core: MD4 + MSCHAPv2 (RFC 2759 NT-Response vector), DES 7→8 expansion,
+  and an SslStream ↔ EAP TLS bridge (`EapTlsStream`) verified with a local
+  self-signed TLS handshake. Tests: Core 31 passed. EAPOL transport, PEAP
+  phase2 state machine, PEAP vendor segment, and `peap`/`eap-tls` debug
+  features remain.
+- Next: implement PEAP/EAP-TLS EAPOL transport + phase2, then P7 wireless.
 
 ## Verified State
 
