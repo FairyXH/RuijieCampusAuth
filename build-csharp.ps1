@@ -93,15 +93,8 @@ if ($Deploy) {
     $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
     Write-Host "Deployed GUI: $target"
 
-    $vbsSource = Join-Path $PSScriptRoot "python\packaging\restart_ruijie.vbs"
-    $vbsTarget = "C:\Program Files\restart_ruijie.vbs"
-    if (Test-Path $vbsTarget) {
-        $backup = "$vbsTarget.bak-" + (Get-Date -Format "yyyyMMdd-HHmmss")
-        Copy-Item $vbsTarget $backup -Force
-        Write-Host "Backed up launcher: $backup"
-    }
-    Copy-Item $vbsSource $vbsTarget -Force
-    Write-Host "Deployed launcher: $vbsTarget"
+        # C: is Deep-Frozen; the restart launcher (VBS) and the service name
+    # are managed outside deployments. Only D: content is touched here.
 
     $ws = New-Object -ComObject WScript.Shell
     $shortcutPath = Join-Path $DeployDir "RuijieAuth.lnk"
