@@ -17,6 +17,13 @@ Python 版逐字节比对（569 字节，SHA256 一致），并已完成实网�
 页导入/切换。新增学校/算法时按 `docs/ADAPTATION.md` 做增量 provider，不修改
 既有实现。
 
+文档入口：
+
+- [官方客户端完整逆向报告](docs/REVERSE_ENGINEERING.md)
+- [原版函数差分测试](docs/DIFFERENTIAL_TESTING.md)
+- [学校适配指南](docs/ADAPTATION.md)
+- [跨会话上下文](docs/AGENT_CONTEXT.md)
+
 ### 项目结构
 
 ```text

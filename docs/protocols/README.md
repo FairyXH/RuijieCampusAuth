@@ -1,5 +1,8 @@
 # 原版协议档案
 
+完整逆向总览见 [`../REVERSE_ENGINEERING.md`](../REVERSE_ENGINEERING.md)；
+函数级差分见 [`../DIFFERENTIAL_TESTING.md`](../DIFFERENTIAL_TESTING.md)。
+
 每个协议一份文档，必须包含：
 
 - 抓包/反编译证据（文件、偏移、地址、日志行）
