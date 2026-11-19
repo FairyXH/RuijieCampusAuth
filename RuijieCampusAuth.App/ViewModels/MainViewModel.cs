@@ -1,19 +1,48 @@
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Net.Sockets;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using RuijieCampusAuth.App.Services;
 using RuijieCampusAuth.Core;
 
 namespace RuijieCampusAuth.App.ViewModels;
 
+/// <summary>
+/// Seam over the service installer so every service button can be exercised
+/// in automated tests without touching the real SCM.
+/// </summary>
+public interface IServiceBridge
+{
+    ServiceState Query();
+    void Install();
+    void Uninstall();
+    void Start();
+    void Stop();
+}
+
+public sealed class SystemServiceBridge : IServiceBridge
+{
+    public ServiceState Query() => ServiceInstaller.Query();
+    public void Install() => ServiceInstaller.Install();
+    public void Uninstall() => ServiceInstaller.Uninstall();
+    public void Start() => ServiceInstaller.Start();
+    public void Stop() => ServiceInstaller.Stop();
+}
+
 public partial class MainViewModel : ViewModelBase
 {
-    private readonly UserStore _store = new();
+    private readonly UserStore _store;
+    private readonly IServiceBridge _service;
+    private readonly Func<List<PcapDeviceInfo>> _listInterfaces;
     private static readonly TimeSpan PausedProbeInterval = TimeSpan.FromSeconds(30);
     private const long GuiLogMaxBytes = 5 * 1024 * 1024;
+    private ServiceLogTailer? _tailer;
+    private readonly Action<string>? _openPath;
     private CancellationTokenSource? _cancellation;
     private bool _applyingSettings;
     private Supplicant? _activeSupplicant;
@@ -21,6 +50,8 @@ public partial class MainViewModel : ViewModelBase
     private int _guardianFailureCount;
     private DateTimeOffset _nextGuardianCheck = DateTimeOffset.MinValue;
     private bool? _lastGuardianDecision;
+    private readonly StringBuilder _pendingServiceLines = new();
+    private readonly object _logGate = new();
 
     [ObservableProperty] private UserAccount? _selectedAccount;
     [ObservableProperty] private string _username = "";
@@ -58,6 +89,7 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _discoveryStatus = "自动探测";
     [ObservableProperty] private string _logText = "";
     [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private bool _verboseLog;
 
     public ObservableCollection<UserAccount> Accounts { get; } = [];
     public ObservableCollection<PcapDeviceInfo> Interfaces { get; } = [];
@@ -72,9 +104,20 @@ public partial class MainViewModel : ViewModelBase
         new("none", "不使用"),
     ];
 
-    public MainViewModel()
+    public MainViewModel() : this(new SystemServiceBridge(), null, null)
     {
-        foreach (var device in PcapNative.ListDevices())
+    }
+
+    public MainViewModel(
+        IServiceBridge serviceBridge,
+        Func<List<PcapDeviceInfo>>? listInterfaces,
+        Action<string>? openPath = null)
+    {
+        _service = serviceBridge;
+        _listInterfaces = listInterfaces ?? (() => PcapNative.ListDevices());
+        _openPath = openPath;
+        _store = new UserStore();
+        foreach (var device in _listInterfaces())
         {
             Interfaces.Add(device);
         }
@@ -96,6 +139,131 @@ public partial class MainViewModel : ViewModelBase
         RefreshProfiles();
         LoadServerList();
         RefreshService();
+        StartServiceLogTail();
+    }
+
+    /// <summary>
+    /// Streams the service log into the shared log view; the service writes
+    /// with AutoFlush, so lines appear the moment the service emits them.
+    /// </summary>
+    private void StartServiceLogTail()
+    {
+        try
+        {
+            var path = Path.Combine(_store.BaseDirectory, "logs", "service.log");
+            _tailer = new ServiceLogTailer(path);
+            _tailer.LineAppended += OnServiceLogLine;
+            _tailer.Start();
+        }
+        catch (Exception)
+        {
+            // Log tailing is best-effort; auth must not depend on it.
+            _tailer?.Dispose();
+            _tailer = null;
+        }
+    }
+
+    private void OnServiceLogLine(string rawLine)
+    {
+        var line = FormatServiceLine(rawLine);
+        if (string.IsNullOrWhiteSpace(line))
+        {
+            return;
+        }
+        Dispatcher.UIThread.Post(() => AppendServiceLine(line));
+    }
+
+    private static string FormatServiceLine(string rawLine)
+    {
+        // "2026-11-19 21:51:00 [Information] Category: message"
+        var marker = rawLine.IndexOf("]: ", StringComparison.Ordinal);
+        if (marker > 0 && rawLine.Length > marker + 3)
+        {
+            var message = rawLine[(marker + 3)..];
+            var timeEnd = rawLine.IndexOf(' ');
+            var secondSpace = timeEnd >= 0
+                ? rawLine.IndexOf(' ', timeEnd + 1)
+                : -1;
+            var time = secondSpace > 0 ? rawLine[(timeEnd + 1)..secondSpace] : "";
+            return string.IsNullOrWhiteSpace(time)
+                ? $"[服务] {message}"
+                : $"[服务 {time}] {message}";
+        }
+        return $"[服务] {rawLine}";
+    }
+
+    private static bool IsRoutineLine(string line)
+    {
+        // Hidden unless 详细信息 is on: the guardian heartbeat repeats every
+        // few seconds and drowns out everything else.
+        return line.Contains("网络管家:");
+    }
+
+    partial void OnVerboseLogChanged(bool value) => RebuildLogView();
+
+    private readonly List<string> _logHistory = [];
+
+    private void AppendToHistory(string line)
+    {
+        lock (_logGate)
+        {
+            _logHistory.Add(line);
+            if (_logHistory.Count > 4000)
+            {
+                _logHistory.RemoveRange(0, _logHistory.Count - 2000);
+            }
+        }
+    }
+
+    private void RebuildLogView()
+    {
+        List<string> snapshot;
+        lock (_logGate)
+        {
+            snapshot = [.. _logHistory];
+        }
+        var visible = VerboseLog
+            ? snapshot
+            : snapshot.Where(line => !IsRoutineLine(line));
+        var text = string.Join(Environment.NewLine, visible);
+        if (text.Length > 200_000)
+        {
+            text = text[^100_000..];
+        }
+        LogText = text;
+    }
+
+    [RelayCommand]
+    private void ClearLog()
+    {
+        lock (_logGate)
+        {
+            _logHistory.Clear();
+        }
+        LogText = "";
+    }
+
+    [RelayCommand]
+    private void OpenLogFolder()
+    {
+        try
+        {
+            var dir = Path.Combine(_store.BaseDirectory, "logs");
+            Directory.CreateDirectory(dir);
+            if (_openPath is not null)
+            {
+                _openPath(dir);
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo(dir) { UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            Status = $"打开日志目录失败: {ex.Message}";
+            AppendLog(Status);
+        }
     }
 
     [RelayCommand]
@@ -127,7 +295,7 @@ public partial class MainViewModel : ViewModelBase
                           ?? AvailableProfiles.FirstOrDefault();
         ProfileStatus = AvailableProfiles.Count == 0
             ? "未发现档案：把 JSON 放到程序目录 profiles/ 或当前目录 profiles/"
-            : $"发现 {AvailableProfiles.Count} 个档案，导入会覆盖 settings.json 中同名字段";
+            : $"发现 {AvailableProfiles.Count} 个档案；当前: {settings.ProfileName ?? "(未导入)"}";
     }
 
     [RelayCommand]
@@ -143,7 +311,7 @@ public partial class MainViewModel : ViewModelBase
             var profile = ProfileStore.Load(SelectedProfile.Path);
             var result = ProfileStore.Import(profile, _store, SelectedProfile.Path);
             ApplySettings(_store.LoadSettings());
-            ProfileStatus = $"已导入 {result.ProfileName}；备份: {result.BackupPath ?? "(none)"}";
+            ProfileStatus = $"已切换到 {result.ProfileName}；备份: {result.BackupPath ?? "(none)"}";
             AppendLog($"已导入配置档案: {result.ProfileName} ({SelectedProfile.Path})");
             RefreshService();
         }
@@ -283,7 +451,7 @@ public partial class MainViewModel : ViewModelBase
         Username = "";
         Password = "";
         Note = "";
-        Status = "输入新账号信息后点击添加";
+        Status = "已新建空表单，填写后点击 添加";
     }
 
     [RelayCommand]
@@ -311,6 +479,7 @@ public partial class MainViewModel : ViewModelBase
         SelectedAccount = account;
         PersistAccounts(account.Id);
         Status = "账号已添加";
+        AppendLog(Status);
     }
 
     [RelayCommand]
@@ -326,6 +495,7 @@ public partial class MainViewModel : ViewModelBase
         SelectedAccount.Note = Note.Trim();
         PersistAccounts(SelectedAccount.Id);
         Status = "账号已更新";
+        AppendLog(Status);
     }
 
     [RelayCommand]
@@ -333,12 +503,15 @@ public partial class MainViewModel : ViewModelBase
     {
         if (SelectedAccount is null)
         {
+            Status = "请先选择账号";
             return;
         }
+        var removed = SelectedAccount.Username;
         Accounts.Remove(SelectedAccount);
         SelectedAccount = Accounts.FirstOrDefault();
         PersistAccounts(SelectedAccount?.Id);
-        Status = "账号已删除";
+        Status = $"账号已删除: {removed}";
+        AppendLog(Status);
     }
 
     [RelayCommand]
@@ -351,6 +524,7 @@ public partial class MainViewModel : ViewModelBase
         }
         PersistAccounts(SelectedAccount.Id);
         Status = $"当前账号: {SelectedAccount.Username}";
+        AppendLog(Status);
     }
 
     [RelayCommand]
@@ -421,7 +595,6 @@ public partial class MainViewModel : ViewModelBase
                     ? $"；当前锁定 {LockedServer}"
                     : "");
         }
-        AppendLog(ServerStatus);
     }
 
     [RelayCommand]
@@ -513,7 +686,7 @@ public partial class MainViewModel : ViewModelBase
         {
             return;
         }
-        if (ServiceInstaller.Query().Running)
+        if (_service.Query().Running)
         {
             Status = "系统服务正在托管认证，请先停止服务";
             AppendLog(Status);
@@ -680,7 +853,7 @@ public partial class MainViewModel : ViewModelBase
     [RelayCommand]
     private void RefreshService()
     {
-        var state = ServiceInstaller.Query();
+        var state = _service.Query();
         var detail = state.Detail;
         var status = RuijieCampusAuth.Core.ServiceStatus.Read();
         if (status is not null)
@@ -727,10 +900,10 @@ public partial class MainViewModel : ViewModelBase
         try
         {
             ApplyServiceConfig();
-            ServiceInstaller.Install();
+            _service.Install();
             if (OperatingSystem.IsWindows())
             {
-                ServiceInstaller.Start();
+                _service.Start();
                 AppendLog("系统服务已安装并启动");
             }
             else
@@ -752,7 +925,7 @@ public partial class MainViewModel : ViewModelBase
     {
         try
         {
-            ServiceInstaller.Uninstall();
+            _service.Uninstall();
             RefreshService();
             AppendLog("系统服务已卸载");
         }
@@ -768,7 +941,7 @@ public partial class MainViewModel : ViewModelBase
     {
         try
         {
-            ServiceInstaller.Start();
+            _service.Start();
             RefreshService();
             AppendLog("系统服务已启动");
         }
@@ -784,7 +957,7 @@ public partial class MainViewModel : ViewModelBase
     {
         try
         {
-            ServiceInstaller.Stop();
+            _service.Stop();
             RefreshService();
             AppendLog("系统服务已停止");
         }
@@ -958,6 +1131,7 @@ public partial class MainViewModel : ViewModelBase
     private void AppendLog(string message)
     {
         var line = $"{DateTime.Now:HH:mm:ss} {message}";
+        AppendToHistory(line);
         try
         {
             var logDir = Path.Combine(_store.BaseDirectory, "logs");
@@ -978,6 +1152,23 @@ public partial class MainViewModel : ViewModelBase
         {
             // File logging is diagnostic only.
         }
+        var snapshot = VerboseLog || !IsRoutineLine(line);
+        if (!snapshot)
+        {
+            Dispatcher.UIThread.Post(RebuildLogView);
+            return;
+        }
+        if (Dispatcher.UIThread.CheckAccess())
+        {
+            // Commands run on the UI thread: update immediately so the log
+            // reflects each action with zero delay.
+            LogText += line + Environment.NewLine;
+            if (LogText.Length > 200_000)
+            {
+                LogText = LogText[^100_000..];
+            }
+            return;
+        }
         Dispatcher.UIThread.Post(() =>
         {
             LogText += line + Environment.NewLine;
@@ -986,5 +1177,19 @@ public partial class MainViewModel : ViewModelBase
                 LogText = LogText[^100_000..];
             }
         });
+    }
+
+    private void AppendServiceLine(string line)
+    {
+        AppendToHistory(line);
+        if (!VerboseLog && IsRoutineLine(line))
+        {
+            return;
+        }
+        LogText += line + Environment.NewLine;
+        if (LogText.Length > 200_000)
+        {
+            LogText = LogText[^100_000..];
+        }
     }
 }

@@ -91,9 +91,11 @@ internal static class Program
                     IpString: op.GetProperty("ip").GetString()!);
                 var options = new TailOptions
                 {
-                    Nonce = Hex(op.GetProperty("nonce").GetString()!),
-                    Fingerprint = Hex(op.GetProperty("fingerprint").GetString()!),
-                    ServiceName = Encoding.ASCII.GetBytes(op.GetProperty("service").GetString()!),
+                    // The nonce and fingerprint are ASCII-hex strings on the
+                    // wire (see the captured tails), so take them verbatim.
+                    Nonce = Encoding.ASCII.GetBytes(op.GetProperty("nonce").GetString()!),
+                    Fingerprint = Encoding.ASCII.GetBytes(op.GetProperty("fingerprint").GetString()!),
+                    ServiceName = Hex(op.GetProperty("service_gbk").GetString()!),
                     ClientFlag = [op.GetProperty("client_flag").GetByte()],
                 };
                 if (op.TryGetProperty("static_id", out var sid) && sid.GetString() is { Length: > 0 } sidText)

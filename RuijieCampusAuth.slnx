@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="RuijieCampusAuth.App/RuijieCampusAuth.App.csproj" />
+  <Project Path="RuijieCampusAuth.App.Tests/RuijieCampusAuth.App.Tests.csproj" />
   <Project Path="RuijieCampusAuth.Core/RuijieCampusAuth.Core.csproj" />
   <Project Path="RuijieCampusAuth.Core.Tests/RuijieCampusAuth.Core.Tests.csproj" />
   <Project Path="RuijieCampusAuth.Service/RuijieCampusAuth.Service.csproj" />

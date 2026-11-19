@@ -5,290 +5,453 @@
         xmlns:dbg="using:RuijieCampusAuth.Core.Debug"
         x:Class="RuijieCampusAuth.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Width="920" Height="640"
-        MinWidth="760" MinHeight="520"
+        Width="980" Height="680"
+        CanResize="False"
         Title="锐捷认证器"
         WindowStartupLocation="CenterScreen">
   <Design.DataContext>
     <vm:MainViewModel />
   </Design.DataContext>
 
-  <Grid Margin="18" RowDefinitions="Auto,*,Auto">
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#FAFBFD" />
+      <Setter Property="BorderBrush" Value="#DFE5EF" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="TextBlock.section-title">
+      <Setter Property="FontSize" Value="13" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="#3B4A68" />
+      <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="MinWidth" Value="110" />
+    </Style>
+    <Style Selector="Expander.adv">
+      <Setter Property="Margin" Value="0,10,0,0" />
+    </Style>
+    <Style Selector="Expander.adv /template/ ToggleButton#PART_header">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="#5A6B8C" />
+    </Style>
+    <Style Selector="TextBox.log">
+      <Setter Property="FontFamily" Value="Cascadia Mono,Consolas,monospace" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="IsReadOnly" Value="True" />
+      <Setter Property="AcceptsReturn" Value="True" />
+      <Setter Property="TextWrapping" Value="NoWrap" />
+    </Style>
+    <Style Selector="TextBlock.hint">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Opacity" Value="0.55" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </Window.Styles>
+
+  <Grid Margin="16" RowDefinitions="Auto,*,Auto">
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
       <StackPanel Spacing="2">
-        <TextBlock Text="校园网认证" FontSize="24" FontWeight="Bold" />
-        <TextBlock Text="锐捷校园网开放认证器 · EAP-MD5 · .NET 10 / Avalonia" Opacity="0.6" />
+        <TextBlock Text="校园网认证" FontSize="22" FontWeight="Bold" Foreground="#22335A" />
+        <TextBlock Text="锐捷校园网开放认证器 · EAP-MD5 / PEAP / TLS · .NET 10 / Avalonia"
+                   Opacity="0.6" FontSize="11" />
       </StackPanel>
       <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
-        <TextBlock Text="{Binding Status}" FontSize="14" FontWeight="SemiBold" />
+        <Border Classes="card" Padding="10,6">
+          <TextBlock Text="{Binding Status}" FontSize="13" FontWeight="SemiBold"
+                     Foreground="#1F6F43" />
+        </Border>
       </StackPanel>
     </Grid>
 
-    <TabControl Grid.Row="1" Margin="0,14,0,0">
-      <TabItem Header="账号">
-        <Grid Margin="14" ColumnDefinitions="230,*">
-          <StackPanel Grid.Column="0" Spacing="6">
-            <TextBlock Text="账号池" FontWeight="SemiBold" />
-            <ListBox Height="330" ItemsSource="{Binding Accounts}"
-                     SelectedItem="{Binding SelectedAccount}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="core:UserAccount">
-                  <TextBlock Text="{Binding Display}" />
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-            <WrapPanel Orientation="Horizontal">
-              <Button Content="新建" Command="{Binding NewAccountCommand}" Margin="0,0,6,0" />
-              <Button Content="添加" Command="{Binding AddAccountCommand}" Margin="0,0,6,0" />
-              <Button Content="更新" Command="{Binding UpdateAccountCommand}" Margin="0,0,6,0" />
-              <Button Content="删除" Command="{Binding DeleteAccountCommand}" Margin="0,0,6,0" />
-              <Button Content="启用/停用" Command="{Binding ToggleAccountEnabledCommand}" />
-            </WrapPanel>
-            <Button Content="设为当前账号" Command="{Binding UseAccountCommand}"
-                    HorizontalAlignment="Stretch" />
-          </StackPanel>
+    <TabControl x:Name="MainTabs" Grid.Row="1" Margin="0,12,0,0">
 
-          <Grid Grid.Column="1" Margin="16,0,0,0"
-                ColumnDefinitions="80,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="用户名" VerticalAlignment="Center" />
-            <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Username}" PlaceholderText="校园网用户名" />
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="密码" VerticalAlignment="Center" Margin="0,10,0,0" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Password}" PasswordChar="*" PlaceholderText="校园网密码" Margin="0,10,0,0" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="备注" VerticalAlignment="Center" Margin="0,10,0,0" />
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Note}" PlaceholderText="可选备注" Margin="0,10,0,0" />
-            <TextBlock Grid.Row="3" Grid.Column="1" Text="密码保存在本机，Windows 使用 DPAPI 加密"
-                       Opacity="0.6" Margin="0,10,0,0" />
-            <Button Grid.Row="4" Grid.Column="1" Content="保存配置"
-                    Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
-          </Grid>
-        </Grid>
-      </TabItem>
+      <!-- ================= 账户 ================= -->
+      <TabItem Header="账户">
+        <Grid Margin="4,12,4,4" RowDefinitions="*,Auto">
+          <Grid Grid.Row="0" ColumnDefinitions="340,*">
+            <Border Classes="card" Grid.Column="0" Margin="0,0,10,0">
+              <Grid RowDefinitions="Auto,*,Auto">
+                <TextBlock Classes="section-title" Text="账号池" />
+                <ListBox Grid.Row="1" Height="360" ItemsSource="{Binding Accounts}"
+                         SelectedItem="{Binding SelectedAccount}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="core:UserAccount">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="●" FontSize="8" VerticalAlignment="Center"
+                                   Foreground="#1F6F43"
+                                   IsVisible="{Binding Enabled}" />
+                        <TextBlock Text="○" FontSize="8" VerticalAlignment="Center"
+                                   Foreground="#B0B6C0"
+                                   IsVisible="{Binding !Enabled}" />
+                        <TextBlock Text="{Binding Display}" />
+                      </StackPanel>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <WrapPanel Grid.Row="2" Orientation="Horizontal" Margin="0,10,0,0">
+                  <Button Content="新建" Command="{Binding NewAccountCommand}"
+                          Margin="0,0,8,0" />
+                  <Button Content="启用 / 停用" Command="{Binding ToggleAccountEnabledCommand}"
+                          Margin="0,0,8,0" />
+                  <Button Content="设为当前账号" Classes="primary"
+                          Command="{Binding UseAccountCommand}" />
+                </WrapPanel>
+              </Grid>
+            </Border>
 
-      <TabItem Header="认证">
-        <Grid Margin="14" RowDefinitions="Auto,Auto,*">
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <Button Content="开始认证" Command="{Binding StartCommand}" />
-            <Button Content="停止" Command="{Binding StopCommand}" />
-            <CheckBox Content="抢占保活" IsChecked="{Binding Preempt}" VerticalAlignment="Center" />
-          </StackPanel>
-          <TextBlock Grid.Row="1" Text="{Binding Status}" Opacity="0.7" Margin="0,10,0,8" />
-          <TextBox Grid.Row="2" Text="{Binding LogText}" IsReadOnly="True"
-                   AcceptsReturn="True" TextWrapping="NoWrap"
-                   FontFamily="Cascadia Mono,Consolas,monospace"
-                   ScrollViewer.VerticalScrollBarVisibility="Auto"
-                   ScrollViewer.HorizontalScrollBarVisibility="Auto" />
-        </Grid>
-      </TabItem>
-
-      <TabItem Header="服务器">
-        <Grid Margin="14" RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,210">
-          <TextBlock Text="{Binding ServerStatus}" Opacity="0.75" />
-          <ListBox Grid.Row="1" Margin="0,10,0,0" ItemsSource="{Binding Servers}"
-                   SelectedItem="{Binding SelectedServer}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="core:ServerRecord">
-                <StackPanel Spacing="3">
-                  <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.65" />
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
-          <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="16,0,0,0" Spacing="8">
-            <Button Content="锁定选中服务器" Command="{Binding LockSelectedServerCommand}" />
-            <Button Content="取消锁定" Command="{Binding UnlockServerCommand}" />
-            <Button Content="刷新列表" Command="{Binding RefreshServersCommand}" />
-            <Button Content="删除记录" Command="{Binding DeleteServerCommand}" />
-            <CheckBox Content="锁定服务器发包" IsChecked="{Binding ServerLock}" />
-            <TextBlock Text="当前锁定" FontSize="11" Opacity="0.6" Margin="0,8,0,0" />
-            <TextBlock Text="{Binding LockedServer}" FontFamily="Cascadia Mono,Consolas,monospace" />
-          </StackPanel>
-          <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Margin="0,10,0,0" FontSize="11" Opacity="0.55"
-                     Text="扫描到的认证服务器会自动加入列表；锁定后 Start 单播到该服务器，Logoff 仍走标准组播。" />
-        </Grid>
-      </TabItem>
-
-      <TabItem Header="服务">
-        <StackPanel Margin="14" Spacing="10">
-          <TextBlock Text="Windows 服务 / Linux systemd" FontSize="16" FontWeight="SemiBold" />
-          <TextBlock Text="{Binding ServiceStatus}" Opacity="0.8" />
-          <CheckBox Content="接管模式：临时阻止原版锐捷进程和相关服务"
-                    IsChecked="{Binding TakeoverEnabled}" />
-          <WrapPanel Orientation="Horizontal">
-            <Button Content="应用服务配置" Command="{Binding ApplyServiceConfigCommand}" Margin="0,0,8,8" />
-            <Button Content="安装并启动" Command="{Binding InstallServiceCommand}" Margin="0,0,8,8" />
-            <Button Content="卸载" Command="{Binding UninstallServiceCommand}" Margin="0,0,8,8" />
-            <Button Content="启动" Command="{Binding StartServiceCommand}" Margin="0,0,8,8" />
-            <Button Content="停止" Command="{Binding StopServiceCommand}" Margin="0,0,8,8" />
-            <Button Content="刷新" Command="{Binding RefreshServiceCommand}" Margin="0,0,8,8" />
-          </WrapPanel>
-          <TextBlock Text="服务模式会以系统权限在登录前认证；安装前请先保存账号和网卡配置。"
-                     Opacity="0.6" TextWrapping="Wrap" />
-          <TextBlock Text="接管模式将在服务层阻止官方锐捷认证进程与相关服务。" Opacity="0.6" TextWrapping="Wrap" />
-        </StackPanel>
-      </TabItem>
-
-      <TabItem Header="设置">
-        <ScrollViewer>
-          <Grid Margin="14" ColumnDefinitions="130,380" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
-            <TextBlock Grid.Row="0" Grid.Column="0" Text="网卡" VerticalAlignment="Center" />
-            <ComboBox Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Interfaces}"
-                      SelectedItem="{Binding SelectedInterface}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="core:PcapDeviceInfo">
-                  <TextBlock Text="{Binding Description}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-
-            <TextBlock Grid.Row="1" Grid.Column="0" Text="服务名" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ServiceName}" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="2" Grid.Column="0" Text="静态 ID" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding StaticId}" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="3" Grid.Column="0" Text="认证超时" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding Timeout}" Minimum="5" Maximum="120" Increment="1" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="4" Grid.Column="0" Text="Start 次数" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="4" Grid.Column="1" Value="{Binding Retries}" Minimum="1" Maximum="10" Increment="1" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="5" Grid.Column="0" Text="应答次数" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="5" Grid.Column="1" Value="{Binding Repeats}" Minimum="1" Maximum="10" Increment="1" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="6" Grid.Column="0" Text="Start 间隔" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="6" Grid.Column="1" Value="{Binding StartTimeout}" Minimum="0.5" Maximum="30" Increment="0.5" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="7" Grid.Column="0" Text="掉线检测" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="7" Grid.Column="1" Value="{Binding CheckInterval}" Minimum="0.5" Maximum="120" Increment="0.5" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="8" Grid.Column="0" Text="失败重试" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="8" Grid.Column="1" Value="{Binding RetryInterval}" Minimum="0.5" Maximum="120" Increment="0.5" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="9" Grid.Column="0" Text="连通检测" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding ConnectivityUrl}" Margin="0,8,0,0" />
-            <CheckBox Grid.Row="10" Grid.Column="1" Content="锁定服务器 MAC" IsChecked="{Binding ServerLock}" Margin="0,10,0,0" />
-            <TextBlock Grid.Row="11" Grid.Column="0" Text="服务器 MAC" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="11" Grid.Column="1" Text="{Binding LockedServer}" Margin="0,8,0,0" PlaceholderText="00:1a:a9:17:ff:ff" />
-            <TextBlock Grid.Row="12" Grid.Column="0" Text="发现缓存" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <StackPanel Grid.Row="12" Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-              <TextBlock Text="{Binding DiscoveryStatus}" VerticalAlignment="Center"
-                         TextWrapping="Wrap" MaxWidth="250" Opacity="0.7" />
-              <Button Content="强制重新探测" Command="{Binding ForceRediscoverCommand}" />
-            </StackPanel>
-            <CheckBox Grid.Row="13" Grid.Column="1" Content="启用网络管家联动"
-                      IsChecked="{Binding GuardianEnabled}" Margin="0,10,0,0" />
-            <TextBlock Grid.Row="14" Grid.Column="0" Text="管家 MCP" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="14" Grid.Column="1" Text="{Binding GuardianUrl}" Margin="0,8,0,0"
-                     PlaceholderText="http://127.0.0.1:18765/mcp" />
-            <TextBlock Grid.Row="15" Grid.Column="0" Text="管家间隔" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="15" Grid.Column="1" Value="{Binding GuardianInterval}"
-                           Minimum="1" Maximum="60" Increment="1" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="16" Grid.Column="0" Text="离线确认" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="16" Grid.Column="1" Value="{Binding GuardianFailures}"
-                           Minimum="1" Maximum="10" Increment="1" Margin="0,8,0,0" />
-            <TextBlock Grid.Row="18" Grid.Column="0" Text="DHCP 模式" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <ComboBox Grid.Row="18" Grid.Column="1" ItemsSource="{Binding DhcpModes}"
-                      SelectedItem="{Binding SelectedDhcpMode}" Margin="0,8,0,0">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:DhcpOption">
-                  <TextBlock Text="{Binding Display}" />
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <TextBlock Grid.Row="19" Grid.Column="0" Text="DHCP 超时" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <NumericUpDown Grid.Row="19" Grid.Column="1" Value="{Binding DhcpTimeout}"
-                           Minimum="5" Maximum="300" Increment="1" Margin="0,8,0,0" />
-            <CheckBox Grid.Row="20" Grid.Column="1" Content="启用 DHCP Option 82"
-                      IsChecked="{Binding DhcpOption82}" Margin="0,10,0,0" />
-            <TextBlock Grid.Row="21" Grid.Column="0" Text="学校代码" VerticalAlignment="Center" Margin="0,8,0,0" />
-            <TextBox Grid.Row="21" Grid.Column="1" Text="{Binding SchoolCode}" Margin="0,8,0,0"
-                     PlaceholderText="可选，例如 EXAM" />
-            <Button Grid.Row="22" Grid.Column="1" Content="保存配置" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
-          </Grid>
-        </ScrollViewer>
-      </TabItem>
-
-      <TabItem Header="档案">
-        <Grid Margin="14" RowDefinitions="Auto,Auto,Auto,*">
-          <TextBlock Text="配置档案（通用壳 + 学校档案）" FontSize="16" FontWeight="SemiBold" />
-          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
-            <ComboBox ItemsSource="{Binding AvailableProfiles}"
-                      SelectedItem="{Binding SelectedProfile}">
-              <ComboBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:ProfileOption">
-                  <StackPanel Spacing="2">
-                    <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
-                    <TextBlock Text="{Binding Path}" FontSize="10" Opacity="0.55" />
+            <Border Classes="card" Grid.Column="1">
+              <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                <TextBlock Classes="section-title" Text="账号信息" />
+                <Grid Grid.Row="1" ColumnDefinitions="76,*" RowDefinitions="Auto,Auto,Auto">
+                  <TextBlock Grid.Row="0" Grid.Column="0" Text="用户名" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding Username}"
+                           PlaceholderText="校园网用户名" />
+                  <TextBlock Grid.Row="1" Grid.Column="0" Text="密码" VerticalAlignment="Center"
+                             Margin="0,10,0,0" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Password}" PasswordChar="*"
+                           PlaceholderText="校园网密码" Margin="0,10,0,0" />
+                  <TextBlock Grid.Row="2" Grid.Column="0" Text="备注" VerticalAlignment="Center"
+                             Margin="0,10,0,0" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Note}"
+                           PlaceholderText="可选备注" Margin="0,10,0,0" />
+                </Grid>
+                <Button Grid.Row="2" Classes="primary" Content="添加" HorizontalAlignment="Left"
+                        Command="{Binding AddAccountCommand}" Margin="0,12,0,0" />
+                <TextBlock Grid.Row="3" Classes="hint" Margin="0,8,0,0"
+                           Text="密码保存在本机，Windows 使用 DPAPI 加密。" />
+                <Expander Grid.Row="4" Classes="adv" Header="高级功能" IsExpanded="False">
+                  <StackPanel Spacing="10">
+                    <WrapPanel>
+                      <Button Content="更新选中账号" Command="{Binding UpdateAccountCommand}"
+                              Margin="0,0,8,8" />
+                      <Button Content="删除选中账号" Command="{Binding DeleteAccountCommand}"
+                              Margin="0,0,8,8" />
+                    </WrapPanel>
+                    <TextBlock Classes="hint"
+                               Text="更新会把左侧表单内容写回选中的账号；删除立即生效并落盘。" />
                   </StackPanel>
-                </DataTemplate>
-              </ComboBox.ItemTemplate>
-            </ComboBox>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="10,0,0,0">
-              <Button Content="导入/切换" Command="{Binding ImportProfileCommand}" />
-              <Button Content="刷新档案" Command="{Binding RefreshProfilesCommand}" />
-            </StackPanel>
+                </Expander>
+              </Grid>
+            </Border>
           </Grid>
-          <TextBlock Grid.Row="2" Text="{Binding ProfileStatus}" TextWrapping="Wrap"
-                     Opacity="0.7" Margin="0,10,0,0" />
-          <TextBlock Grid.Row="3" TextWrapping="Wrap" Opacity="0.55" FontSize="11" Margin="0,10,0,0"
-                     Text="档案目录：程序目录 profiles/ 或当前目录 profiles/。导入只覆盖档案声明的字段，账号、网卡、接管开关保持不变；导入前自动备份 settings.json。" />
+          <TextBlock Grid.Row="1" Classes="hint" Margin="4,8,0,0"
+                     Text="服务模式使用“设为当前账号”的账号在登录前认证；账号池中的启用状态决定服务回退顺序。" />
         </Grid>
       </TabItem>
 
+      <!-- ================= 认证 ================= -->
+      <TabItem Header="认证">
+        <Grid Margin="4,12,4,4" RowDefinitions="Auto,Auto,*,Auto">
+          <Border Classes="card">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <Button Classes="primary" Content="开始认证" Command="{Binding StartCommand}" />
+              <Button Content="停止" Command="{Binding StopCommand}" />
+              <CheckBox Content="抢占保活" IsChecked="{Binding Preempt}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.75" />
+            </StackPanel>
+          </Border>
+          <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,10,0,0">
+            <CheckBox Content="详细信息" IsChecked="{Binding VerboseLog}" VerticalAlignment="Center" />
+            <TextBlock Text="（含网络管家心跳等服务例行输出）" FontSize="11" Opacity="0.5"
+                       VerticalAlignment="Center" />
+            <Button Content="清空日志" Command="{Binding ClearLogCommand}" />
+            <Button Content="打开日志目录" Command="{Binding OpenLogFolderCommand}" />
+          </StackPanel>
+          <Border Grid.Row="2" Classes="card" Margin="0,10,0,0" Padding="6">
+            <TextBox Classes="log" Text="{Binding LogText}"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+          </Border>
+          <TextBlock Grid.Row="3" Classes="hint" Margin="4,8,0,0"
+                      Text="[服务] 前缀的行来自 Windows 服务进程，实时同步（服务层落盘即显示）；其余为 GUI 本机认证输出。" />
+        </Grid>
+      </TabItem>
+
+      <!-- ================= 网络 ================= -->
+      <TabItem Header="网络">
+        <Grid Margin="4,12,4,4" RowDefinitions="Auto,*,Auto">
+          <Border Classes="card">
+            <Grid ColumnDefinitions="76,*,Auto" RowDefinitions="Auto">
+              <TextBlock Text="网卡" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding Interfaces}"
+                        SelectedItem="{Binding SelectedInterface}" MinWidth="420">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="core:PcapDeviceInfo">
+                    <TextBlock Text="{Binding Description}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                          VerticalAlignment="Center" Margin="10,0,0,0">
+                <TextBlock Text="{Binding DiscoveryStatus}" VerticalAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="230" Opacity="0.7" FontSize="11" />
+                <Button Content="强制重新探测" Command="{Binding ForceRediscoverCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Border Grid.Row="1" Classes="card" Margin="0,10,0,0">
+            <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,230">
+              <StackPanel Grid.Row="0" Grid.ColumnSpan="2">
+                <TextBlock Classes="section-title" Text="认证服务器" />
+                <TextBlock Text="{Binding ServerStatus}" Opacity="0.75" FontSize="11" />
+              </StackPanel>
+              <ListBox Grid.Row="1" Margin="0,8,0,0" ItemsSource="{Binding Servers}"
+                       SelectedItem="{Binding SelectedServer}">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="core:ServerRecord">
+                    <StackPanel Spacing="3">
+                      <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Detail}" FontSize="11" Opacity="0.65" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <StackPanel Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="12,26,0,0"
+                          Spacing="8">
+                <Button Classes="primary" Content="锁定选中服务器"
+                        Command="{Binding LockSelectedServerCommand}" />
+                <Button Content="取消锁定" Command="{Binding UnlockServerCommand}" />
+                <Button Content="刷新列表" Command="{Binding RefreshServersCommand}" />
+              </StackPanel>
+              <Expander Grid.Row="2" Grid.ColumnSpan="2" Classes="adv" Header="高级功能"
+                        IsExpanded="False">
+                <StackPanel Spacing="10">
+                  <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                    <TextBlock Grid.Row="0" Text="DHCP 模式" VerticalAlignment="Center" />
+                    <ComboBox Grid.Row="0" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                              ItemsSource="{Binding DhcpModes}"
+                              SelectedItem="{Binding SelectedDhcpMode}">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DhcpOption">
+                          <TextBlock Text="{Binding Display}" />
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <TextBlock Grid.Row="1" Text="DHCP 超时" VerticalAlignment="Center" Margin="0,8,0,0" />
+                    <NumericUpDown Grid.Row="1" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                   Value="{Binding DhcpTimeout}" Minimum="5" Maximum="300"
+                                   Increment="1" Margin="0,8,0,0" />
+                    <CheckBox Grid.Row="2" Grid.Column="1" Content="启用 DHCP Option 82"
+                              IsChecked="{Binding DhcpOption82}" Margin="0,10,0,0" />
+                    <TextBlock Grid.Row="3" Text="服务器 MAC" VerticalAlignment="Center" Margin="0,8,0,0" />
+                    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Margin="0,8,0,0"
+                                Spacing="8">
+                      <TextBox Text="{Binding LockedServer}" Width="220"
+                               PlaceholderText="00:1a:a9:17:ff:ff" />
+                      <CheckBox Content="锁定服务器发包" IsChecked="{Binding ServerLock}"
+                                VerticalAlignment="Center" />
+                      <Button Content="删除选中记录" Command="{Binding DeleteServerCommand}" />
+                    </StackPanel>
+                  </Grid>
+                </StackPanel>
+              </Expander>
+            </Grid>
+          </Border>
+          <TextBlock Grid.Row="2" Classes="hint" Margin="4,8,0,0"
+                      Text="扫描到的认证服务器自动加入列表；锁定后 Start 单播到该服务器，Logoff 仍走标准组播。" />
+        </Grid>
+      </TabItem>
+
+      <!-- ================= 服务 ================= -->
+      <TabItem Header="服务">
+        <Grid Margin="4,12,4,4" RowDefinitions="Auto,Auto,Auto">
+          <Border Classes="card">
+            <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+              <TextBlock Classes="section-title" Text="Windows 服务 / Linux systemd" />
+              <TextBlock Grid.Row="1" Text="{Binding ServiceStatus}" Opacity="0.8"
+                         TextWrapping="Wrap" />
+              <StackPanel Grid.Column="1" Grid.RowSpan="2" Orientation="Horizontal"
+                          VerticalAlignment="Center" Spacing="8">
+                <Button Classes="primary" Content="安装并启动"
+                        Command="{Binding InstallServiceCommand}" />
+                <Button Content="启动" Command="{Binding StartServiceCommand}" />
+                <Button Content="停止" Command="{Binding StopServiceCommand}" />
+                <Button Content="卸载" Command="{Binding UninstallServiceCommand}" />
+                <Button Content="刷新" Command="{Binding RefreshServiceCommand}" />
+              </StackPanel>
+            </Grid>
+          </Border>
+
+          <Expander Grid.Row="1" Classes="adv" Header="高级功能" IsExpanded="False">
+            <StackPanel Spacing="12">
+              <CheckBox Content="接管模式：临时阻止原版锐捷进程和相关服务"
+                        IsChecked="{Binding TakeoverEnabled}" />
+              <Button Content="应用服务配置" Command="{Binding ApplyServiceConfigCommand}"
+                      HorizontalAlignment="Left" />
+              <Separator />
+              <TextBlock Classes="section-title" Text="网络管家联动（Guardian）" />
+              <CheckBox Content="启用网络管家联动" IsChecked="{Binding GuardianEnabled}" />
+              <Grid ColumnDefinitions="110,*" RowDefinitions="Auto,Auto,Auto">
+                <TextBlock Grid.Row="0" Text="管家 MCP" VerticalAlignment="Center" />
+                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GuardianUrl}"
+                         PlaceholderText="http://127.0.0.1:18765/mcp" />
+                <TextBlock Grid.Row="1" Text="管家间隔" VerticalAlignment="Center" Margin="0,8,0,0" />
+                <NumericUpDown Grid.Row="1" Grid.Column="1" HorizontalAlignment="Left" MinWidth="200"
+                               Value="{Binding GuardianInterval}" Minimum="1" Maximum="60"
+                               Increment="1" Margin="0,8,0,0" />
+                <TextBlock Grid.Row="2" Text="离线确认" VerticalAlignment="Center" Margin="0,8,0,0" />
+                <NumericUpDown Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" MinWidth="200"
+                               Value="{Binding GuardianFailures}" Minimum="1" Maximum="10"
+                               Increment="1" Margin="0,8,0,0" />
+              </Grid>
+            </StackPanel>
+          </Expander>
+
+          <TextBlock Grid.Row="2" Classes="hint" Margin="4,10,0,0"
+                      Text="服务模式会以系统权限在登录前认证；安装前请先保存账号和网卡配置。接管模式将在服务层阻止官方锐捷认证进程与相关服务。" />
+        </Grid>
+      </TabItem>
+
+      <!-- ================= 配置 ================= -->
+      <TabItem Header="配置">
+        <Grid Margin="4,12,4,4" RowDefinitions="*,Auto">
+          <Grid Grid.Row="0" RowDefinitions="Auto,*">
+            <Border Classes="card">
+              <StackPanel Spacing="8">
+                <TextBlock Classes="section-title" Text="学校配置档案" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <ComboBox ItemsSource="{Binding AvailableProfiles}"
+                            SelectedItem="{Binding SelectedProfile}" MinWidth="480">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ProfileOption">
+                        <StackPanel Spacing="2">
+                          <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding Path}" FontSize="10" Opacity="0.55" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                              VerticalAlignment="Center" Margin="10,0,0,0">
+                    <Button Classes="primary" Content="导入 / 切换"
+                            Command="{Binding ImportProfileCommand}" />
+                    <Button Content="刷新档案" Command="{Binding RefreshProfilesCommand}" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding ProfileNameLabel}" FontWeight="SemiBold" Foreground="#1F6F43" />
+                <TextBlock Text="{Binding ProfileStatus}" TextWrapping="Wrap" Opacity="0.7" FontSize="11" />
+                <TextBlock Classes="hint"
+                           Text="支持多个学校档案并存，选中后“导入 / 切换”即应用到本机；导入只覆盖档案声明的字段，账号、网卡、接管开关保持不变，导入前自动备份 settings.json。" />
+              </StackPanel>
+            </Border>
+
+            <Expander Grid.Row="1" Classes="adv" Header="高级功能：认证与协议参数" IsExpanded="False">
+              <ScrollViewer MaxHeight="300">
+                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+                  <TextBlock Grid.Row="0" Text="服务名" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServiceName}" />
+                  <TextBlock Grid.Row="1" Text="静态 ID" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding StaticId}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="2" Text="认证超时" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="2" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding Timeout}" Minimum="5" Maximum="120" Increment="1"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="3" Text="Start 次数" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="3" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding Retries}" Minimum="1" Maximum="10" Increment="1"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="4" Text="应答次数" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="4" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding Repeats}" Minimum="1" Maximum="10" Increment="1"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="5" Text="Start 间隔" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="5" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding StartTimeout}" Minimum="0.5" Maximum="30" Increment="0.5"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="6" Text="掉线检测" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="6" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding CheckInterval}" Minimum="0.5" Maximum="120" Increment="0.5"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="7" Text="失败重试" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="7" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding RetryInterval}" Minimum="0.5" Maximum="120" Increment="0.5"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="8" Text="连通检测" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding ConnectivityUrl}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="9" Text="学校代码" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding SchoolCode}" Margin="0,8,0,0"
+                           PlaceholderText="可选，例如 HPVTC" />
+                  <Button Grid.Row="10" Grid.Column="1" Classes="primary" Content="保存配置"
+                          Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,12,0,0" />
+                </Grid>
+              </ScrollViewer>
+            </Expander>
+          </Grid>
+          <TextBlock Grid.Row="1" Classes="hint" Margin="4,8,0,0"
+                      Text="数据目录：服务配置与日志位于程序目录；GUI 配置位于用户配置目录。" />
+        </Grid>
+      </TabItem>
+
+      <!-- ================= 调试 ================= -->
       <TabItem Header="调试">
-        <Grid Margin="14" DataContext="{Binding Debug}" x:DataType="vm:DebugViewModel"
-              RowDefinitions="Auto,*" ColumnDefinitions="300,*">
+        <Grid Margin="4,12,4,4" DataContext="{Binding Debug}" x:DataType="vm:DebugViewModel"
+              RowDefinitions="Auto,*,Auto" ColumnDefinitions="320,*">
           <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8"
                       Margin="0,0,0,8">
             <CheckBox Content="启用调试功能（实验）" IsChecked="{Binding Enabled}" />
             <Button Content="保存开关" Command="{Binding SaveCommand}" />
             <Button Content="刷新" Command="{Binding RefreshCommand}" />
-            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.65" />
+            <Button Content="打开调试日志" Command="{Binding OpenLogCommand}" />
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.65" FontSize="11" />
           </StackPanel>
 
-          <ListBox Grid.Row="1" Grid.Column="0" Margin="0,0,12,0"
-                   ItemsSource="{Binding Features}" SelectedItem="{Binding SelectedFeature}">
-            <ListBox.ItemTemplate>
-              <DataTemplate x:DataType="dbg:DebugFeatureDescriptor">
-                <StackPanel Spacing="2">
-                  <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
-                  <StackPanel Orientation="Horizontal" Spacing="4">
-                    <TextBlock Text="{Binding Phase}" FontSize="11" Opacity="0.6" />
-                    <TextBlock Text="·" FontSize="11" Opacity="0.6" />
-                    <TextBlock Text="{Binding State}" FontSize="11" Opacity="0.6" />
+          <Border Grid.Row="1" Grid.Column="0" Classes="card" Margin="0,0,10,0" Padding="6">
+            <ListBox ItemsSource="{Binding Features}" SelectedItem="{Binding SelectedFeature}">
+              <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="dbg:DebugFeatureDescriptor">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                      <TextBlock Text="{Binding Category}" FontSize="11" Opacity="0.6" />
+                      <TextBlock Text="·" FontSize="11" Opacity="0.6" />
+                      <TextBlock Text="{Binding Phase}" FontSize="11" Opacity="0.6" />
+                      <TextBlock Text="·" FontSize="11" Opacity="0.6" />
+                      <TextBlock Text="{Binding State}" FontSize="11" Opacity="0.6" />
+                    </StackPanel>
                   </StackPanel>
-                </StackPanel>
-              </DataTemplate>
-            </ListBox.ItemTemplate>
-          </ListBox>
+                </DataTemplate>
+              </ListBox.ItemTemplate>
+            </ListBox>
+          </Border>
 
-          <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*">
-            <StackPanel Grid.Row="0" Spacing="4">
-              <TextBlock Text="{Binding SelectedTitle}" FontSize="18" FontWeight="SemiBold" />
-              <TextBlock Text="{Binding SelectedDescription}" TextWrapping="Wrap" Opacity="0.75" />
-              <TextBlock Text="{Binding SelectedMeta}" FontSize="11" Opacity="0.55" />
-              <CheckBox Content="启用该功能（保存后生效）" IsChecked="{Binding FeatureEnabled}"
-                        Margin="0,6,0,0" />
-            </StackPanel>
+          <Border Grid.Row="1" Grid.Column="1" Classes="card" Padding="12">
+            <Grid RowDefinitions="Auto,Auto,Auto,*">
+              <StackPanel Spacing="4">
+                <TextBlock Text="{Binding SelectedTitle}" FontSize="17" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedDescription}" TextWrapping="Wrap" Opacity="0.75" />
+                <TextBlock Text="{Binding SelectedMeta}" FontSize="11" Opacity="0.55" />
+                <CheckBox Content="启用该功能（保存后生效）" IsChecked="{Binding FeatureEnabled}"
+                          Margin="0,6,0,0" />
+              </StackPanel>
 
-            <StackPanel Grid.Row="1" Margin="0,10,0,0" Spacing="4">
-              <TextBlock Text="参数 JSON" FontSize="12" Opacity="0.65" />
-              <TextBox Text="{Binding ArgumentsJson}" AcceptsReturn="True" Height="90"
-                       FontFamily="Cascadia Mono,Consolas,monospace" />
-            </StackPanel>
+              <StackPanel Grid.Row="1" Margin="0,10,0,0" Spacing="4">
+                <TextBlock Text="参数 JSON" FontSize="12" Opacity="0.65" />
+                <TextBox Text="{Binding ArgumentsJson}" AcceptsReturn="True" Height="84"
+                         FontFamily="Cascadia Mono,Consolas,monospace" />
+              </StackPanel>
 
-            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-              <Button Content="执行" Command="{Binding RunCommand}" />
-              <Button Content="停止" Command="{Binding StopCommand}" />
-              <Button Content="打开调试日志" Command="{Binding OpenLogCommand}" />
-            </StackPanel>
+              <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                <Button Classes="primary" Content="执行" Command="{Binding RunCommand}" />
+                <Button Content="停止" Command="{Binding StopCommand}" />
+              </StackPanel>
 
-            <TextBox Grid.Row="3" Margin="0,10,0,0" Text="{Binding ResultText}" IsReadOnly="True"
-                     AcceptsReturn="True" TextWrapping="Wrap"
-                     FontFamily="Cascadia Mono,Consolas,monospace"
-                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
-          </Grid>
+              <TextBox Grid.Row="3" Margin="0,10,0,0" Text="{Binding ResultText}" IsReadOnly="True"
+                       AcceptsReturn="True" TextWrapping="Wrap"
+                       FontFamily="Cascadia Mono,Consolas,monospace"
+                       ScrollViewer.VerticalScrollBarVisibility="Auto" />
+            </Grid>
+          </Border>
+          <TextBlock Grid.Row="2" Grid.ColumnSpan="2" Classes="hint" Margin="4,8,0,0"
+                      Text="未归入五大类的实验与观测功能集中在调试页执行；来源显示“service”表示经由系统服务管道执行，否则本机执行。" />
         </Grid>
       </TabItem>
     </TabControl>
 
-    <StackPanel Grid.Row="2" Spacing="2">
-      <TextBlock Text="{Binding ProfileNameLabel}" Opacity="0.5" FontSize="11" />
-      <TextBlock Text="数据目录：服务配置与日志位于程序目录；GUI 配置位于用户配置目录。"
-                 Opacity="0.5" FontSize="11" />
-    </StackPanel>
+    <TextBlock Grid.Row="2" Classes="hint" Margin="4,8,0,0"
+               Text="{Binding ProfileNameLabel}" />
   </Grid>
 </Window>
