@@ -13,22 +13,39 @@ description: >
 每个阶段都有可复现的产物与验收标准。**不要跳过差分校对**——仓库里所有
 协议算法都锁定在原版二进制的输出上，跳过校对的实现一律不接受。
 
-## 阶段 0：环境与工具链
+## 阶段 0：环境与工具链（全部自动探测，禁止写死路径）
 
-机器上的逆向工具链（REA 6.9.0 体系，全部装在 D 盘，环境变量在用户级）：
+所有工具路径按下面的顺序探测，探测不到才提示用户安装；任何一步都不要
+把盘符或安装目录写死：
 
-| 工具 | 位置 / 调用 |
+1. **环境变量优先**：`GHIDRA_INSTALL_DIR`、`REA_RIZIN_COMMAND`、
+   `REA_IDA_MCP_CONFIG`、`JAVA_HOME`、`REA_WABT_BIN_DIRECTORY` 等用户级
+   变量（REA 体系安装时写入）。PowerShell 探测：
+   `[Environment]::GetEnvironmentVariable('GHIDRA_INSTALL_DIR','User')`。
+2. **PATH 探测**：`where rizin`、`where analyzeHeadless`、`where ghidraRun`。
+3. **模式匹配兜底**：在检测到的磁盘根下通配搜索，例如
+   `Get-ChildItem <盘>:\ -Recurse -Filter analyzeHeadless.exe -ErrorAction SilentlyContinue`
+   （先浅后深：先扫一二级目录，再按 `Ghidra*/support/`、`rizin*/bin/` 模式收窄），
+   驱动器枚举用 `[System.IO.DriveInfo]::GetDrives()`。
+4. **原版客户端定位**：默认路径
+   `%ProgramFiles%\Ruijie Networks\Ruijie Supplicant\8021x.exe`；
+   探测不到就搜注册表卸载键
+   `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall` 里的
+   "Ruijie"，或查运行中的 `8021x.exe` 进程路径。目标只是拿到一份
+   `8021x.exe` 样本，之后一切分析在副本上进行（原文件只读）。
+5. **Python 依赖**：`python -m pip install pefile unicorn`（差分调用器依赖）。
+6. **分析产物复用**：历史产物目录（Ghidra 反编译/RTTI/字符串/PE 画像）按
+   `<工具链根>/_rea_analysis` 探测；不存在也没关系，仓库内的
+   `docs/REVERSE_ENGINEERING.md` 与 `docs/protocols/*.md` 是权威汇总，
+   大部分结论已经沉淀，直接引用即可。
+
+| 工具 | 用途 |
 |---|---|
-| Ghidra 12.1.4 | `%GHIDRA_INSTALL_DIR%`（默认 `D:\Storageredirect\Program\Ghidra\ghidra_12.1.4_PUBLIC`），headless 分析 |
-| rizin 0.9.1 | `D:\Storageredirect\Program\rizin\rizin-win-installer-vs2019_static-64\bin\rizin.exe` |
-| IDA headless | `REA_IDA_MCP_CONFIG` 指向 idalib-mcp |
-| Unicorn 2.1.4 + pefile | Python 侧差分调用器依赖（`python -m pip install pefile unicorn`） |
-| 差分调用器 | 仓库 `tools/re_diff/pe_call.py`（按 RVA 直调）与 `tools/re_diff/full_diff.py`（批量差分） |
-| C# 对照端 | `tools/csharp_diff/`（DiffRunner：stdin 吃 JSON op、stdout 吐 JSON 结果） |
-
-已积累的分析产物在 `D:\Storageredirect\Program\_rea_analysis\`（Ghidra 反编译、
-RTTI、字符串、PE 画像），先查这里再决定要不要重新跑 headless——大部分结论已经在了，
-仓库 `docs/REVERSE_ENGINEERING.md` 是权威汇总。
+| Ghidra headless（analyzeHeadless） | 批量反编译、RTTI/字符串提取 |
+| rizin | 交叉引用、快速反汇编（调用是 E8 相对调用） |
+| Unicorn 2.x + pefile | `tools/re_diff/pe_call.py` 按 RVA 直调、`full_diff.py` 批量差分 |
+| C# 对照端 | 仓库 `tools/csharp_diff/`（DiffRunner：stdin 吃 JSON op、stdout 吐 JSON 结果） |
+| tshark / Wireshark | 真实抓包（可选） |
 
 关键结论（不要重新发明）：原版 `8021x.exe` 无壳无混淆、无导出表，只能按
 RVA 直调（`ImageBase 0x400000`）；`.text` 里 `push ebp; mov ebp,esp` 序言
@@ -128,7 +145,7 @@ ENCRYPT_KEY/IV 同时是 SAM 直通的 DES key/IV。
 2. 跑全部测试：`dotnet test RuijieCampusAuth.Core.Tests`（含原版差分锁定
    向量）+ `RuijieCampusAuth.App.Tests`。
 3. 部署：`powershell -File build-csharp.ps1 -Runtime win-x64 -Deploy`
-   （只写 D 盘；C 盘的 VBS/服务名是冻结内容，禁止改动），然后
+   （部署目标目录用 -DeployDir 传入或跟随脚本默认；冻结还原机器上 C 盘的启动器与服务名是基线内容，禁止改动），然后
    `RuijieCampusAuth.Cli.exe service restart`（服务名保持原样，不要
    `service install` 迁移）。
 4. 验收看 `logs/service.log`：`认证成功` + 服务器属性行出现即通过。

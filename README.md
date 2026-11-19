@@ -90,6 +90,9 @@ RuijieCampusAuth.Cli.exe service install
 
 ## 使用
 
+> **操作手册**：`docs/MANUAL_CSHARP.md` — 安装、Npcap、GUI 图解、服务模式、
+> 接管模式、CLI 全命令、调试功能与排错。
+
 ### GUI（推荐）
 
 窗口固定大小不可缩放，五个主类页签 + 调试页；每页常用功能置顶，
@@ -141,32 +144,45 @@ RuijieCampusAuth.Cli.exe config show
 
 ## OpenWrt 插件版
 
-`openwrt/` 是软路由端实现，与 C#/Python 并列维护：
+`openwrt/` 是软路由端实现：Go 守护进程 + LuCI，和 C# 版共用协议算法与
+`profiles/*.json` 档案。**纯用户态、零 kmod 依赖**，同一二进制在同架构
+OpenWrt 上通用，不绑定机型。
 
 ```text
 openwrt/
-  hxxy-auth/            Go 守护进程 + CLI（默认目标 mipsle）
-  luci-app-hxxy-auth/   LuCI 应用（菜单/ACL/视图）
-  files/                Image Builder 覆盖文件（UCI 配置）
-  scripts/build-go.sh       交叉编译 Go 二进制
-  scripts/build-image.sh    组装 files/ 并调用 OpenWrt Image Builder
+  ruijie-auth/            Go 守护进程 + CLI（module: ruijie-auth）
+  luci-app-ruijie-auth/   LuCI 应用：8 个页面、菜单/ACL、zh_Hans 翻译
+  files/                  init、hotplug、UCI 默认值、sysctl
+  scripts/                build-go.sh / build-ipk.sh / build-image.sh / po2lmo.py
 ```
 
-- 源码不绑定设备：同 target（如 `ramips/mt7621`）只改 `PROFILE`，
-  换架构改 `GOARCH` 重编，LuCI/UCI 不动
-- 当前验证目标 Xiaomi R3G（R3Gv2 / 4A 千兆版同流程）
-- **编译在 Ubuntu VM 进行**（Windows 不装 Go、不跑 Image Builder）：
+能力：
+
+- EAP-MD5、569 字节私有尾、服务器私有属性 + RC4、PEAP/EAP-TLS
+- `auth_mode` 分发、`SU_REAUTH_INTERV`、账号池、服务器学习/锁定、守护/抢占
+- WAN 自动识别与多选、MAC 修改、学校档案上传/导入
+- LuCI 8 页（概览/账号/档案/服务器/设置/MAC/调试/日志）+ 简体中文 `.lmo`
+
+**编译在 Ubuntu VM 进行**（Windows 不装 Go、不跑 Image Builder）：
 
 ```sh
-git clone <本仓库> && cd RuijieCampusAuth/openwrt
-sh scripts/build-go.sh
-sh scripts/build-image.sh   # 产出 sysupgrade 镜像
+cd openwrt
+sh scripts/build-go.sh      # 只编译 daemon
+sh scripts/build-ipk.sh     # 打 ipk（含 LuCI 与中文 .lmo）
+sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 ```
 
-细节与 R3G 专项参数见 `openwrt/README.md`、`docs/OPENWRT_FEASIBILITY.md`、
-`docs/OPENWRT_BUILD_ENV.md`。
+默认镜像包集合只有 `luci-ssl` + `luci-i18n-base-zh-cn` + 本插件，不拉任何
+kmod；UA3F/NFQUEUE 方案已移除，防检测只保留纯 nftables 的 TTL/MSS。
+
+**操作手册**：`docs/MANUAL_OPENWRT.md` — 刷机/Breed、ipk 安装、首次配置、
+8 个页面、CLI、排错、自己编译。工程细节见 `openwrt/README.md`、
+`docs/OPENWRT_PORT.md`；构建环境见 `docs/OPENWRT_BUILD_ENV.md`。
 
 ## Python 版（纯 CLI 菜单）
+
+> **操作手册**：`docs/MANUAL_PYTHON.md` — 环境/Npcap、菜单逐项、CLI 参数、
+> Python API、档案导入、服务宿主构建与排错。
 
 `python/` 是完整的 Python 转译实现，协议算法、调用链、函数签名与 C# 版
 逐模块对应，已通过原版二进制差分向量和真实抓包数据校验。**无 GUI**，
@@ -211,7 +227,7 @@ ruijie-auth --help
 | `dhcp_control.py` | DhcpControl.cs | iphlpapi ctypes 续租/释放 |
 | `http_json_client.py` | HttpJsonClient.cs | stdlib HTTP GET/POST JSON |
 | `clients.py` | PortalClient + ClientCenterClient + SelfServiceClient + UpgradeClient + SamDirectClient | Portal API + 自助 + 客户端中心 + SAM + 升级 |
-| `wlan_profile_manager.py` | WlanProfileManager.cs | netsh 无线配置 |
+| `cli.py`（WlanProfile 部分） | WlanProfileManager.cs | netsh 无线配置 |
 
 ### 诊断模块（`src/ruijie_auth/diagnostics/`）
 
@@ -222,8 +238,9 @@ ruijie-auth --help
 
 - CRC16/混淆/凭据加密/RC4/私有属性解析：**与原版二进制和真实抓包逐字节一致**
 - `auth_mode`/`dhcp_mode`/学校档案字段：**与 C# 版运行时语义完全相同**
-- 测试：`python/tests/test_protocols.py`（21 项向量）+
-  `test_menu.py`（5 项菜单逻辑）= 38 项
+- 测试：`python/tests/` 共 **60 项**（`PYTHONPATH=src python -m pytest -q`），
+  覆盖协议向量（私有属性真实抓包、RC4、MSCHAPv2 RFC2759）、私有尾、
+  档案导入、账号存储、菜单逻辑、Guardian 与服务状态。
 
 ### 生产部署说明
 
@@ -235,8 +252,12 @@ Linux systemd 和 Windows SCM，但功能覆盖以 C# 版为准。
 
 | 文档 | 内容 |
 |---|---|
+| `docs/MANUAL_CSHARP.md` | C# 版操作手册（GUI/服务/CLI/接管/排错） |
+| `docs/MANUAL_PYTHON.md` | Python 版操作手册（菜单/CLI/API/服务） |
+| `docs/MANUAL_OPENWRT.md` | OpenWrt 版操作手册（刷机/配置/CLI/编译） |
 | `docs/REVERSE_ENGINEERING.md` | 原版客户端完整逆向报告（函数地址表/调用链/差分结果） |
 | `docs/DIFFERENTIAL_TESTING.md` | Unicorn 直调 + 差分方法与结果 |
+| `docs/OPENWRT_PORT.md` | C# → OpenWrt 移植对照与验证 |
 | `docs/protocols/*.md` | 逐协议档案（私有属性/PEAP/DHCP/Portal/SAM/无线） |
 | `docs/ADAPTATION.md` | 新学校适配规则（auth_mode + 版本选择 provider） |
 | `docs/OPENWRT_FEASIBILITY.md` | OpenWrt 移植评估与 R3G 专项 |

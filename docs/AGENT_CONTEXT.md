@@ -12,7 +12,8 @@
 两套实现：
 
 - **根目录 C# / .NET 10**：Core + CLI + Windows 服务/Linux systemd + Avalonia GUI。
-- **`python/`**：Python 参考实现（本轮未改动，后续通用化）。
+- **`python/`**：完整协议转译 + 数字菜单 CLI，无 GUI；协议模块与 C# 一一
+  对应，`pytest` 59 项通过。
 - **`openwrt/`**：Go 守护进程 + LuCI（2026-11-20 完成移植，见
   `docs/OPENWRT_PORT.md`）。
 
@@ -48,7 +49,7 @@ profiles/                    学校档案（hxxy.json 为当前示例）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
 openwrt/                     锐捷认证器 OpenWrt 版：ruijie-auth（Go）+ luci-app-ruijie-auth
-python/                      延期，不动
+python/                      完整协议转译 + 菜单 CLI（60 项测试，无 GUI）
 ```
 
 ## 3. 构建 / 测试
@@ -204,6 +205,9 @@ Deep Freeze：
 
 | 文档 | 内容 |
 |---|---|
+| `docs/MANUAL_CSHARP.md` | C# 版操作手册 |
+| `docs/MANUAL_PYTHON.md` | Python 版操作手册 |
+| `docs/MANUAL_OPENWRT.md` | OpenWrt 版操作手册 |
 | `docs/REVERSE_ENGINEERING.md` | 官方客户端完整逆向报告 |
 | `docs/DIFFERENTIAL_TESTING.md` | Unicorn 直接调用 + 差分方法与结果 |
 | `docs/ADAPTATION.md` | 新学校适配、增量 provider、算法切换规则 |
@@ -247,7 +251,8 @@ a8e8b91 feat: add debug feature framework, service pipe, and debug page
 5. 部署新构建：停旧服务/GUI → 复制到 D: → `service install`（迁移服务名）。
 6. OpenWrt 现场验证：刷入 R3G 镜像，导入学校档案，确认概览页
    properties 与桌面版一致；PEAP 学校补一次隧道抓包。
-7. Python 通用化（延期）。
+7. Python 服务宿主打包（`python/build.ps1` + PyInstaller）与 Linux systemd
+   包装待实机验证。
 
 差分校对工具链：`tools/re_diff/full_diff.py`（Unicorn 直调原版）+
 `tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
