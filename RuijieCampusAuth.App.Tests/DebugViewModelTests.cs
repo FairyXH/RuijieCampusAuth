@@ -53,6 +53,28 @@ public sealed class DebugViewModelTests
     }
 
     [AvaloniaFact]
+    public async Task Selecting_feature_prefills_arguments_from_school_config()
+    {
+        var store = new RuijieCampusAuth.Core.UserStore();
+        var settings = store.LoadSettings();
+        settings.SelfServiceUrl = "http://netss.hxxy.edu.cn/selfservice/";
+        store.SaveSettings(settings);
+
+        var vm = new DebugViewModel(store);
+        await vm.RefreshCommand.ExecuteAsync(null);
+        var target = vm.Features.FirstOrDefault(f => f.Name == "self-service");
+        Assert.NotNull(target);
+        vm.SelectedFeature = target;
+
+        // 预填的参数必须能反序列化并包含档案里的 URL
+        var parsed = System.Text.Json.JsonDocument.Parse(vm.ArgumentsJson);
+        Assert.True(
+            parsed.RootElement.TryGetProperty("url", out var url) &&
+            url.GetString() == "http://netss.hxxy.edu.cn/selfservice/",
+            $"args = {vm.ArgumentsJson}");
+    }
+
+    [AvaloniaFact]
     public async Task Stop_reports_result()
     {
         var vm = new DebugViewModel();
