@@ -43,13 +43,6 @@ public static class DebugFeatureCatalog
     public static IReadOnlyList<IDebugFeature> Planned { get; } =
     [
         new PlannedDebugFeature(
-            "private-properties",
-            "服务器私有属性",
-            "auth",
-            "P2",
-            "解析 EAP-Success 私有段 TLV（RC4 com.ruijie.www），输出字段表。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
             "server-timers",
             "服务器重认证/心跳",
             "auth",

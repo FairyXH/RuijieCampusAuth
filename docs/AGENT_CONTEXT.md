@@ -39,7 +39,11 @@ to the Python tree under `python/`.
   into the deployed install; service/marker/pipe/mutex names generic with
   one-way legacy migration. See `docs/GENERICIZATION.md`.
 - Tests: Core 12 passed; Service pipe integration 1 passed.
-- Next: P2 server private-property TLV/RC4 parser.
+- P2: server private-property TLV parser (type/len/value, max 1400, len 254),
+  RC4 only for 0x5C/0x5D with `com.ruijie.www`, debug viewer, and
+  `SU_REAUTH_INTERV`-driven reauth in `AuthWorker` (`use_server_reauth`).
+  Tests: Core 15 passed.
+- Next: P3 DHCP client + Option 82.
 
 ## Verified State
 

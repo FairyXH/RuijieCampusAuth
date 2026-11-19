@@ -35,6 +35,7 @@ public sealed class ServiceSettings
     public string AdDomain { get; init; } = "";
     public double AdTimeout { get; init; } = 120;
     public string EngineVersion { get; init; } = "";
+    public bool UseServerReauth { get; init; } = true;
     public bool GuardianEnabled { get; init; }
     public string GuardianUrl { get; init; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; init; } = 5;
@@ -72,6 +73,7 @@ public sealed class ServiceSettings
             AdDomain = settings.AdDomain,
             AdTimeout = settings.AdTimeout,
             EngineVersion = settings.EngineVersion,
+            UseServerReauth = settings.UseServerReauth,
             GuardianEnabled = settings.GuardianEnabled,
             GuardianUrl = settings.GuardianUrl,
             GuardianInterval = settings.GuardianInterval,
@@ -135,6 +137,7 @@ public sealed class ServiceConfig
             AdDomain = GetString(settingsElement, "ad_domain"),
             AdTimeout = GetDouble(settingsElement, "ad_timeout") ?? 120,
             EngineVersion = GetString(settingsElement, "engine_version"),
+            UseServerReauth = GetBool(settingsElement, "use_server_reauth") ?? true,
             GuardianEnabled = GetBool(settingsElement, "guardian_enabled") ?? false,
             GuardianUrl = GetStringOr(settingsElement, "guardian_url", "http://127.0.0.1:18765/mcp"),
             GuardianInterval = GetDouble(settingsElement, "guardian_interval") ?? 5,
@@ -216,6 +219,7 @@ public sealed class ServiceConfig
                 ad_domain = settings.AdDomain,
                 ad_timeout = settings.AdTimeout,
                 engine_version = settings.EngineVersion,
+                use_server_reauth = settings.UseServerReauth,
                 guardian_enabled = settings.GuardianEnabled,
                 guardian_url = settings.GuardianUrl,
                 guardian_interval = settings.GuardianInterval,

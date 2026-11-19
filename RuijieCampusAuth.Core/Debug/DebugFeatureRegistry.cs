@@ -190,6 +190,7 @@ public static class DebugFeatureFactory
         var features = new List<IDebugFeature>
         {
             new SystemInfoDebugFeature(store),
+            new PrivatePropertiesDebugFeature(),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(

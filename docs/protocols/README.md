@@ -14,7 +14,7 @@
 | 模块 | 文档 | 状态 |
 |---|---|---|
 | EAPOL / EAP-MD5 / 私有尾包 | `eap-md5.md`（待补） | 已有实现 |
-| 服务器私有属性 TLV / RC4 | `private-properties.md` | P2 |
+| 服务器私有属性 TLV / RC4 | `private-properties.md` | P2 已实现 |
 | DHCP + Option 82 | `dhcp.md` | P3 |
 | ARP / 代理 / 拨号检测 | `diagnostics.md` | P4 |
 | Portal eportal / Portal UDP | `portal.md` | P5 |

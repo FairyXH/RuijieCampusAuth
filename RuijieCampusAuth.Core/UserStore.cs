@@ -115,6 +115,7 @@ public sealed class UserSettings
     public string AdDomain { get; set; } = "";
     public double AdTimeout { get; set; } = 120;
     public string EngineVersion { get; set; } = "";
+    public bool UseServerReauth { get; set; } = true;
     public DebugSettings Debug { get; set; } = new();
 }
 

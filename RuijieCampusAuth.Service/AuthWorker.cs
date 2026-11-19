@@ -59,7 +59,8 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     break;
                 }
                 logger.LogInformation("尝试账号: {Account}", account.Username);
-                (bool ok, bool attempted, bool connected, string? server, string interfaceName) result;
+                (bool ok, bool attempted, bool connected, string? server, string interfaceName,
+                    int? reauth) result;
                 try
                 {
                     result = await Task.Run(
@@ -78,7 +79,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 {
                     logger.LogError(ex, "认证过程异常");
                     ServiceStatus.Write("error", $"认证异常: {ex.Message}");
-                    result = (false, false, false, null, settings.Interface);
+                    result = (false, false, false, null, settings.Interface, null);
                 }
                 if (!result.ok)
                 {
@@ -114,7 +115,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     }
                     break;
                 }
-                await HoldAsync(settings, stoppingToken);
+                await HoldAsync(settings, result.reauth, stoppingToken);
                 break;
             }
             if (!authenticated)
@@ -241,7 +242,8 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         }
     }
 
-    private (bool ok, bool attempted, bool connected, string? server, string interfaceName) Authenticate(
+    private (bool ok, bool attempted, bool connected, string? server, string interfaceName,
+        int? reauth) Authenticate(
         ServiceSettings settings,
         string username,
         string password,
@@ -289,7 +291,8 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         {
             _store.ClearDiscovery();
         }
-        return (ok, true, supplicant.Connected, supplicant.ServerMac, interfaceName);
+        return (ok, true, supplicant.Connected, supplicant.ServerMac, interfaceName,
+            settings.UseServerReauth ? supplicant.ServerReauthIntervalSeconds : null);
     }
 
     private string ResolveInterface(ServiceSettings settings)
@@ -327,13 +330,31 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                ?? throw new InvalidOperationException("没有可用的抓包网卡");
     }
 
-    private async Task HoldAsync(ServiceSettings settings, CancellationToken stoppingToken)
+    private async Task HoldAsync(
+        ServiceSettings settings,
+        int? reauthIntervalSeconds,
+        CancellationToken stoppingToken)
     {
         _guardianFailures = 0;
         _nextGuardianCheck = DateTimeOffset.MinValue;
         _lastGuardianDecision = null;
+        var reauthAt = reauthIntervalSeconds is > 0
+            ? DateTimeOffset.UtcNow.AddSeconds(reauthIntervalSeconds.Value)
+            : (DateTimeOffset?)null;
+        if (reauthAt is not null)
+        {
+            logger.LogInformation(
+                "服务器要求每 {Seconds}s 重新认证",
+                reauthIntervalSeconds);
+        }
         while (!stoppingToken.IsCancellationRequested)
         {
+            if (reauthAt is { } deadline && DateTimeOffset.UtcNow >= deadline)
+            {
+                ServiceStatus.Write("reauth", "到达服务器重认证间隔");
+                logger.LogInformation("到达服务器重认证间隔，开始重新认证");
+                return;
+            }
             if (!await OnlineAsync(settings, stoppingToken))
             {
                 logger.LogWarning("检测到掉线，开始补认证");

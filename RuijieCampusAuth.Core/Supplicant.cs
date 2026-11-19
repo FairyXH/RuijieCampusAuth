@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using RuijieCampusAuth.Core.Protocols;
 
 namespace RuijieCampusAuth.Core;
 
@@ -29,6 +30,8 @@ public sealed class Supplicant : IDisposable
     public string? ServerMac { get; private set; }
     public bool Connected { get; private set; }
     public DateTimeOffset? ConnectedAt { get; private set; }
+    public PrivatePropertiesResult? LastPrivateProperties { get; private set; }
+    public int? ServerReauthIntervalSeconds { get; private set; }
 
     public Supplicant(
         string interfaceName,
@@ -148,6 +151,8 @@ public sealed class Supplicant : IDisposable
         Connected = false;
         ConnectedAt = null;
         ServerMac = null;
+        LastPrivateProperties = null;
+        ServerReauthIntervalSeconds = null;
         var received = new BlockingCollection<byte[]>(new ConcurrentQueue<byte[]>());
         _device = new PcapDevice(_interface);
         _device.PacketReceived += packet =>
@@ -231,6 +236,7 @@ public sealed class Supplicant : IDisposable
                 ServerMac = source;
                 if (code == Eapol.EapSuccess)
                 {
+                    CaptureServerProperties(eap);
                     foreach (var message in Eapol.ExtractServerMessages(eap))
                     {
                         _log?.Invoke($"服务器消息: {message}");
@@ -311,6 +317,54 @@ public sealed class Supplicant : IDisposable
             received.CompleteAdding();
             _device.Dispose();
             _device = null;
+        }
+    }
+
+    private void CaptureServerProperties(byte[] eap)
+    {
+        if (eap.Length <= 4)
+        {
+            return;
+        }
+        try
+        {
+            var parsed = PrivateProperties.Parse(eap.AsSpan(4));
+            LastPrivateProperties = parsed;
+            foreach (var property in parsed.Properties)
+            {
+                switch (property.Type)
+                {
+                    case (byte)PrivatePropertyType.SuReauthInterval:
+                        if (property.Number is > 0 and <= int.MaxValue)
+                        {
+                            ServerReauthIntervalSeconds = (int)property.Number.Value;
+                        }
+                        break;
+                    case (byte)PrivatePropertyType.SuUpgradeUrl:
+                    case (byte)PrivatePropertyType.AccountInfo:
+                    case (byte)PrivatePropertyType.PersonalInfo:
+                    case (byte)PrivatePropertyType.BroadcastInfo:
+                    case (byte)PrivatePropertyType.RejectReason:
+                        _log?.Invoke($"服务器属性: {property.Name}={property.DisplayValue}");
+                        break;
+                    case (byte)PrivatePropertyType.HelloInterval:
+                    case (byte)PrivatePropertyType.IndicatePort:
+                    case (byte)PrivatePropertyType.IndicateServerIp:
+                    case (byte)PrivatePropertyType.MessageClientPort:
+                    case (byte)PrivatePropertyType.ClientMessagePeriod:
+                        _log?.Invoke($"服务器属性: {property.Name}={property.DisplayValue}");
+                        break;
+                }
+            }
+            if (parsed.Errors.Count > 0)
+            {
+                _log?.Invoke(
+                    $"服务器私有属性解析告警: {string.Join("; ", parsed.Errors)}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log?.Invoke($"服务器私有属性解析失败: {ex.Message}");
         }
     }
 
