@@ -16,9 +16,9 @@ type fakeTransport struct {
 	failure   string
 }
 
-func (f *fakeTransport) SourceMAC() string { return f.source }
-func (f *fakeTransport) ServerMAC() string { return f.server }
-func (f *fakeTransport) OuterSuccess() bool { return f.success }
+func (f *fakeTransport) SourceMAC() string    { return f.source }
+func (f *fakeTransport) ServerMAC() string    { return f.server }
+func (f *fakeTransport) OuterSuccess() bool   { return f.success }
 func (f *fakeTransport) OuterFailure() string { return f.failure }
 
 func (f *fakeTransport) Start(identity string, tail []byte) ([]byte, error) {
