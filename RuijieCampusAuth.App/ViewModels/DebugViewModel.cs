@@ -52,7 +52,13 @@ public partial class DebugViewModel : ViewModelBase
             $"{value.Category} · {value.Phase} · {value.State}" +
             (value.RequiresService ? " · 需要服务后端" : "");
         FeatureEnabled = value.Enabled;
-        ArgumentsJson = "{}";
+        // Pre-fill arguments from the current school configuration so the
+        // user sees (and can tweak) exactly what the server-side fallback
+        // would use.
+        ArgumentsJson = DebugArgumentDefaults.Build(
+            value.Name,
+            _store.LoadSettings(),
+            _store.ActiveAccount());
         ResultText = string.IsNullOrWhiteSpace(value.Detail) ? "" : value.Detail;
     }
 

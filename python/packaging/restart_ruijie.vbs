@@ -22,13 +22,23 @@ Const TAKEOVER_PROCESS = "RuijieCampusAuth.exe"
 Const SERVICE_PROCESS = "RuijieCampusAuth.Service.exe"
 Const HEARTBEAT_MAX_AGE = 12
 
-Dim shell, fso, wmi
+Dim shell, fso, wmi, regSvc
 Set shell = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 Set wmi = Nothing
 On Error Resume Next
 Set wmi = GetObject("winmgmts:\\.\root\cimv2")
 Err.Clear
+
+' StdRegProv does registry reads/writes in-process: no console windows
+' at all (reg.exe children flicker badly under wscript). The hDefKey
+' flags select the 64/32-bit view, replacing reg.exe /reg:64|32.
+Set regSvc = Nothing
+Set regSvc = GetObject("winmgmts:{impersonationLevel=impersonate}!\\.\root\default:StdRegProv")
+Err.Clear
+
+Const HKLM = &H80000002
+Const KEY_WOW64_32KEY = &H200
 
 Function StateDir()
     Dim dir
@@ -76,6 +86,68 @@ Function RegExe()
     Else
         RegExe = system32
     End If
+End Function
+
+Function IfeoValueHas(view32, name, valueName, needle)
+    Dim subKey, value
+    IfeoValueHas = False
+    On Error Resume Next
+    subKey = "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\" & name
+    If view32 Then subKey = "SOFTWARE\WOW6432Node\" & subKey
+    If Not regSvc Is Nothing Then
+        value = ""
+        regSvc.GetStringValue HKLM, subKey, valueName, value
+        If Err.Number <> 0 Then
+            Err.Clear
+            Exit Function
+        End If
+        If InStr(1, CStr(value), needle, vbTextCompare) > 0 Then
+            IfeoValueHas = True
+        End If
+        Exit Function
+    End If
+    ' StdRegProv unavailable: hidden reg.exe fallback (shell.Exec would
+    ' flash a console window, so capture through a hidden cmd redirect).
+    If InStr(1, RegQueryHidden("reg query """ & IfeoKeyFor(name) & """ /v " & valueName & " /reg:64"), needle, vbTextCompare) > 0 _
+       Or InStr(1, RegQueryHidden("reg query """ & IfeoKeyFor(name) & """ /v " & valueName & " /reg:32"), needle, vbTextCompare) > 0 Then
+        IfeoValueHas = True
+    End If
+End Function
+
+Sub IfeoValueDelete(view32, name, valueName)
+    Dim subKey
+    On Error Resume Next
+    subKey = "SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\" & name
+    If view32 Then subKey = "SOFTWARE\WOW6432Node\" & subKey
+    If Not regSvc Is Nothing Then
+        regSvc.DeleteValue HKLM, subKey, valueName
+        Err.Clear
+        Exit Sub
+    End If
+    shell.Run "reg delete """ & IfeoKeyFor(name) & """ /v " & valueName & " /f /reg:64", 0, True
+    shell.Run "reg delete """ & IfeoKeyFor(name) & """ /v " & valueName & " /f /reg:32", 0, True
+End Sub
+
+Function RegQueryHidden(cmd)
+    Dim out, text, file
+    RegQueryHidden = ""
+    On Error Resume Next
+    out = shell.ExpandEnvironmentStrings("%TEMP%") & "\ruijie_reg_query.tmp"
+    shell.Run "cmd.exe /c " & cmd & " > """ & out & """ 2>nul", 0, True
+    If Err.Number <> 0 Then
+        Err.Clear
+        Exit Function
+    End If
+    If fso.FileExists(out) Then
+        Set file = fso.OpenTextFile(out, 1, False)
+        If Err.Number = 0 Then
+            text = file.ReadAll
+            file.Close
+            RegQueryHidden = text
+        End If
+        fso.DeleteFile out, True
+    End If
+    Err.Clear
 End Function
 
 Function ReadIni(path)
@@ -143,22 +215,9 @@ Function IfeoKeyFor(name)
 End Function
 
 Function MarkerForName(name)
-    Dim views, view, cmd, exec, output
-    MarkerForName = False
-    On Error Resume Next
-    views = Array("64", "32")
-    For Each view In views
-        cmd = """" & RegExe() & """ query """ & IfeoKeyFor(name) & """ /v " & MARKER_NAME & " /reg:" & view
-        Set exec = shell.Exec(cmd)
-        If Err.Number = 0 Then
-            output = exec.StdOut.ReadAll
-            If exec.ExitCode = 0 And InStr(1, output, MARKER_VALUE, vbTextCompare) > 0 Then
-                MarkerForName = True
-                Exit Function
-            End If
-        End If
-        Err.Clear
-    Next
+    ' 8021x.exe is 32-bit: check the 32-bit view first, then 64-bit.
+    MarkerForName = IfeoValueHas(True, name, MARKER_NAME, MARKER_VALUE) _
+        Or IfeoValueHas(False, name, MARKER_NAME, MARKER_VALUE)
 End Function
 
 Function MarkerPresent()
@@ -168,23 +227,12 @@ End Function
 ' Older builds wrote only the Debugger value, without HXXYTakeover.
 ' Treat that as a stale policy so the transition cannot leave 8021x blocked.
 Function LegacyDebuggerForName(name)
-    Dim views, view, cmd, exec, output, text
-    LegacyDebuggerForName = False
-    On Error Resume Next
-    views = Array("64", "32")
-    For Each view In views
-        cmd = """" & RegExe() & """ query """ & IfeoKeyFor(name) & """ /v Debugger /reg:" & view
-        Set exec = shell.Exec(cmd)
-        If Err.Number = 0 Then
-            output = exec.StdOut.ReadAll
-            text = LCase(output)
-            If exec.ExitCode = 0 And InStr(1, text, "cmd.exe", vbTextCompare) > 0 And InStr(1, text, "/c exit", vbTextCompare) > 0 Then
-                LegacyDebuggerForName = True
-                Exit Function
-            End If
-        End If
-        Err.Clear
-    Next
+    LegacyDebuggerForName = IfeoValueHas(True, name, "Debugger", "cmd.exe") _
+        And IfeoValueHas(True, name, "Debugger", "/c exit")
+    If Not LegacyDebuggerForName Then
+        LegacyDebuggerForName = IfeoValueHas(False, name, "Debugger", "cmd.exe") _
+            And IfeoValueHas(False, name, "Debugger", "/c exit")
+    End If
 End Function
 
 Function LegacyDebuggerPresent()
@@ -216,14 +264,8 @@ Function AnyIfeoPolicyPresent()
 End Function
 
 Sub DeleteIfeoValue(name, valueName)
-    Dim views, view, cmd
-    On Error Resume Next
-    views = Array("64", "32")
-    For Each view In views
-        cmd = """" & RegExe() & """ delete """ & IfeoKeyFor(name) & """ /v " & valueName & " /f /reg:" & view
-        shell.Run cmd, 0, True
-        Err.Clear
-    Next
+    IfeoValueDelete True, name, valueName
+    IfeoValueDelete False, name, valueName
 End Sub
 
 ' Last-resort recovery if --restore-client is missing, hung, or D: is offline.
