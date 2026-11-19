@@ -207,6 +207,9 @@ public static class DebugFeatureFactory
             new UserMessagesDebugFeature(),
             new PeapDebugFeature(store),
             new EapTlsDebugFeature(store),
+            new WirelessProfileDebugFeature(store),
+            new UpgradeCheckDebugFeature(store),
+            new SamDirectDebugFeature(store),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(

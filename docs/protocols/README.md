@@ -20,8 +20,8 @@
 | Portal eportal / Portal UDP | `portal.md` | P5 已实现 |
 | 客户端中心 / 自助服务 | `portal.md` | P5 已实现 |
 | PEAP / EAP-TLS | `peap.md` | P6 已实现，待实验服务器验证 |
-| 无线 WPA2-Enterprise | `wireless.md` | P7 |
-| SAM 直通 / 升级 | `sam-upgrade.md` | P8 |
+| 无线 WPA2-Enterprise | `wireless.md` | P7 已实现，待 AP 验证 |
+| SAM 直通 / 升级 | `sam-upgrade.md` | P8 探针/检查已实现，SAM 报文待抓包 |
 
 ## 规则
 

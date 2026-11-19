@@ -98,9 +98,9 @@ public sealed class DebugFeatureTests : IDisposable
         Assert.Equal("P6", peap.Phase);
         Assert.False(peap.Enabled);
 
-        var wireless = descriptors.Single(item => item.Name == "wireless-profile");
+        var wireless = descriptors.Single(item => item.Name == "xiaorui-share");
         Assert.Equal("planned", wireless.State);
-        Assert.Equal("P7", wireless.Phase);
+        Assert.Equal("P8", wireless.Phase);
         Assert.False(wireless.Enabled);
     }
 

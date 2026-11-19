@@ -66,7 +66,14 @@ to the Python tree under `python/`.
   MSCHAPv2, optional client certificate, and `peap`/`eap-tls` debug features.
   Tests: Core 31 passed. Real RADIUS/PEAP server verification and PEAP vendor
   segment field mapping remain.
-- Next: P7 wireless WPA2-Enterprise.
+- P7: Windows WLAN profile manager (`WlanProfileManager`) with PEAP/MSCHAPv2
+  profile XML + EAP user credentials, list/create/delete/connect/disconnect
+  debug feature. Live list verified (1 interface, 5 profiles); create/connect
+  need a lab AP. Tests: Core 33 passed.
+- P8: `upgrade-check` (GET only, no install) and `sam-direct` UDP probe with
+  optional DES-CBC/ECB transform. Both verified against local fake services.
+  SAM packet layout remains unknown; no fake handshake. Tests: Core 35 passed.
+- Next: P9 multi-profile GUI switch, adaptation guide, final regression.
 
 ## Verified State
 
