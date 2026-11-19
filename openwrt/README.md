@@ -1,264 +1,161 @@
-# OpenWrt 组件（当前验证目标：Xiaomi R3G）
+# 锐捷认证器 · OpenWrt 版
 
-本目录是 OpenWrt 软路由端的源码，和仓库根目录的 C#/Python 实现并列维护。
+OpenWrt 软路由端的锐捷校园网 802.1X 认证器：Go 守护进程 + LuCI 管理界面。
+协议算法与桌面版（根目录 C# / .NET 10）一一对应，学校差异只通过
+`profiles/*.json` 档案导入，产品本身不内置任何学校配置。
 
-## 目标可移植性
+## 设计约束
 
-源码不绑定 R3G。Go daemon、LuCI、UCI 都只依赖 OpenWrt 用户态和标准
-AF_PACKET/ubus/UCI 能力，没有 MT7621 专属代码。目标相关只有：
-
-- Image Builder 的 `PROFILE` 和 device packages（默认
-  `xiaomi_mi-router-3g`）；
-- `GOARCH`（默认 `mipsle`，换 ARM/ARM64/x86 时改这里）；
-- UCI 的 `device`（默认 `wan`，不同设备按实际 netdev 调整）；
-- `disguise=full` 时 UA3F 的 kmod 依赖（`kmod-nft-queue`、
-  `kmod-nft-tproxy`），这是 OpenWrt 目标相关，不是 R3G 专属。
-
-所以同 target（`ramips/mt7621`）的其他 OpenWrt 设备只改 `PROFILE` 就能构建；
-换架构只改 `GOARCH` 重新编译，LuCI/UCI 文件不用动。
+- **纯用户态，零 kmod 依赖**：只用到 Linux 自带的 AF_PACKET 原始套接字和
+  Go 标准库。`opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；同一二进制
+  在任何同架构 OpenWrt 上都能跑，不需要按机型重编。
+- **不做机型绑定**：WAN 口由 daemon 自动识别（ubus 逻辑接口 + 默认路由 +
+  链路状态），也可在 LuCI 里多选候选网口。
+- **协议一致**：私有尾、CRC16/XMODEM、字节混淆、MD5 链式凭据加密、
+  服务器私有属性分段解析、RC4、MSCHAPv2、PEAP/EAP-TLS 都是 C# 实现的
+  逐函数移植，测试向量与桌面版共用。
+- **配置通用**：`profiles/*.json` 字段与 C# `SchoolProfile` 完全一致，
+  同一份档案在桌面版和路由器上都能导入。
 
 ## 目录
 
 ```text
 openwrt/
-  hxxy-auth/                 Go 守护进程 + CLI（目标 mipsle）
-  luci-app-hxxy-auth/        LuCI 应用源码（菜单/ACL/视图）
-  files/                     Image Builder 覆盖文件（UCI 配置等）
-  scripts/build-go.sh        交叉编译 Go 二进制
-  scripts/build-image.sh     组装 files/ 并调用 Image Builder
-  README.md
+  ruijie-auth/                 Go 守护进程 + CLI（module: ruijie-auth）
+    cmd/ruijie-auth/           入口：daemon / status / profile / ...
+    internal/protocol/         协议算法层（与 C# Core/Protocols 对应）
+    internal/supplicant/       EAP-MD5 与 PEAP/EAP-TLS 会话状态机
+    internal/profile/          学校档案加载与 UCI 导入
+    internal/config/           UCI 配置解析
+    internal/netcfg/           WAN 候选接口识别、MAC 修改
+    internal/servers/          已学习认证服务器 + 探测缓存
+    internal/daemon/           常驻循环、账号轮换、守护
+    internal/transport/        AF_PACKET 收发
+  luci-app-ruijie-auth/        LuCI 应用
+    htdocs/.../view/ruijie-auth/ 8 个页面
+    po/zh_Hans/ruijie-auth.po    简体中文翻译
+    root/.../menu.d、acl.d、uci-defaults
+  files/                       ipk 里的系统文件（init、UCI 默认值、hotplug）
+  scripts/
+    build-go.sh                交叉编译
+    build-ipk.sh               打 ipk（含 LuCI 与中文 .lmo）
+    build-image.sh             组装固件
+    po2lmo.py                  把 .po 编译成 LuCI 的 .lmo
 ```
 
 ## 源码与编译分工
 
-- **源码统一放在实体机仓库的 `openwrt/`**。在 Windows 上编辑、提交、推送 GitHub。
-- **编译和测试只在 Ubuntu VM 进行**。Windows 不安装 Go、不跑 OpenWrt Image Builder。
-- Ubuntu 侧从 GitHub 拉代码后执行：
+源码统一在实体机仓库编辑、提交；编译和测试只在 Ubuntu VM 进行。
+Ubuntu 侧：
 
 ```sh
 cd openwrt
-sh scripts/build-go.sh
-sh scripts/build-image.sh
+sh scripts/build-go.sh      # 只编译 daemon
+sh scripts/build-ipk.sh     # 打 ipk（默认 mipsle，可用 GOARCH= 改）
+sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 ```
 
-- 构建产物在 `openwrt/build/`，已被 `.gitignore` 排除，不提交。
-- 私有仓库在 Ubuntu 上需要只读 deploy key 或 `gh auth login`；临时/离线可用
-  `git bundle` 传输，命令见 `docs/OPENWRT_BUILD_ENV.md`。
+`build-ipk.sh` 需要 `python3` 生成中文 `.lmo`；没有 python3 时只跳过翻译，
+其余照常构建。
 
-## 当前状态（2026-11-19）
+## 功能
 
 已实现：
 
-- `internal/protocol`：私有尾、CRC16/XMODEM、位反转、MD5 链式凭据、
-  EAPOL 组帧、EAP-MD5、服务器 GB18030 消息解析。
-- 569 字节 golden test 与 C#/Python 参考实现一致：
-  `779ea31765daef370dd54c243e0ac4bf0912bf183f889ac50ff7bb1bc3cfbfe5`。
-- `hxxy-auth` CLI：`version`、`status [--json]`、`tail`、`selftest`、
-  `daemon`、`auth/logoff/pause/resume/reload`、`accounts`、
-  `servers list/lock/unlock/remove/rename`、`discovery show/clear`、
-  `mac show/set/random/clear`。
-- 常驻 daemon：Linux AF_PACKET raw socket、Start/Identity/MD5/Success、
-  账号轮换（UCI `config account`，最多 5 个）、服务器学习、探测缓存、
-  自动守护（掉线重认证）、持续抢占/定时重认证、家庭网络暂停、
-  Unix socket 控制接口、1MB 日志轮转。
-- LuCI 六页：概览（状态 + 控制按钮）、账号池、服务器/探测缓存、MAC、
-  设置、日志。
-- 默认校园网防检测（`disguise=full`）：
-  - `hxxy-disguise` 设置 nft TTL 128 + MSS 1460；
-  - UA3F 3.7.0 mipsel 以 NFQUEUE 运行，L3 改写 TTL/IPID/TCP timestamp/
-    TCP initial window；
-  - UA 改写**默认关闭**（`rewrite_mode DIRECT`），不触碰微信/企业微信 UA；
-  - sysctl `ip_default_ttl=128`、`tcp_timestamps=0`、`tcp_ecn=0`、
-    IPv6 关闭；flow offload 关闭。
-- 内置 `https-dns-proxy` + `luci-app-https-dns-proxy` +
-  `luci-i18n-https-dns-proxy-zh-cn` + `luci-i18n-base-zh-cn`；
-  默认 AliDNS + Tencent DoH，IPv4 bootstrap，`force_dns` 开启。
-- MAC 快捷修改：CLI `hxxy-auth mac ...` + LuCI MAC 页；写
-  `network.wan.macaddr`、`ifup wan`、reload daemon。
-- USB 网络共享：内置 `kmod-usb-net`、RNDIS、CDC-ECM/NCM/subset、ipheth；
-  `/etc/hotplug.d/net/90-hxxy-usbwan` 自动接管 `usb*`/`wwan*`，生成
-  `usbwan` DHCP 接口（metric 100）并加入 WAN 防火墙 zone。
-- 应用层打成 `hxxy-auth` ipk，opkg 拥有二进制/脚本/LuCI 文件；后续可
-  `opkg install` 升级，不必重刷固件。
-- procd init、WAN hotplug、UCI defaults（0600、enable、flow offload 关闭）。
-- 测试：协议 golden vector、UCI/账号池上限、服务器/缓存、控制 socket、
-  supplicant 假认证器全链路、网关解析、`go vet`。
-- 2026-11-19 已验证：`go test ./...`、`go vet ./...`、mipsle 交叉编译、
-  `qemu-mipsel selftest`；完整 R3G 固件 14MB，
-  SHA256 `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`，
-  rootfs 约 10MB，含 UA3F 17MB、https-dns-proxy、LuCI 中文包、
-  nft/iptables/ipset 依赖、USB tethering kmods。
-- x86_64 OpenWrt QEMU 实测：daemon 在 `br-lan` 上真实打开 AF_PACKET，
-  无认证服务器时自动进入 `paused`（“未检测到认证服务器，当前网络在线，
-  暂停认证”），概览页显示账号/接口；Resume 按钮能把 paused 拉回认证流程；
-  账号池、服务器/缓存、设置页均正常渲染。
+- EAP-MD5 有线认证（Start / Identity / MD5 / Success-Failure 全流程）。
+- 569 字节私有尾：CRC16/XMODEM、逐字节位反转+取反混淆、MD5 链式凭据加密、
+  0x17–0x7E 属性集；`private_tail` 可关。
+- 服务器私有属性：段 1 GBK 消息、段 2 0x6F 布局、段 3/4 版本门、段 5
+  15 字节解混淆、属性 TLV 循环；`ENCRYPT_KEY`/`ENCRYPT_IV` 走 RC4
+  (`com.ruijie.www`)；`SU_REAUTH_INTERV` 驱动重认证。
+- PEAPv0 + MSCHAPv2（RFC 2759，含 MD4、DES 展开、奇偶校验）与 EAP-TLS，
+  由 `auth_mode` 选择；隧道分片、ACK、phase2 状态机与 C# 一致。
+- 账号池（最多 5 个）、服务器学习/锁定、探测缓存、自动守护、定时重认证、
+  家庭网络暂停、Unix socket 控制、1MB 日志轮转。
+- WAN 自动识别与多选；MAC 修改（写 `network.<section>.macaddr`）。
+- 学校档案：读取 `/etc/ruijie-auth/profiles`、`/usr/share/ruijie-auth/profiles`
+  或上传/粘贴 JSON；导入语义与 C# 一致（只覆盖档案声明字段、先备份）。
+- LuCI 8 页：概览、账号、学校档案、认证服务器、设置、MAC、调试、日志；
+  中文翻译随 ipk 安装。
 
-待验证：
+暂未移植（桌面版有、路由器不需要或无证据）：
 
-- R3G 真机：`wan` AF_PACKET、DSA/MT7530、DHCP 时序、100Mbps `iperf3`。
-- UA3F NFQUEUE 在 MT7621 100Mbps 下的实际吞吐。
-- MAC 页在真机 `wan` 上的 ifup/重认证时序。
-- USB 共享在 R3G 上的实际枚举（`usb0`/`wwan0`）、DHCP 与路由切换。
-- Breed 重打包镜像在真机 Breed 上的刷写与启动。
-- 可选：malta/le MIPS QEMU、EAPOL tap/veth 真实传输模拟。
+- Portal / eportal、自助服务、客户端中心消息、SAM 直通、升级下载。
+- Windows 专用 DHCP 控制（`dhcp_mode` 目前只记录，不驱动 udhcpc）。
+- 无线 WPA2-Enterprise 档案管理与诊断页（OUI/ARP/代理探测）。
 
-## 构建
+## 配置与运行数据
 
-```sh
-# Ubuntu，仅编译 daemon
-cd openwrt
-sh scripts/build-go.sh
+| 路径 | 用途 |
+|---|---|
+| `/etc/config/ruijie-auth` | 设置 + 账号池（明文，0600） |
+| `/etc/ruijie-auth/profiles/*.json` | 学校档案 |
+| `/etc/ruijie-auth/servers.json` | 已学习服务器 + locked |
+| `/etc/ruijie-auth/discovery.json` | 探测缓存 |
+| `/var/run/ruijie-auth/status.json` | 状态（含服务器私有属性） |
+| `/var/run/ruijie-auth.sock` | 控制 socket（0600） |
+| `/var/log/ruijie-auth.log` | 1MB 轮转日志 |
 
-# 构建完整 R3G 固件（UA3F + https-dns-proxy + LuCI 中文 + kmods）
-# 脚本会自动下载/校验 UA3F 3.7.0 mipsel 包并抽取二进制
-IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
-  sh scripts/build-image.sh
-```
+`config auth` 关键项：`device`（`auto` 或 `list device`）、`auth_mode`、
+`service_name`、`static_id`、`private_tail`、`logoff_first`、
+`response_delay`、`reauth_interval`、`autoguard`、`preempt`。
 
-默认输出：
+## CLI
 
 ```text
-/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64/
-  bin/targets/ramips/mt7621/
-  openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin
-  openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-kernel1.bin
-  openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-rootfs0.bin
+ruijie-auth version
+ruijie-auth daemon
+ruijie-auth status [--json]
+ruijie-auth auth|logoff|pause|resume|reload
+ruijie-auth accounts [--json]
+ruijie-auth servers list|lock|unlock|remove|rename
+ruijie-auth discovery show|clear
+ruijie-auth mac show|set|random|clear [--section wan]
+ruijie-auth interfaces [--json] [--auto]
+ruijie-auth profile list|show|import [--file ...] [--config ...]
+ruijie-auth tail [--username ...] [--mac ...]
+ruijie-auth selftest
 ```
 
-同时生成可单独升级的 ipk：
+`selftest` 在设备上跑一遍算法向量（RC4、MD4、MSCHAPv2、569 字节私有尾、
+混淆往返、私有属性分段解析），不依赖服务器，可用来确认二进制正常。
 
-```text
-openwrt/build/ipk/hxxy-auth_0.1.0_mipsel_24kc.ipk
-```
+## LuCI 与中文
 
-## USB 网络共享（Android / iPhone）
+- 菜单：服务 → 锐捷认证器；8 个页面标题与全部控件文本都是
+  `_('English')` 源串。
+- 翻译：`luci-app-ruijie-auth/po/zh_Hans/ruijie-auth.po`，构建时由
+  `scripts/po2lmo.py` 编译为 `/usr/lib/lua/luci/i18n/ruijie-auth.zh-cn.lmo`。
+  LuCI 会把该目录下当前语言的所有 `.lmo` 合并进 `window.TR`，所以不需要
+  额外注册。
+- `po2lmo.py` 的哈希、索引和字符串表与 LuCI 自带 `po2lmo` 逐字节一致
+  （用 24.10 镜像里的 `https-dns-proxy.zh-cn.lmo` 反查校验：154/154 条
+  键值和偏移完全相同）。
 
-固件已内置以下内核模块，插手机开“USB 网络共享”即可用，不需要重编：
+## 防检测（可选）
 
-```text
-kmod-usb-net kmod-usb-net-rndis kmod-usb-net-cdc-ether
-kmod-usb-net-cdc-ncm kmod-usb-net-cdc-subset kmod-usb-net-ipheth
-```
+`ruijie-disguise` 只做纯 nftables 的 TTL=128 + TCP MSS=1460，无内核模块、
+无第三方守护进程。`disguise=off` 时删除表。UA3F/NFQUEUE 方案已移除，
+因为它依赖 `kmod-nft-queue` 等包，与本项目“一份编译到处跑”的约束冲突。
 
-行为：
+`files/etc/hotplug.d/net/90-ruijie-usbwan` 仍保留：插手机 USB 共享时自动
+建 `usbwan` 备用 WAN。它只是脚本，没有 kmod 也能安全存在（没有对应驱动时
+不会触发）。
 
-- 手机枚举出的 `usb0`（RNDIS/CDC-ECM）或 `wwan0`（CDC-NCM）由
-  `/etc/hotplug.d/net/90-hxxy-usbwan` 自动识别，只接受 USB 驱动挂载的
-  netdev，不会误抓同名的非 USB 接口。
-- 首次启动由 `uci-defaults` 创建 `network.usbwan`：DHCP、metric 100，
-  并加入 WAN 防火墙 zone（NAT/转发）。
-- metric 100 表示**备用 WAN**：校园网 WAN 在线时仍走 WAN；拔掉 WAN 网线
-  或 `ifdown wan` 后自动走手机流量。如果校园网口有链路但未认证，默认路由
-  仍会压在 WAN 上，需要拔线或 `ifdown wan` 才会切到 USB。
-- 查看状态：`ifstatus usbwan`、`logread -e hxxy-usbwan`；
-  LuCI 的“网络 → 接口”里会出现 `usbwan`。
-- 固件的防检测 sysctl 关闭了 IPv6，因此 USB 共享走 IPv4；手机侧不需要
-  特别设置。
+## 升级与迁移
 
-## 免刷固件更新插件（ipk）
+- `/etc/config/ruijie-auth` 是 conffile，`opkg install --force-reinstall`
+  不会覆盖账号和档案。
+- 从改名前的老包迁移：老包的配置文件名与包名不同，先停老服务，把老配置
+  内容手工复制到 `/etc/config/ruijie-auth`，再安装新 ipk。
 
-固件里的 `hxxy-auth` 二进制、init 脚本、热插拔脚本和 LuCI 页面都由 opkg
-包 `hxxy-auth` 拥有，不再散落在只读 `FILES` 覆盖层里。后续更新流程：
+## 验证状态（2026-11-20）
 
-1. 在 Ubuntu 构建新包：`sh scripts/build-image.sh` 会顺带生成
-   `build/ipk/hxxy-auth_<version>_mipsel_24kc.ipk`；只更新插件也可以单独跑
-   `sh scripts/build-ipk.sh`。
-2. 把 ipk 传到路由器（LuCI“系统 → 软件包”上传，或 `scp` 到 `/tmp`）。
-3. 安装：
-
-```sh
-opkg install --force-reinstall /tmp/hxxy-auth_0.1.0_mipsel_24kc.ipk
-```
-
-`/etc/config/hxxy-auth` 是 conffile，账号池和设置不会被覆盖；安装后
-`postinst` 会自动重启 `hxxy-auth` 和 `hxxy-disguise`。LuCI 页面更新后
-浏览器强制刷新一次（Ctrl+F5）即可。
-
-需要重刷固件的只有：内核、kmod、UA3F 本体、https-dns-proxy 等系统级组件。
-
-## Breed 刷写
-
-标准 `...-squashfs-sysupgrade.bin` 是 OpenWrt 的 sysupgrade tar，Breed
-的升级页不接受它，**不要直接选这个文件**。Breed 需要专用的重打包镜像：
-
-```text
-openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-breed.bin
-```
-
-生成方式（Ubuntu）：
-
-```sh
-git clone https://github.com/eg15/mir3g-breed-image-maker /opt/openwrt/breed
-cd /opt/openwrt/breed
-./make_mir3g_breed_image.sh \
-  .../openwrt-...-squashfs-kernel1.bin \
-  .../openwrt-...-squashfs-rootfs0.bin
-```
-
-脚本把 `kernel1.bin` 写到偏移 0 和 4M，再从 8M 起追加 `rootfs0.bin`。
-这对应 R3G 的 `kernel1`（8MB）+ `rootfs0`（0xE00000）布局。
-
-刷写步骤：
-
-1. 断电，按住复位孔上电，橙灯闪烁后松开；电脑接 LAN 口。
-2. 打开 `http://192.168.1.1`，进 Breed 的固件更新页。
-3. 选择 `...-squashfs-breed.bin`，目标选**第二个分区**（0x600000）。
-4. 在环境变量页确认/设置 `autoboot.command = boot flash 0x600000`。
-5. 刷写完成后重启。
-
-注意：
-
-- 该重打包工具是社区方案，当前镜像已按相同布局生成，但尚未在 R3G 真机
-  上验证。
-- 已经在跑标准 OpenWrt 布局的设备，继续用 LuCI/`sysupgrade` 升级即可，
-  不需要每次重打包 Breed 镜像。
-- 如果之前刷的是小米原厂固件且没有 Breed，需要先自行安装 Breed；本仓库
-  不提供 bootloader。
-
-## API/配置契约
-
-LuCI 只依赖 CLI 的 JSON 输出、UCI 配置和控制 socket，不要求 daemon 监听
-HTTP 端口：
-
-```text
-hxxy-auth status --json
-hxxy-auth version
-hxxy-auth auth|logoff|pause|resume|reload
-hxxy-auth accounts --json
-hxxy-auth servers list --json
-hxxy-auth discovery show --json
-```
-
-UCI 配置在 `/etc/config/hxxy-auth`，由 LuCI 设置页/账号页读写；daemon 直接
-解析 `config auth` 和 `config account`。账号池最多 5 个，`Current` 优先，
-失败后按顺序尝试其他启用账号。
-
-运行数据：
-
-- `/etc/config/hxxy-auth` — 设置 + 账号（明文，0600）
-- `/etc/hxxy-auth/servers.json` — 学习到的认证服务器 + locked 标记
-- `/etc/hxxy-auth/discovery.json` — 探测缓存
-- `/var/run/hxxy-auth/status.json` — 状态
-- `/var/run/hxxy-auth.sock` — 控制 socket（0600）
-- `/var/log/hxxy-auth.log` — 1MB 轮转日志
-
-状态文件：
-
-```json
-{
-  "time": "2026-11-19T00:00:00+08:00",
-  "state": "authenticated",
-  "message": "认证成功",
-  "account": "S12016004",
-  "interface": "wan",
-  "server": "00:1a:a9:17:ff:ff"
-}
-```
-
-## 安全与兼容说明
-
-- 协议核心必须使用 MD5：EAP-MD5 challenge 和锐捷私有尾 0x2F 凭据都是
-  MD5 链式运算。这不是密码存储，也不能换成 AES/SHA；换掉会直接认证失败。
-- 账号密码明文保存在设备 `/etc/config/hxxy-auth` 的 `config account` 段，
-  文件权限 0600；按当前部署要求不使用 DPAPI/加密。仓库里不包含真实账号。
-- 本目录不包含任何真实账号、密码或抓包。
+- `go test ./...`：protocol（含真实抓包私有属性向量、RC4、MD4、
+  MSCHAPv2 RFC 向量、PEAP 分片布局）、config、profile、supplicant、
+  servers、network 全部通过。
+- `go vet ./...` 干净；`gofmt` 无差异。
+- amd64 原生与 mipsle（`qemu-mipsel`）`selftest` 均通过。
+- ipk 构建通过，内容包含二进制、init、hotplug、UCI 默认值、8 个 LuCI
+  页面、菜单/ACL 和 `ruijie-auth.zh-cn.lmo`。
+- 未在真实校园网环境上做端到端认证（需要现场 WAN 与账号）。

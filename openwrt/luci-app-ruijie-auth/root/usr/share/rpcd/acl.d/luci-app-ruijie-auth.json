@@ -1,0 +1,25 @@
+{
+	"luci-app-ruijie-auth": {
+		"description": "Ruijie Authenticator management",
+		"read": {
+			"file": {
+				"/usr/sbin/ruijie-auth": [ "exec" ],
+				"/etc/init.d/ruijie-auth": [ "exec" ],
+				"/etc/init.d/ruijie-disguise": [ "exec" ],
+				"/var/run/ruijie-auth/status.json": [ "read" ],
+				"/var/log/ruijie-auth.log": [ "read" ],
+				"/etc/ruijie-auth/profiles/": [ "read" ]
+			},
+			"uci": [ "ruijie-auth" ]
+		},
+		"write": {
+			"file": {
+				"/usr/sbin/ruijie-auth": [ "exec" ],
+				"/etc/init.d/ruijie-auth": [ "exec" ],
+				"/etc/init.d/ruijie-disguise": [ "exec" ],
+				"/etc/ruijie-auth/profiles/": [ "write" ]
+			},
+			"uci": [ "ruijie-auth" ]
+		}
+	}
+}

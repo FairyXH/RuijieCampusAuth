@@ -1,6 +1,0 @@
-#!/bin/sh
-
-[ "$ACTION" = "ifup" ] || [ "$ACTION" = "ifdown" ] || exit 0
-[ "$INTERFACE" = "wan" ] || exit 0
-
-/usr/sbin/hxxy-auth reload >/dev/null 2>&1 || true

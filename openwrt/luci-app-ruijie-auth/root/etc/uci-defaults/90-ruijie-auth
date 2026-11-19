@@ -1,0 +1,16 @@
+#!/bin/sh
+
+chmod 600 /etc/config/ruijie-auth 2>/dev/null
+
+mkdir -p /etc/ruijie-auth/profiles
+chmod 700 /etc/ruijie-auth /etc/ruijie-auth/profiles 2>/dev/null
+
+# Hardware/software flow offloading bypasses the netfilter postrouting hook,
+# which would make the optional TTL/MSS disguise ineffective.
+uci -q set firewall.@defaults[0].flow_offloading='0'
+uci -q set firewall.@defaults[0].flow_offloading_hw='0'
+uci -q commit firewall
+
+/etc/init.d/ruijie-auth enable 2>/dev/null
+/etc/init.d/ruijie-disguise enable 2>/dev/null
+exit 0

@@ -1,0 +1,10 @@
+#!/bin/sh
+
+[ "$ACTION" = "ifup" ] || [ "$ACTION" = "ifdown" ] || exit 0
+
+case "$INTERFACE" in
+	wan|wan6|usbwan) ;;
+	*) exit 0 ;;
+esac
+
+/usr/sbin/ruijie-auth reload >/dev/null 2>&1 || true

@@ -1,0 +1,101 @@
+{
+	"admin/services/ruijie-auth": {
+		"title": "Ruijie Authenticator",
+		"order": 90,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/overview"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/overview": {
+		"title": "Overview",
+		"order": 10,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/overview"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/accounts": {
+		"title": "Accounts",
+		"order": 20,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/accounts"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/profiles": {
+		"title": "School profiles",
+		"order": 30,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/profiles"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/servers": {
+		"title": "Servers",
+		"order": 40,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/servers"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/settings": {
+		"title": "Settings",
+		"order": 50,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/settings"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/mac": {
+		"title": "MAC address",
+		"order": 60,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/mac"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/debug": {
+		"title": "Debug",
+		"order": 70,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/debug"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	},
+	"admin/services/ruijie-auth/logs": {
+		"title": "Logs",
+		"order": 80,
+		"action": {
+			"type": "view",
+			"path": "ruijie-auth/logs"
+		},
+		"depends": {
+			"acl": [ "luci-app-ruijie-auth" ]
+		}
+	}
+}

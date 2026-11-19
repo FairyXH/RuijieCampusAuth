@@ -1,0 +1,40 @@
+#!/bin/sh /etc/rc.common
+
+# Optional on-wire disguise. Pure nftables: no kernel packages, no daemons.
+# "basic" rewrites the IPv4 TTL and the TCP MSS to look like a stock
+# Windows host; "off" removes the table.
+
+START=99
+
+disguise_mode() {
+	local value
+	value=$(uci -q get ruijie-auth.main.disguise 2>/dev/null)
+	[ -n "$value" ] || value=basic
+	echo "$value"
+}
+
+start() {
+	local mode
+	mode=$(disguise_mode)
+	if [ "$mode" = "off" ]; then
+		stop
+		return 0
+	fi
+	command -v nft >/dev/null 2>&1 || return 0
+	nft delete table inet ruijie 2>/dev/null
+	nft add table inet ruijie
+	nft 'add chain inet ruijie post { type filter hook postrouting priority mangle; policy accept; }'
+	nft 'add rule inet ruijie post tcp flags syn tcp option maxseg size set 1460'
+	nft 'add rule inet ruijie post ip ttl set 128'
+}
+
+stop() {
+	command -v nft >/dev/null 2>&1 || return 0
+	nft delete table inet ruijie 2>/dev/null
+	return 0
+}
+
+reload() {
+	stop
+	start
+}
