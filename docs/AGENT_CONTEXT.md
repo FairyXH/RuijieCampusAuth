@@ -47,7 +47,11 @@ to the Python tree under `python/`.
   `IpRenewAddress`), not raw DHCP. Option 82 is config-only in this engine
   version. Debug feature supports `status|renew|release|release-renew`; status
   verified live (adapter index 14, lease read). Tests: Core 16 passed.
-- Next: P4 diagnostics (OUI/NIC/ARP/probe/proxy/dialup).
+- P4: diagnostics debug features implemented: OUI, NIC inventory (filtered),
+  ARP gateway monitor, network probe, proxy port probe, dialup detection,
+  doctor pipe. Live checks: OUI 00:1a:a9, 13 NICs, ARP stable, gateway/DNS/HTTP
+  OK, no proxy ports, no active dialup. Tests: Core 22 passed.
+- Next: P5 Portal / client center / self-service / password change.
 
 ## Verified State
 

@@ -43,12 +43,6 @@ public static class DebugFeatureCatalog
     public static IReadOnlyList<IDebugFeature> Planned { get; } =
     [
         new PlannedDebugFeature(
-            "server-timers",
-            "服务器重认证/心跳",
-            "auth",
-            "P2",
-            "按服务器下发的 SU_REAUTH_INTERV、HELLO_INTERV、INDICATE_PORT 驱动定时行为。"),
-        new PlannedDebugFeature(
             "service-switch",
             "服务切换",
             "auth",
@@ -69,48 +63,6 @@ public static class DebugFeatureCatalog
             "P6",
             "EAP-TLS 客户端证书认证实验台。",
             supportsArguments: true),
-        new PlannedDebugFeature(
-            "arp-monitor",
-            "ARP 网关监控",
-            "network",
-            "P4",
-            "监控网关 MAC 变化并记录告警。",
-            requiresService: true,
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "nic-monitor",
-            "网卡监控",
-            "network",
-            "P4",
-            "枚举网卡、监听热插拔与状态变化。",
-            requiresService: true),
-        new PlannedDebugFeature(
-            "network-probe",
-            "网络诊断",
-            "network",
-            "P4",
-            "网关 ping、DNS 解析、HTTP 探测。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "oui-detect",
-            "锐捷设备识别",
-            "network",
-            "P4",
-            "按 MAC OUI 判断认证设备是否为本司设备。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "proxy-detect",
-            "代理检测",
-            "network",
-            "P4",
-            "SOCKS4/SOCKS5/HTTP 代理探测。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "dialup-detect",
-            "拨号规避",
-            "network",
-            "P4",
-            "检测 PPP/3G/4G 适配器冲突。"),
         new PlannedDebugFeature(
             "portal-auth",
             "Portal 认证",
@@ -172,12 +124,6 @@ public static class DebugFeatureCatalog
             "ops",
             "P5",
             "读取服务器广播/用户消息。"),
-        new PlannedDebugFeature(
-            "doctor-pipe",
-            "小锐医生管道",
-            "ops",
-            "P4",
-            "探测 \\\\.\\pipe\\SU_DOCTOR_INTERFACE。"),
         new PlannedDebugFeature(
             "upgrade-check",
             "升级检查",

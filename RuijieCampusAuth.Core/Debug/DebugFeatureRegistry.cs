@@ -192,6 +192,13 @@ public static class DebugFeatureFactory
             new SystemInfoDebugFeature(store),
             new PrivatePropertiesDebugFeature(),
             new DhcpClientDebugFeature(store),
+            new OuiDetectDebugFeature(store),
+            new NicMonitorDebugFeature(),
+            new ArpMonitorDebugFeature(store),
+            new NetworkProbeDebugFeature(store),
+            new ProxyDetectDebugFeature(store),
+            new DialupDetectDebugFeature(),
+            new DoctorPipeDebugFeature(),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(
