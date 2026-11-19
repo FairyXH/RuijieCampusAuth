@@ -50,20 +50,6 @@ public static class DebugFeatureCatalog
             "读取服务列表并执行服务切换。",
             supportsArguments: true),
         new PlannedDebugFeature(
-            "peap",
-            "PEAP / MSCHAPv2",
-            "auth",
-            "P6",
-            "PEAP v0/v1 + MSCHAPv2 认证实验台。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "eap-tls",
-            "EAP-TLS",
-            "auth",
-            "P6",
-            "EAP-TLS 客户端证书认证实验台。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
             "password-change",
             "修改密码",
             "portal",

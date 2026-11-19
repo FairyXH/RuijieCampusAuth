@@ -205,6 +205,8 @@ public static class DebugFeatureFactory
             new ServerListUpdateDebugFeature(),
             new PortalUdpDebugFeature(),
             new UserMessagesDebugFeature(),
+            new PeapDebugFeature(store),
+            new EapTlsDebugFeature(store),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(

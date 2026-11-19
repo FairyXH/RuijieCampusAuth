@@ -61,7 +61,12 @@ to the Python tree under `python/`.
   self-signed TLS handshake. Tests: Core 31 passed. EAPOL transport, PEAP
   phase2 state machine, PEAP vendor segment, and `peap`/`eap-tls` debug
   features remain.
-- Next: implement PEAP/EAP-TLS EAPOL transport + phase2, then P7 wireless.
+- P6b: EAPOL transport (`PcapEapTransport`) and PEAP/EAP-TLS session
+  (`PeapSession`) implemented, including fragmentation, phase2 Identity +
+  MSCHAPv2, optional client certificate, and `peap`/`eap-tls` debug features.
+  Tests: Core 31 passed. Real RADIUS/PEAP server verification and PEAP vendor
+  segment field mapping remain.
+- Next: P7 wireless WPA2-Enterprise.
 
 ## Verified State
 

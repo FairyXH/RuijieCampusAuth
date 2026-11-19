@@ -94,9 +94,14 @@ public sealed class DebugFeatureTests : IDisposable
         Assert.True(system.Enabled);
 
         var peap = descriptors.Single(item => item.Name == "peap");
-        Assert.Equal("planned", peap.State);
+        Assert.Equal("feature-off", peap.State);
         Assert.Equal("P6", peap.Phase);
         Assert.False(peap.Enabled);
+
+        var wireless = descriptors.Single(item => item.Name == "wireless-profile");
+        Assert.Equal("planned", wireless.State);
+        Assert.Equal("P7", wireless.Phase);
+        Assert.False(wireless.Enabled);
     }
 
     [Fact]

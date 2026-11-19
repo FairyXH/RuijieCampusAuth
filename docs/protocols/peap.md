@@ -1,7 +1,16 @@
 # PEAP / EAP-TLS
 
-状态：P6 核心已实现（MSCHAPv2、MD4、DES、TLS 双向流桥）。
-待完成：EAPOL 传输、PEAP phase2 状态机、PEAP 私有段字段、证书策略现场验证。
+状态：P6 已实现（MSCHAPv2、MD4、DES、TLS 双向流、EAPOL 传输、PEAP phase2）。
+待现场验证：真实 RADIUS/PEAP 服务器、证书策略、PEAP 私有段字段。
+
+## 0. 当前实现范围
+
+- `Core/Protocols/MschapV2.cs`：MD4、challenge、NT-Response、response 布局。
+- `Core/Protocols/EapTlsStream.cs`：SslStream ↔ EAP 分片双向桥。
+- `Core/Protocols/PeapSession.cs`：PEAP/EAP-TLS 会话、分片、phase2。
+- `Core/Protocols/PcapEapTransport.cs`：EAPOL Start/Identity/Exchange。
+- `Core/Debug/PeapDebugFeatures.cs`：`peap` / `eap-tls` 调试功能。
+- 测试：MD4/NT-Response RFC 向量、TLS 双向握手；PEAP 端到端需实验 RADIUS。
 
 ## 1. 原版证据
 
@@ -57,9 +66,23 @@
 | MSCHAPv2 challenge/response | `Core/Protocols/MschapV2.cs` | 完成 |
 | DES key 扩展 | `Core/Protocols/MschapV2.cs` | 完成 |
 | SslStream ↔ EAP 双向桥 | `Core/Protocols/EapTlsStream.cs` | 完成，本机 TLS 握手测试 |
-| PEAP 分片/phase2 | 待定 | 未实现 |
-| EAPOL 传输 | 待定 | 未实现 |
-| 调试页 `peap` / `eap-tls` | 待定 | 计划中 |
+| PEAP 分片/phase2 | `Core/Protocols/PeapSession.cs` | 完成，待实验服务器 |
+| EAPOL 传输 | `Core/Protocols/PcapEapTransport.cs` | 完成，待实验服务器 |
+| 调试页 `peap` / `eap-tls` | `Core/Debug/PeapDebugFeatures.cs` | 完成 |
+
+调试参数：
+
+| 参数 | 说明 |
+|---|---|
+| `interface` | NPF 设备或网卡名 |
+| `username` / `password` | 缺省取当前账号 |
+| `target_host` | 证书主机名，默认空 |
+| `verify_cert` | 默认 false（原版客户端不强制校验） |
+| `protocols` | `tls12`（默认）/`tls13`/`auto` |
+| `max_fragment` | 默认 1200 字节 |
+| `timeout` | 默认取 settings.timeout |
+| `tail_hex` | 可选私有尾 hex（附加在 EAP 响应后） |
+| `cert_path` / `cert_password` / `cert_thumbprint` | EAP-TLS 客户端证书 |
 
 测试：
 

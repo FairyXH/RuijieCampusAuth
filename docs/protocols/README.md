@@ -19,7 +19,7 @@
 | ARP / 代理 / 拨号检测 | `diagnostics.md` | P4 已实现 |
 | Portal eportal / Portal UDP | `portal.md` | P5 已实现 |
 | 客户端中心 / 自助服务 | `portal.md` | P5 已实现 |
-| PEAP / EAP-TLS | `peap.md` | P6 核心已实现，传输待接 |
+| PEAP / EAP-TLS | `peap.md` | P6 已实现，待实验服务器验证 |
 | 无线 WPA2-Enterprise | `wireless.md` | P7 |
 | SAM 直通 / 升级 | `sam-upgrade.md` | P8 |
 
