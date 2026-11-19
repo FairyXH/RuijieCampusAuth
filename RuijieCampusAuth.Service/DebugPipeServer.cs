@@ -31,8 +31,10 @@ public sealed class DebugPipeServer(ILogger<DebugPipeServer> logger) : Backgroun
                 break;
             }
             catch (Exception ex)
+                when (ex is IOException or ObjectDisposedException)
             {
-                logger.LogWarning(ex, "debug pipe loop error");
+                // GUI 断开（退出/崩溃/闪断）导致的管道损坏：静默收线。
+                logger.LogDebug(ex, "debug pipe client disconnected");
                 try
                 {
                     await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
