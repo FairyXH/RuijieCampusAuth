@@ -78,7 +78,7 @@ if ($Deploy) {
     }
     New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
 
-    Get-Service HXXY-CampusAuth -ErrorAction SilentlyContinue |
+    Get-Service RuijieCampusAuth, HXXY-CampusAuth -ErrorAction SilentlyContinue |
         Stop-Service -Force -ErrorAction SilentlyContinue
     Get-Process RuijieCampusAuth, RuijieCampusAuth.Service -ErrorAction SilentlyContinue |
         Stop-Process -Force
@@ -99,25 +99,25 @@ if ($Deploy) {
     Write-Host "Deployed launcher: $vbsTarget"
 
     $ws = New-Object -ComObject WScript.Shell
-    $shortcutPath = Join-Path $DeployDir "HXXY-CampusAuth.lnk"
+    $shortcutPath = Join-Path $DeployDir "RuijieAuth.lnk"
     $shortcut = $ws.CreateShortcut($shortcutPath)
     $shortcut.TargetPath = $target
     $shortcut.Arguments = "--tray --auto"
     $shortcut.WorkingDirectory = $DeployDir
     $shortcut.IconLocation = "$target,0"
-    $shortcut.Description = "HXXY Ruijie Campus Auth"
+    $shortcut.Description = "Ruijie Campus Auth Client"
     $shortcut.Save()
     Write-Host "Shortcut: $shortcutPath"
 
     $desktop = [Environment]::GetFolderPath("Desktop")
     if ($desktop) {
-        $desktopShortcut = Join-Path $desktop "HXXY-CampusAuth.lnk"
+        $desktopShortcut = Join-Path $desktop "RuijieAuth.lnk"
         $shortcut = $ws.CreateShortcut($desktopShortcut)
         $shortcut.TargetPath = $target
         $shortcut.Arguments = "--tray --auto"
         $shortcut.WorkingDirectory = $DeployDir
         $shortcut.IconLocation = "$target,0"
-        $shortcut.Description = "HXXY Ruijie Campus Auth"
+        $shortcut.Description = "Ruijie Campus Auth Client"
         $shortcut.Save()
         Write-Host "Desktop shortcut: $desktopShortcut"
     }

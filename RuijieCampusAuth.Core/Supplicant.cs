@@ -62,7 +62,7 @@ public sealed class Supplicant : IDisposable
         _lockedServer = PrivateTail.NormalizeMac(lockedServer) is { Length: > 0 } locked
             ? locked
             : null;
-        var service = string.IsNullOrWhiteSpace(serviceName) ? "电信宽带服务" : serviceName.Trim();
+        var service = string.IsNullOrWhiteSpace(serviceName) ? "" : serviceName.Trim();
         _serviceName = Encoding.GetEncoding("GB18030").GetBytes(service);
         _log = log;
         _error = error;

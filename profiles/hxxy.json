@@ -1,0 +1,19 @@
+{
+  "name": "厦门华厦学院",
+  "school_code": "HPVTC",
+  "auth_mode": "EAPMD5",
+  "service_name": "电信宽带服务",
+  "static_id": "Static:AB45A862",
+  "self_service_url": "http://netss.hxxy.edu.cn/selfservice/",
+  "update_url": "http://update.rghall.com.cn/das/update",
+  "portal_url": "",
+  "sam_host": "",
+  "sam_port": 0,
+  "dhcp_mode": "before",
+  "dhcp_timeout": 30,
+  "dhcp_option82": false,
+  "ad_domain": "",
+  "ad_timeout": 120,
+  "engine_version": "5.0.2014.108",
+  "notes": "锐捷认证客户端 6.40 分支 / 8021x 引擎 5.0.2014.108。服务名与静态 ID 取自实网观测。"
+}

@@ -21,7 +21,7 @@ sealed class Program
                 return;
             }
         }
-        using var mutex = new Mutex(true, "HXXY-CampusAuth-GUI", out var createdNew);
+        using var mutex = new Mutex(true, "RuijieCampusAuth-GUI", out var createdNew);
         if (!createdNew)
         {
             return;

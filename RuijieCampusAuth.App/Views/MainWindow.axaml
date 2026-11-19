@@ -7,7 +7,7 @@
         x:DataType="vm:MainViewModel"
         Width="920" Height="640"
         MinWidth="760" MinHeight="520"
-        Title="HXXY 校园网认证"
+        Title="锐捷认证器"
         WindowStartupLocation="CenterScreen">
   <Design.DataContext>
     <vm:MainViewModel />
@@ -17,7 +17,7 @@
     <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
       <StackPanel Spacing="2">
         <TextBlock Text="校园网认证" FontSize="24" FontWeight="Bold" />
-        <TextBlock Text="HXXY · 锐捷 EAP-MD5 · .NET 10 / Avalonia" Opacity="0.6" />
+        <TextBlock Text="锐捷校园网开放认证器 · EAP-MD5 · .NET 10 / Avalonia" Opacity="0.6" />
       </StackPanel>
       <StackPanel Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center">
         <TextBlock Text="{Binding Status}" FontSize="14" FontWeight="SemiBold" />
@@ -195,7 +195,7 @@
                       IsChecked="{Binding DhcpOption82}" Margin="0,10,0,0" />
             <TextBlock Grid.Row="21" Grid.Column="0" Text="学校代码" VerticalAlignment="Center" Margin="0,8,0,0" />
             <TextBox Grid.Row="21" Grid.Column="1" Text="{Binding SchoolCode}" Margin="0,8,0,0"
-                     PlaceholderText="可选，例如 HPVTC" />
+                     PlaceholderText="可选，例如 EXAM" />
             <Button Grid.Row="22" Grid.Column="1" Content="保存配置" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
           </Grid>
         </ScrollViewer>
@@ -258,6 +258,10 @@
       </TabItem>
     </TabControl>
 
-    <TextBlock Grid.Row="2" Text="数据目录：服务配置与日志位于程序目录；GUI 配置位于用户配置目录。" Opacity="0.5" FontSize="11" />
+    <StackPanel Grid.Row="2" Spacing="2">
+      <TextBlock Text="{Binding ProfileNameLabel}" Opacity="0.5" FontSize="11" />
+      <TextBlock Text="数据目录：服务配置与日志位于程序目录；GUI 配置位于用户配置目录。"
+                 Opacity="0.5" FontSize="11" />
+    </StackPanel>
   </Grid>
 </Window>

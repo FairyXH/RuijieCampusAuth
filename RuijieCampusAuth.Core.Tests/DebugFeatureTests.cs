@@ -8,7 +8,7 @@ public sealed class DebugFeatureTests : IDisposable
 {
     private readonly string _root = Path.Combine(
         Path.GetTempPath(),
-        "hxxy-debug-" + Guid.NewGuid().ToString("N"));
+        "ruijie-debug-" + Guid.NewGuid().ToString("N"));
 
     public DebugFeatureTests()
     {

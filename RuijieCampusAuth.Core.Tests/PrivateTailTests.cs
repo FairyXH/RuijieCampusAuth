@@ -21,7 +21,7 @@ public class PrivateTailTests
         {
             Nonce = Enumerable.Repeat((byte)'A', 32).ToArray(),
             Fingerprint = Enumerable.Repeat((byte)'B', 128).ToArray(),
-            ServiceName = PrivateTail.DefaultServiceName,
+            ServiceName = Encoding.GetEncoding("GB18030").GetBytes("电信宽带服务"),
         };
         var tail = PrivateTail.BuildTail(
             Encoding.ASCII.GetBytes("user"),

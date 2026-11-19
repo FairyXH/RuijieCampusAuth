@@ -26,8 +26,8 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _username = "";
     [ObservableProperty] private string _password = "";
     [ObservableProperty] private string _note = "";
-    [ObservableProperty] private string _serviceName = "电信宽带服务";
-    [ObservableProperty] private string _staticId = "Static:AB45A862";
+    [ObservableProperty] private string _serviceName = "";
+    [ObservableProperty] private string _staticId = "";
     [ObservableProperty] private double _timeout = 20;
     [ObservableProperty] private int _retries = 3;
     [ObservableProperty] private int _repeats = 3;
@@ -51,6 +51,7 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private int _guardianFailures = 2;
     [ObservableProperty] private PcapDeviceInfo? _selectedInterface;
     [ObservableProperty] private string _status = "就绪";
+    [ObservableProperty] private string _profileNameLabel = "配置档案: 未导入";
     [ObservableProperty] private string _serviceStatus = "未检测";
     [ObservableProperty] private string _discoveryStatus = "自动探测";
     [ObservableProperty] private string _logText = "";
@@ -154,6 +155,9 @@ public partial class MainViewModel : ViewModelBase
         DhcpTimeout = settings.DhcpTimeout;
         DhcpOption82 = settings.DhcpOption82;
         SchoolCode = settings.SchoolCode;
+        ProfileNameLabel = string.IsNullOrWhiteSpace(settings.ProfileName)
+            ? "配置档案: 未导入"
+            : $"配置档案: {settings.ProfileName}";
         ServerLock = settings.ServerLock;
         LockedServer = settings.LockedServer;
         Preempt = settings.Preempt;
@@ -673,7 +677,7 @@ public partial class MainViewModel : ViewModelBase
             else
             {
                 AppendLog(
-                    "systemd unit 已写入；请执行 systemctl daemon-reload && systemctl enable --now hxxy-campus-auth.service");
+                    "systemd unit 已写入；请执行 systemctl daemon-reload && systemctl enable --now ruijie-campus-auth.service");
             }
             RefreshService();
         }
@@ -737,8 +741,8 @@ public partial class MainViewModel : ViewModelBase
         var settings = _store.LoadSettings();
         settings.ActiveAccountId = SelectedAccount?.Id;
         settings.Interface = SelectedInterface?.Name ?? "";
-        settings.ServiceName = string.IsNullOrWhiteSpace(ServiceName) ? "电信宽带服务" : ServiceName.Trim();
-        settings.StaticId = string.IsNullOrWhiteSpace(StaticId) ? "Static:AB45A862" : StaticId.Trim();
+        settings.ServiceName = ServiceName.Trim();
+        settings.StaticId = StaticId.Trim();
         settings.Timeout = Timeout;
         settings.Retries = Retries;
         settings.Repeats = Repeats;

@@ -136,6 +136,66 @@ if (command == "debug")
             return 2;
     }
 }
+if (command == "profile")
+{
+    var action = Subcommand(args, "profile") ?? "list";
+    var root = options.GetValueOrDefault("--root") ?? ServiceConfig.ServiceRoot;
+    var store = new UserStore(root);
+    switch (action)
+    {
+        case "list":
+        {
+            var directory = options.GetValueOrDefault("--dir")
+                ?? Path.Combine(Environment.CurrentDirectory, "profiles");
+            var profiles = ProfileStore.ListProfiles(directory);
+            if (profiles.Count == 0)
+            {
+                Console.WriteLine($"没有可用档案: {directory}");
+                return 1;
+            }
+            foreach (var path in profiles)
+            {
+                Console.WriteLine(path);
+            }
+            return 0;
+        }
+        case "show":
+        {
+            var path = Subcommand(args, "show") ?? options.GetValueOrDefault("--path");
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                Console.Error.WriteLine("用法: profile show <profile.json>");
+                return 2;
+            }
+            var profile = ProfileStore.Load(path);
+            Console.WriteLine(JsonSerializer.Serialize(profile, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            }));
+            return 0;
+        }
+        case "import":
+        {
+            var path = Subcommand(args, "import") ?? options.GetValueOrDefault("--path");
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                Console.Error.WriteLine("用法: profile import <profile.json> [--root <install-dir>]");
+                return 2;
+            }
+            var profile = ProfileStore.Load(path);
+            var result = ProfileStore.Import(profile, store, path);
+            Console.WriteLine($"profile: {result.ProfileName}");
+            Console.WriteLine($"settings: {result.SettingsPath}");
+            Console.WriteLine($"backup: {result.BackupPath ?? "(none)"}");
+            Console.WriteLine($"applied: {string.Join(", ", result.Applied)}");
+            return 0;
+        }
+        default:
+            Console.Error.WriteLine("用法: profile list|show|import");
+            return 2;
+    }
+}
 if (command == "service")
 {
     var action = Subcommand(args, "service") ?? "status";
@@ -156,7 +216,7 @@ if (command == "service")
             else
             {
                 Console.WriteLine(
-                    "systemd unit 已写入；请执行: systemctl daemon-reload && systemctl enable --now hxxy-campus-auth.service");
+                    "systemd unit 已写入；请执行: systemctl daemon-reload && systemctl enable --now ruijie-campus-auth.service");
             }
             PrintStatus();
             return 0;
@@ -331,8 +391,8 @@ static ServiceSettings BuildSettings(Dictionary<string, string> options)
     return new ServiceSettings
     {
         Interface = options.GetValueOrDefault("--interface", ""),
-        ServiceName = options.GetValueOrDefault("--service-name", "电信宽带服务"),
-        StaticId = options.GetValueOrDefault("--static-id", "Static:AB45A862"),
+        ServiceName = options.GetValueOrDefault("--service-name", ""),
+        StaticId = options.GetValueOrDefault("--static-id", ""),
         Timeout = options.TryGetValue("--timeout", out var timeout) ? double.Parse(timeout) : 20,
         Retries = options.TryGetValue("--retries", out var retries) ? int.Parse(retries) : 4,
         Repeats = options.TryGetValue("--repeats", out var repeats) ? int.Parse(repeats) : 3,
@@ -411,16 +471,8 @@ internal static class ConfigStore
         }
         var serviceName = serviceNameOverride
             ?? (settingsRoot is null ? "" : GetString(settings, "service_name"));
-        if (string.IsNullOrWhiteSpace(serviceName))
-        {
-            serviceName = "电信宽带服务";
-        }
         var staticId = staticIdOverride
             ?? (settingsRoot is null ? "" : GetString(settings, "static_id"));
-        if (string.IsNullOrWhiteSpace(staticId))
-        {
-            staticId = "Static:AB45A862";
-        }
         var locked = lockedServerOverride;
         if (locked is null && GetBool(settings, "server_lock"))
         {

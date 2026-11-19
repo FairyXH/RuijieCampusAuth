@@ -28,7 +28,7 @@ public sealed record TailOptions
     public int HeaderFlag { get; init; } = 1;
     public byte[] Nonce { get; init; } = PrivateTail.RandomHex(16);
     public byte[] Fingerprint { get; init; } = PrivateTail.RandomHex(64);
-    public byte[] ServiceName { get; init; } = PrivateTail.DefaultServiceName;
+    public byte[] ServiceName { get; init; } = [];
 }
 
 public static class PrivateTail
@@ -37,8 +37,8 @@ public static class PrivateTail
     public static readonly byte[] ClientName = Encoding.ASCII.GetBytes("8021x.exe");
     public static readonly byte[] ClientVersion = [0x06, 0x56, 0x00, 0x00];
     public static readonly byte[] ClientFlag = [0x01];
-    public static readonly byte[] DefaultStaticId = Encoding.ASCII.GetBytes("Static:AB45A862");
-    public static readonly byte[] DefaultServiceName = CreateServiceName();
+    public static readonly byte[] DefaultStaticId = [];
+    public static readonly byte[] DefaultServiceName = [];
     public const byte AttrTag = 0x1A;
     private static readonly byte[] ZeroIp = [0, 0, 0, 0];
     private static readonly Regex MacPattern = new(
@@ -48,12 +48,6 @@ public static class PrivateTail
     static PrivateTail()
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
-
-    private static byte[] CreateServiceName()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-        return Encoding.GetEncoding("GB18030").GetBytes("电信宽带服务");
     }
 
     public static string NormalizeMac(string? value)

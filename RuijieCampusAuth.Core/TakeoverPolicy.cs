@@ -26,7 +26,8 @@ public static class TakeoverPolicy
 {
     private const string IfeoPath =
         @"SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options";
-    private const string MarkerName = "HXXYTakeover";
+    private const string MarkerName = "RuijieTakeover";
+    private const string LegacyMarkerName = "HXXYTakeover";
     private const string DebuggerValue = @"C:\Windows\System32\cmd.exe /c exit";
     private const string OfficialDirectory =
         @"C:\Program Files\Ruijie Networks\Ruijie Supplicant";
@@ -132,13 +133,16 @@ public static class TakeoverPolicy
                 return;
             }
             var marker = key.GetValue(MarkerName) as string;
+            var legacyMarker = key.GetValue(LegacyMarkerName) as string;
             var debugger = key.GetValue("Debugger") as string;
             if (!string.Equals(marker, "RuijieCampusAuth", StringComparison.Ordinal) &&
+                !string.Equals(legacyMarker, "RuijieCampusAuth", StringComparison.Ordinal) &&
                 !string.Equals(debugger, DebuggerValue, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }
             key.DeleteValue(MarkerName, throwOnMissingValue: false);
+            key.DeleteValue(LegacyMarkerName, throwOnMissingValue: false);
             if (string.IsNullOrEmpty(originalDebugger))
             {
                 key.DeleteValue("Debugger", throwOnMissingValue: false);

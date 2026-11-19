@@ -6,7 +6,7 @@ namespace RuijieCampusAuth.Core.Debug;
 
 public static class DebugPipeProtocol
 {
-    public const string PipeName = "HXXY-CampusAuth-Debug";
+    public const string PipeName = "RuijieCampusAuth-Debug";
 
     public static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {

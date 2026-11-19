@@ -2,11 +2,16 @@
 
 ## Project
 
-`ruijie-campus-auth-hxxy` is a cross-platform 802.1X supplicant for the Ruijie
-campus network at Xiamen Huaxia University (HXXY). It authenticates with the
-normal campus username/password using EAP-MD5 and reproduces the Ruijie vendor
-private tail used by the official Windows client. It is a compatibility client,
-not an authentication bypass.
+`ruijie-campus-auth-hxxy` (directory name kept for history) is a cross-platform
+802.1X supplicant for Ruijie campus networks. It authenticates with the normal
+campus username/password using EAP-MD5 and reproduces the Ruijie vendor private
+tail used by the official Windows client. It is a compatibility client, not an
+authentication bypass.
+
+School-specific values are not built into the binaries. They live in
+`profiles/*.json` and are applied with `profile import`; see
+`docs/GENERICIZATION.md` and `profiles/README.md`. The generic product name is
+“锐捷认证器 / 锐捷校园网开放认证器”.
 
 Two implementations are maintained:
 
@@ -18,6 +23,23 @@ Two implementations are maintained:
 
 Older sections below that mention `src/ruijie_auth/...` and `tests/...` refer
 to the Python tree under `python/`.
+
+## 2026-11-19 Debug Framework / Genericization
+
+- Branch `feat/debug-protocols`; P0/P1 committed as `a8e8b91`.
+- Core: `DebugSettings`, `IDebugFeature`, `DebugFeatureRegistry`, audit log with
+  redaction, pipe client/gateway, `system-info` feature, planned-feature catalog.
+- Service: `DebugPipeServer` named pipe (`RuijieCampusAuth-Debug`) with local ACL;
+  all requests re-read settings and enforce the master + per-feature switches.
+- GUI: `调试` tab with feature list, enable switches, JSON arguments, run/stop,
+  result panel, debug log shortcut. Existing tabs untouched.
+- CLI: `debug list|status|run|stop|enable|disable|settings` and
+  `profile list|show|import [--root]`.
+- Genericization: school defaults removed from C#; `profiles/hxxy.json` imported
+  into the deployed install; service/marker/pipe/mutex names generic with
+  one-way legacy migration. See `docs/GENERICIZATION.md`.
+- Tests: Core 12 passed; Service pipe integration 1 passed.
+- Next: P2 server private-property TLV/RC4 parser.
 
 ## Verified State
 

@@ -102,7 +102,7 @@ public partial class App : Application
         var tray = new TrayIcon
         {
             Icon = icon,
-            ToolTipText = "HXXY 校园网认证",
+            ToolTipText = "锐捷认证器",
             Menu = menu,
             IsVisible = true,
         };

@@ -1,6 +1,7 @@
-# HXXY Ruijie Campus Auth
+# 锐捷校园网开放认证器
 
-厦门华厦学院锐捷校园网认证工具，包含两套完整实现：
+通用的锐捷校园网第三方认证客户端，包含两套完整实现。学校差异通过 `profiles/`
+配置档案导入，程序本身不内置任何学校配置。
 
 | 目录 | 版本 | 形态 |
 | --- | --- | --- |
@@ -8,7 +9,7 @@
 | `python/` | Python 3.10+ | CLI + Python API + PySide6 GUI + 单文件 exe |
 
 两套版本使用相同的 EAP-MD5 + 569 字节锐捷私有尾协议。C# Core 的私有尾已与
-Python 版逐字节比对（569 字节，SHA256 一致），并在 HXXY 实网认证成功。
+Python 版逐字节比对（569 字节，SHA256 一致），并已完成实网认证验证。
 
 ## C# 版本
 
@@ -75,14 +76,14 @@ RuijieCampusAuth.Cli.exe service uninstall
 
 ### 系统服务
 
-- **Windows**：服务名 `HXXY-CampusAuth`，`LocalSystem`，自动启动，登录前运行。
+- **Windows**：服务名 `RuijieCampusAuth`，`LocalSystem`，自动启动，登录前运行。
   服务配置、GUI 账号、设置、发现缓存和服务器列表全部在程序目录直读：
   `service.json`、`accounts.json`、`settings.json`、`discovery.json`、
   `servers.json`。服务优先使用 `settings.json` + `accounts.json` 的账号池，
   当前账号失败后自动尝试其他已启用账号；`service.json` 作为回退并把密码用
   LocalMachine DPAPI 加密。
 - **Linux**：`service install` 写入
-  `/etc/systemd/system/hxxy-campus-auth.service`，`Type=notify`，由
+  `/etc/systemd/system/ruijie-campus-auth.service`，`Type=notify`，由
   `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。
 - **macOS**：尚未实现 launchd 包装，CLI/服务 Core 可运行，GUI 使用 Avalonia。
 
@@ -101,19 +102,19 @@ RuijieCampusAuth.Cli.exe service uninstall
 
 ### 冰点还原与更新
 
-- 当前已完成一次“C: 冻结 + 重启”验收：VBS 哈希、`RunHXXYNet`、服务
+- 当前已完成一次“C: 冻结 + 重启”验收：VBS 哈希、`RuijieCampusAuth` 计划任务、服务
   `depend=npcap`/恢复策略、7 个 IFEO 标记、`RJSuService` 状态和 D: 配置均保留；
   服务/GUI 自动启动并认证成功。
 - C: 冻结、D: 可写时，程序更新只需替换
   `D:\Storageredirect\Program\RuijieCampusAuth` 下的文件；先停服务和 GUI，
   再启动即可，不需要解冻。
-- `C:\Program Files\restart_ruijie.vbs`、计划任务 `RunHXXYNet`、服务注册、
+- `C:\Program Files\restart_ruijie.vbs`、计划任务 `RuijieCampusAuth`、服务注册、
   .NET 10、Npcap 和快捷方式都在 C: 上；修改这些内容需要解冻，或在冻结前
   写入基线。
 - 冻结期间不要运行 `build-csharp.ps1 -Deploy`（它会改写 C: 上的 VBS 和
   快捷方式）；只复制 `publish` 目录到 D:。
 - 若长期开启接管，建议冻结前把 `RJSuService` 的基线启动类型设为 Disabled，
-  避免开机时它先于 `HXXY-CampusAuth` 启动。
+  避免开机时它先于 `RuijieCampusAuth` 启动。
 - 服务已配置 `depend= npcap` 和崩溃恢复（5s/10s/30s）；服务日志 10MB、
   GUI 日志 5MB、VBS `launcher.log` 1MB 自动轮转。
 - 冻结前建议做一次重启验收：在 D: 和 C: 各放一个标记文件，冻结重启后确认
@@ -126,7 +127,7 @@ RuijieCampusAuth.Cli.exe service uninstall
 
 - 扫描 `C:\Program Files\Ruijie Networks\Ruijie Supplicant` 下的 `.exe`，按
   **进程名**匹配（不写死路径）；
-- 对枚举到的进程名写入 64/32 位 IFEO `Debugger` + `HXXYTakeover` 标记，并持续
+- 对枚举到的进程名写入 64/32 位 IFEO `Debugger` + `RuijieTakeover` 标记（兼容旧版本标记），并持续
   结束同名进程；
 - 枚举 `ImagePath` 指向该目录、或显示名含 Ruijie/锐捷的服务，停止并临时设为
   disabled；

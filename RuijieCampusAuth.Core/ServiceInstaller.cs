@@ -7,9 +7,12 @@ public sealed record ServiceState(bool Installed, bool Running, string Detail);
 
 public static class ServiceInstaller
 {
-    public const string ServiceName = "HXXY-CampusAuth";
-    public const string DisplayName = "HXXY Campus Auth";
-    private const string LinuxUnitPath = "/etc/systemd/system/hxxy-campus-auth.service";
+    public const string ServiceName = "RuijieCampusAuth";
+    public const string DisplayName = "Ruijie Auth";
+    private const string LinuxUnitPath = "/etc/systemd/system/ruijie-campus-auth.service";
+    // Legacy identifiers kept only for one-way migration from earlier builds.
+    private const string LegacyServiceName = "HXXY-CampusAuth";
+    private const string LegacyLinuxUnitPath = "/etc/systemd/system/hxxy-campus-auth.service";
 
     private const uint ScManagerConnect = 0x0001;
     private const uint ScManagerAllAccess = 0xF003F;
@@ -100,13 +103,43 @@ public static class ServiceInstaller
         }
     }
 
+    private static void RemoveLegacyService(IntPtr scm)
+    {
+        var service = OpenService(
+            scm,
+            LegacyServiceName,
+            ServiceStop | ServiceQueryStatus | ServiceDelete);
+        if (service == IntPtr.Zero)
+        {
+            return;
+        }
+        try
+        {
+            var status = new ServiceStatus();
+            if (QueryServiceStatus(service, ref status) && status.CurrentState == 4)
+            {
+                ControlService(service, ServiceControlStop, ref status);
+            }
+            DeleteService(service);
+        }
+        catch
+        {
+            // Best effort migration; the new service can still be installed.
+        }
+        finally
+        {
+            CloseServiceHandle(service);
+        }
+    }
+
     public static ServiceState Query()
     {
         if (!OperatingSystem.IsWindows())
         {
             if (OperatingSystem.IsLinux())
             {
-                var installed = File.Exists(LinuxUnitPath);
+                var installed = File.Exists(LinuxUnitPath) ||
+                                File.Exists(LegacyLinuxUnitPath);
                 return new ServiceState(
                     installed,
                     false,
@@ -126,6 +159,15 @@ public static class ServiceInstaller
             if (service == IntPtr.Zero)
             {
                 var error = Marshal.GetLastWin32Error();
+                if (error == ErrorServiceDoesNotExist)
+                {
+                    var legacy = OpenService(scm, LegacyServiceName, ServiceQueryStatus);
+                    if (legacy != IntPtr.Zero)
+                    {
+                        CloseServiceHandle(legacy);
+                        return new ServiceState(true, false, "旧服务名，需重新安装");
+                    }
+                }
                 return new ServiceState(
                     error != ErrorServiceDoesNotExist,
                     false,
@@ -168,7 +210,7 @@ public static class ServiceInstaller
             var workingDirectory = AppContext.BaseDirectory.TrimEnd('/');
             var unit = $"""
                 [Unit]
-                Description=HXXY Campus Auth
+                Description=Ruijie Auth
                 After=network-online.target
                 Wants=network-online.target
 
@@ -183,6 +225,7 @@ public static class ServiceInstaller
                 [Install]
                 WantedBy=multi-user.target
                 """;
+            File.Delete(LegacyLinuxUnitPath);
             File.WriteAllText(LinuxUnitPath, unit);
             return;
         }
@@ -198,6 +241,7 @@ public static class ServiceInstaller
         }
         try
         {
+            RemoveLegacyService(scm);
             var service = CreateService(
                 scm,
                 ServiceName,
@@ -321,7 +365,7 @@ public static class ServiceInstaller
         if (!OperatingSystem.IsWindows())
         {
             throw new PlatformNotSupportedException(
-                "Linux 请使用 systemctl start hxxy-campus-auth.service");
+                "Linux 请使用 systemctl start ruijie-campus-auth.service");
         }
         var scm = OpenSCManager(null, null, ScManagerAllAccess);
         if (scm == IntPtr.Zero)
@@ -362,7 +406,7 @@ public static class ServiceInstaller
         if (!OperatingSystem.IsWindows())
         {
             throw new PlatformNotSupportedException(
-                "Linux 请使用 systemctl stop hxxy-campus-auth.service");
+                "Linux 请使用 systemctl stop ruijie-campus-auth.service");
         }
         var scm = OpenSCManager(null, null, ScManagerAllAccess);
         if (scm == IntPtr.Zero)

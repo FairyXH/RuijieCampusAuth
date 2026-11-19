@@ -11,7 +11,7 @@ if (OperatingSystem.IsWindows())
 {
     builder.Services.AddWindowsService(options =>
     {
-        options.ServiceName = "HXXY-CampusAuth";
+        options.ServiceName = "RuijieCampusAuth";
     });
 }
 else if (OperatingSystem.IsLinux() &&

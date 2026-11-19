@@ -8,8 +8,8 @@ namespace RuijieCampusAuth.Core;
 public sealed class ServiceSettings
 {
     public string Interface { get; init; } = "";
-    public string ServiceName { get; init; } = "电信宽带服务";
-    public string StaticId { get; init; } = "Static:AB45A862";
+    public string ServiceName { get; init; } = "";
+    public string StaticId { get; init; } = "";
     public double Timeout { get; init; } = 20;
     public int Retries { get; init; } = 4;
     public int Repeats { get; init; } = 3;
@@ -25,6 +25,16 @@ public sealed class ServiceSettings
     public double DhcpTimeout { get; init; } = 30;
     public bool DhcpOption82 { get; init; }
     public string SchoolCode { get; init; } = "";
+    public string ProfileName { get; init; } = "";
+    public string AuthMode { get; init; } = "EAPMD5";
+    public string SelfServiceUrl { get; init; } = "";
+    public string UpdateUrl { get; init; } = "";
+    public string PortalUrl { get; init; } = "";
+    public string SamHost { get; init; } = "";
+    public int SamPort { get; init; }
+    public string AdDomain { get; init; } = "";
+    public double AdTimeout { get; init; } = 120;
+    public string EngineVersion { get; init; } = "";
     public bool GuardianEnabled { get; init; }
     public string GuardianUrl { get; init; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; init; } = 5;
@@ -52,6 +62,16 @@ public sealed class ServiceSettings
             DhcpTimeout = settings.DhcpTimeout,
             DhcpOption82 = settings.DhcpOption82,
             SchoolCode = settings.SchoolCode,
+            ProfileName = settings.ProfileName,
+            AuthMode = settings.AuthMode,
+            SelfServiceUrl = settings.SelfServiceUrl,
+            UpdateUrl = settings.UpdateUrl,
+            PortalUrl = settings.PortalUrl,
+            SamHost = settings.SamHost,
+            SamPort = settings.SamPort,
+            AdDomain = settings.AdDomain,
+            AdTimeout = settings.AdTimeout,
+            EngineVersion = settings.EngineVersion,
             GuardianEnabled = settings.GuardianEnabled,
             GuardianUrl = settings.GuardianUrl,
             GuardianInterval = settings.GuardianInterval,
@@ -88,8 +108,8 @@ public sealed class ServiceConfig
         var settings = new ServiceSettings
         {
             Interface = GetString(settingsElement, "interface"),
-            ServiceName = GetStringOr(settingsElement, "service_name", "电信宽带服务"),
-            StaticId = GetStringOr(settingsElement, "static_id", "Static:AB45A862"),
+            ServiceName = GetStringOr(settingsElement, "service_name", ""),
+            StaticId = GetStringOr(settingsElement, "static_id", ""),
             Timeout = GetDouble(settingsElement, "timeout") ?? 20,
             Retries = (int)(GetDouble(settingsElement, "retries") ?? 4),
             Repeats = (int)(GetDouble(settingsElement, "repeats") ?? 3),
@@ -105,6 +125,16 @@ public sealed class ServiceConfig
             DhcpTimeout = GetDouble(settingsElement, "dhcp_timeout") ?? 30,
             DhcpOption82 = GetBool(settingsElement, "dhcp_option82") ?? false,
             SchoolCode = GetString(settingsElement, "school_code"),
+            ProfileName = GetString(settingsElement, "profile_name"),
+            AuthMode = GetStringOr(settingsElement, "auth_mode", "EAPMD5"),
+            SelfServiceUrl = GetString(settingsElement, "self_service_url"),
+            UpdateUrl = GetString(settingsElement, "update_url"),
+            PortalUrl = GetString(settingsElement, "portal_url"),
+            SamHost = GetString(settingsElement, "sam_host"),
+            SamPort = (int)(GetDouble(settingsElement, "sam_port") ?? 0),
+            AdDomain = GetString(settingsElement, "ad_domain"),
+            AdTimeout = GetDouble(settingsElement, "ad_timeout") ?? 120,
+            EngineVersion = GetString(settingsElement, "engine_version"),
             GuardianEnabled = GetBool(settingsElement, "guardian_enabled") ?? false,
             GuardianUrl = GetStringOr(settingsElement, "guardian_url", "http://127.0.0.1:18765/mcp"),
             GuardianInterval = GetDouble(settingsElement, "guardian_interval") ?? 5,
@@ -176,6 +206,16 @@ public sealed class ServiceConfig
                 dhcp_timeout = settings.DhcpTimeout,
                 dhcp_option82 = settings.DhcpOption82,
                 school_code = settings.SchoolCode,
+                profile_name = settings.ProfileName,
+                auth_mode = settings.AuthMode,
+                self_service_url = settings.SelfServiceUrl,
+                update_url = settings.UpdateUrl,
+                portal_url = settings.PortalUrl,
+                sam_host = settings.SamHost,
+                sam_port = settings.SamPort,
+                ad_domain = settings.AdDomain,
+                ad_timeout = settings.AdTimeout,
+                engine_version = settings.EngineVersion,
                 guardian_enabled = settings.GuardianEnabled,
                 guardian_url = settings.GuardianUrl,
                 guardian_interval = settings.GuardianInterval,

@@ -96,14 +96,25 @@ public sealed class UserSettings
     public string GuardianUrl { get; set; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; set; } = 5;
     public int GuardianFailures { get; set; } = 2;
-    public string ServiceName { get; set; } = "电信宽带服务";
-    public string StaticId { get; set; } = "Static:AB45A862";
+    public string ServiceName { get; set; } = "";
+    public string StaticId { get; set; } = "";
     public double StartTimeout { get; set; } = 3;
     public string DhcpMode { get; set; } = "before";
     public double DhcpTimeout { get; set; } = 30;
     public bool DhcpOption82 { get; set; }
     public string SchoolCode { get; set; } = "";
     public bool TakeoverEnabled { get; set; }
+    public string ProfileName { get; set; } = "";
+    public string ProfilePath { get; set; } = "";
+    public string AuthMode { get; set; } = "EAPMD5";
+    public string SelfServiceUrl { get; set; } = "";
+    public string UpdateUrl { get; set; } = "";
+    public string PortalUrl { get; set; } = "";
+    public string SamHost { get; set; } = "";
+    public int SamPort { get; set; }
+    public string AdDomain { get; set; } = "";
+    public double AdTimeout { get; set; } = 120;
+    public string EngineVersion { get; set; } = "";
     public DebugSettings Debug { get; set; } = new();
 }
 
