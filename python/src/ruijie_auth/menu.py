@@ -183,21 +183,6 @@ class MenuApp:
                 continue
             account = accounts[int(index) - 1]
             if choice == "2":
-                username = _prompt("用户名")
-                password = getpass.getpass("密码: ")
-                note = _prompt("备注")
-                if not username:
-                    print("用户名不能为空")
-                    continue
-                if any(a.username == username for a in accounts):
-                    print(f"账号已存在: {username}")
-                    continue
-                accounts.append(Account(username=username, password=password, note=note))
-                self.store.save_accounts(accounts)
-                self.settings.active_account_id = accounts[-1].id
-                self.store.save_settings(self.settings)
-                print("账号已添加")
-            elif choice == "2":
                 account.username = _prompt("用户名", account.username)
                 account.password = getpass.getpass(
                     f"密码 [{'保持' if account.password else '无'}]: ") or account.password
@@ -465,6 +450,7 @@ class MenuApp:
             choice = input("选择: ").strip()
             from .system_service import (
                 install_service,
+                service_host_path,
                 start_service,
                 stop_service,
                 uninstall_service,
@@ -476,7 +462,7 @@ class MenuApp:
                         print("请先添加账号")
                         continue
                     write_service_config(account, self.settings)
-                    install_service("python_service_entry")
+                    install_service(str(service_host_path()))
                     start_service()
                     print("服务已安装并启动")
                 elif choice == "2":

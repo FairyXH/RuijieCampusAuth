@@ -75,3 +75,15 @@ def test_invalid_choice_is_ignored(monkeypatch):
     app = _make_app()
     _feed(monkeypatch, ["x", "99", "", "0"])
     app.run()
+
+def test_update_selected_account(monkeypatch):
+    app = _make_app()
+    _feed(monkeypatch, ["1", "user1", "pw", "old note", "0"])
+    app.menu_accounts()
+    _feed(monkeypatch, ["2", "1", "user2", "", "new note", "0"])
+    app.menu_accounts()
+    assert len(app.store.accounts) == 1
+    account = app.store.accounts[0]
+    assert account.username == "user2"
+    assert account.password == "pw"
+    assert account.note == "new note"

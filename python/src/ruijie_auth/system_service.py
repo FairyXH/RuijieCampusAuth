@@ -113,6 +113,33 @@ def service_executable_path() -> Path:
     return service_root() / "RuijieService.exe"
 
 
+def service_host_path() -> Path:
+    """Locate the executable the SCM should start.
+
+    The service needs a real host process: the frozen onedir build
+    (dist/RuijieService/RuijieService.exe) or, when already frozen, the
+    running executable. A plain ``python.exe`` cannot be registered as a
+    service because CreateService takes a single image path.
+    """
+    if getattr(sys, "frozen", False):
+        return Path(sys.executable).resolve()
+    candidates = [
+        Path(__file__).resolve().parents[2]
+        / "dist"
+        / "RuijieService"
+        / "RuijieService.exe",
+        install_dir() / "RuijieService.exe",
+        service_executable_path(),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise RuntimeError(
+        "未找到 RuijieService.exe：请先运行 python/build.ps1 构建服务宿主，"
+        "或改用 C# 版的 service install"
+    )
+
+
 def _decode(raw: bytes) -> str:
     for encoding in ("utf-8-sig", "mbcs"):
         try:

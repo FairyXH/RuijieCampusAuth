@@ -28,8 +28,8 @@ if ($Clean) {
 }
 
 if (-not $SkipInstall) {
-    Write-Host "Installing GUI/build dependencies..."
-    $code = Invoke-Native "python" @("-m", "pip", "install", "-e", ".[gui,build]") `
+    Write-Host "Installing service build dependencies..."
+    $code = Invoke-Native "python" @("-m", "pip", "install", "-e", ".[build]") `
         "logs\build-install.out.log" "logs\build-install.err.log"
     if ($code -ne 0) {
         Get-Content "logs\build-install.out.log" -Tail 80
@@ -47,27 +47,7 @@ if (-not (Test-Path "packaging\icon.ico")) {
     }
 }
 
-Write-Host "Building single-file exe..."
-$code = Invoke-Native "python" `
-    @("-m", "PyInstaller", "--noconfirm", "--clean", "packaging\RuijieCampusAuth.spec") `
-    "logs\build.out.log" "logs\build.err.log"
-if ($code -ne 0) {
-    Get-Content "logs\build.out.log" -Tail 100
-    Get-Content "logs\build.err.log" -Tail 100
-    exit $code
-}
-
-$exe = Join-Path $PSScriptRoot "dist\RuijieCampusAuth.exe"
-if (-not (Test-Path $exe)) {
-    Get-Content "logs\build.out.log" -Tail 80
-    Get-Content "logs\build.err.log" -Tail 80
-    throw "exe not found: $exe"
-}
-
-$size = (Get-Item $exe).Length / 1MB
-Write-Host ("Built: {0} ({1:N1} MB)" -f $exe, $size)
-
-Write-Host "Building service (onedir)..."
+Write-Host "Building service host (onedir)..."
 $code = Invoke-Native "python" `
     @("-m", "PyInstaller", "--noconfirm", "--clean", "packaging\RuijieService.spec") `
     "logs\build-service.out.log" "logs\build-service.err.log"
@@ -76,14 +56,17 @@ if ($code -ne 0) {
     Get-Content "logs\build-service.err.log" -Tail 100
     exit $code
 }
-$serviceExe = Join-Path $PSScriptRoot "dist\RuijieService\RuijieService.exe"
+
+$serviceDir = Join-Path $PSScriptRoot "dist\RuijieService"
+$serviceExe = Join-Path $serviceDir "RuijieService.exe"
 if (-not (Test-Path $serviceExe)) {
     Get-Content "logs\build-service.out.log" -Tail 80
     Get-Content "logs\build-service.err.log" -Tail 80
     throw "service exe not found: $serviceExe"
 }
+
 $serviceSize = (
-    Get-ChildItem (Join-Path $PSScriptRoot "dist\RuijieService") -Recurse -File |
+    Get-ChildItem $serviceDir -Recurse -File |
         Measure-Object -Property Length -Sum
 ).Sum / 1MB
 Write-Host ("Built service: {0} ({1:N1} MB)" -f $serviceExe, $serviceSize)
@@ -96,62 +79,13 @@ if ($Deploy) {
         throw "Deploy requires an elevated PowerShell session"
     }
     New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
-    $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
-    $running = Get-Process RuijieCampusAuth -ErrorAction SilentlyContinue
-    if ($running) {
-        Write-Host "Stopping running RuijieCampusAuth..."
-        $running | Stop-Process -Force
-        Start-Sleep -Seconds 2
-        if (Test-Path $target) {
-            & $target --restore-client | Out-Null
-        }
-    }
     $service = Get-Service -Name "HXXY-CampusAuth" -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne "Stopped") {
         Write-Host "Stopping system service..."
         Stop-Service -Name "HXXY-CampusAuth" -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
     }
-    Copy-Item $exe $target -Force
-    Write-Host "Deployed exe: $target"
-
-    $serviceSrc = Join-Path $PSScriptRoot "dist\RuijieService"
-    Copy-Item (Join-Path $serviceSrc "*") $DeployDir -Recurse -Force
-    Write-Host "Deployed service: $DeployDir\RuijieService.exe"
-
-    $vbsSource = Join-Path $PSScriptRoot "packaging\restart_ruijie.vbs"
-    $vbsTarget = "C:\Program Files\restart_ruijie.vbs"
-    if (Test-Path $vbsTarget) {
-        $backup = "$vbsTarget.bak-" + (Get-Date -Format "yyyyMMdd-HHmmss")
-        Copy-Item $vbsTarget $backup -Force
-        Write-Host "Backed up launcher: $backup"
-    }
-    Copy-Item $vbsSource $vbsTarget -Force
-    Write-Host "Deployed launcher: $vbsTarget"
-
-    $ws = New-Object -ComObject WScript.Shell
-    $shortcutPath = Join-Path $DeployDir "HXXY-CampusAuth.lnk"
-    $shortcut = $ws.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $target
-    $shortcut.WorkingDirectory = $DeployDir
-    $shortcut.IconLocation = "$target,0"
-    $shortcut.Description = "HXXY Ruijie Campus Auth"
-    $shortcut.Save()
-    Write-Host "Shortcut: $shortcutPath"
-
-    $desktop = [Environment]::GetFolderPath("Desktop")
-    if ($desktop) {
-        $desktopShortcut = Join-Path $desktop "HXXY-CampusAuth.lnk"
-        $shortcut = $ws.CreateShortcut($desktopShortcut)
-        $shortcut.TargetPath = $target
-        $shortcut.WorkingDirectory = $DeployDir
-        $shortcut.IconLocation = "$target,0"
-        $shortcut.Description = "HXXY Ruijie Campus Auth"
-        $shortcut.Save()
-        Write-Host "Desktop shortcut: $desktopShortcut"
-    }
+    Copy-Item (Join-Path $serviceDir "*") $DeployDir -Recurse -Force
+    Write-Host "Deployed service host: $DeployDir\RuijieService.exe"
+    Write-Host "Next: run 'ruijie-auth' -> 7) 系统服务 -> 1) 安装并启动"
 }
-
-Write-Host "Requires Npcap; the exe requests administrator rights."
-Write-Host "Run with: `"$target`" --tray --auto"
-exit 0
