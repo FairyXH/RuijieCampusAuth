@@ -2,6 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:RuijieCampusAuth.App.ViewModels"
         xmlns:core="using:RuijieCampusAuth.Core"
+        xmlns:dbg="using:RuijieCampusAuth.Core.Debug"
         x:Class="RuijieCampusAuth.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Width="920" Height="640"
@@ -198,6 +199,62 @@
             <Button Grid.Row="22" Grid.Column="1" Content="保存配置" Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,16,0,0" />
           </Grid>
         </ScrollViewer>
+      </TabItem>
+
+      <TabItem Header="调试">
+        <Grid Margin="14" DataContext="{Binding Debug}" x:DataType="vm:DebugViewModel"
+              RowDefinitions="Auto,*" ColumnDefinitions="300,*">
+          <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="8"
+                      Margin="0,0,0,8">
+            <CheckBox Content="启用调试功能（实验）" IsChecked="{Binding Enabled}" />
+            <Button Content="保存开关" Command="{Binding SaveCommand}" />
+            <Button Content="刷新" Command="{Binding RefreshCommand}" />
+            <TextBlock Text="{Binding Status}" VerticalAlignment="Center" Opacity="0.65" />
+          </StackPanel>
+
+          <ListBox Grid.Row="1" Grid.Column="0" Margin="0,0,12,0"
+                   ItemsSource="{Binding Features}" SelectedItem="{Binding SelectedFeature}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="dbg:DebugFeatureDescriptor">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" />
+                  <StackPanel Orientation="Horizontal" Spacing="4">
+                    <TextBlock Text="{Binding Phase}" FontSize="11" Opacity="0.6" />
+                    <TextBlock Text="·" FontSize="11" Opacity="0.6" />
+                    <TextBlock Text="{Binding State}" FontSize="11" Opacity="0.6" />
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+
+          <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,Auto,Auto,*">
+            <StackPanel Grid.Row="0" Spacing="4">
+              <TextBlock Text="{Binding SelectedTitle}" FontSize="18" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding SelectedDescription}" TextWrapping="Wrap" Opacity="0.75" />
+              <TextBlock Text="{Binding SelectedMeta}" FontSize="11" Opacity="0.55" />
+              <CheckBox Content="启用该功能（保存后生效）" IsChecked="{Binding FeatureEnabled}"
+                        Margin="0,6,0,0" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,10,0,0" Spacing="4">
+              <TextBlock Text="参数 JSON" FontSize="12" Opacity="0.65" />
+              <TextBox Text="{Binding ArgumentsJson}" AcceptsReturn="True" Height="90"
+                       FontFamily="Cascadia Mono,Consolas,monospace" />
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+              <Button Content="执行" Command="{Binding RunCommand}" />
+              <Button Content="停止" Command="{Binding StopCommand}" />
+              <Button Content="打开调试日志" Command="{Binding OpenLogCommand}" />
+            </StackPanel>
+
+            <TextBox Grid.Row="3" Margin="0,10,0,0" Text="{Binding ResultText}" IsReadOnly="True"
+                     AcceptsReturn="True" TextWrapping="Wrap"
+                     FontFamily="Cascadia Mono,Consolas,monospace"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto" />
+          </Grid>
+        </Grid>
       </TabItem>
     </TabControl>
 

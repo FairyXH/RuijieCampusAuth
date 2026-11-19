@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using RuijieCampusAuth.Core;
+using RuijieCampusAuth.Core.Debug;
 
 Console.OutputEncoding = Encoding.UTF8;
 UserStore.MigrateLegacy(ServiceConfig.ServiceRoot);
@@ -23,6 +24,117 @@ if (command == "status")
 {
     PrintStatus();
     return 0;
+}
+if (command == "debug")
+{
+    var action = Subcommand(args, "debug") ?? "list";
+    var store = new UserStore(ServiceConfig.ServiceRoot);
+    var gateway = new DebugGateway(store);
+    switch (action)
+    {
+        case "list":
+        {
+            var result = await gateway.ListAsync();
+            foreach (var item in result.Features)
+            {
+                Console.WriteLine(
+                    $"{item.Name,-22} {item.Phase,-3} {(item.Enabled ? "on " : "off")} " +
+                    $"{item.State,-12} {item.DisplayName}");
+            }
+            Console.WriteLine($"source: {result.Source}");
+            return 0;
+        }
+        case "status":
+        {
+            var name = Subcommand(args, "status") ?? "system-info";
+            var result = await gateway.ListAsync();
+            var item = result.Features.FirstOrDefault(
+                feature => feature.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+            if (item is null)
+            {
+                Console.Error.WriteLine($"未知功能: {name}");
+                return 2;
+            }
+            Console.WriteLine($"name: {item.Name}");
+            Console.WriteLine($"display: {item.DisplayName}");
+            Console.WriteLine($"phase: {item.Phase}");
+            Console.WriteLine($"enabled: {item.Enabled}");
+            Console.WriteLine($"state: {item.State}");
+            Console.WriteLine($"requires_service: {item.RequiresService}");
+            Console.WriteLine($"description: {item.Description}");
+            return 0;
+        }
+        case "run":
+        {
+            var name = Subcommand(args, "run");
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                Console.Error.WriteLine("用法: debug run <feature> [--args '<json>']");
+                return 2;
+            }
+            var result = await gateway.RunAsync(
+                name,
+                options.GetValueOrDefault("--args"));
+            Console.WriteLine(result.Ok ? "OK" : "FAILED");
+            Console.WriteLine(result.Message);
+            if (!string.IsNullOrWhiteSpace(result.Data))
+            {
+                Console.WriteLine(result.Data);
+            }
+            return result.Ok ? 0 : 1;
+        }
+        case "stop":
+        {
+            var name = Subcommand(args, "stop");
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                Console.Error.WriteLine("用法: debug stop <feature>");
+                return 2;
+            }
+            var result = await gateway.StopAsync(name);
+            Console.WriteLine(result.Ok ? "OK" : "FAILED");
+            Console.WriteLine(result.Message);
+            return result.Ok ? 0 : 1;
+        }
+        case "enable":
+        case "disable":
+        {
+            var name = Subcommand(args, action);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                Console.Error.WriteLine($"用法: debug {action} <feature|all>");
+                return 2;
+            }
+            var settings = store.LoadSettings();
+            var enabled = action == "enable";
+            if (name.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                settings.Debug.Enabled = enabled;
+            }
+            else
+            {
+                settings.Debug.Enabled = true;
+                settings.Debug.SetFeature(name, enabled);
+            }
+            store.SaveSettings(settings);
+            Console.WriteLine($"{name}: {(enabled ? "enabled" : "disabled")}");
+            return 0;
+        }
+        case "settings":
+        {
+            var settings = store.LoadDebugSettings();
+            Console.WriteLine(JsonSerializer.Serialize(settings, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+            }));
+            return 0;
+        }
+        default:
+            Console.Error.WriteLine(
+                "用法: debug list|status|run|stop|enable|disable|settings");
+            return 2;
+    }
 }
 if (command == "service")
 {

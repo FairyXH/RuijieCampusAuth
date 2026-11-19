@@ -3,5 +3,6 @@
   <Project Path="RuijieCampusAuth.Core/RuijieCampusAuth.Core.csproj" />
   <Project Path="RuijieCampusAuth.Core.Tests/RuijieCampusAuth.Core.Tests.csproj" />
   <Project Path="RuijieCampusAuth.Service/RuijieCampusAuth.Service.csproj" />
+  <Project Path="RuijieCampusAuth.Service.Tests/RuijieCampusAuth.Service.Tests.csproj" />
   <Project Path="RuijieCampusAuth.Cli/RuijieCampusAuth.Cli.csproj" />
 </Solution>

@@ -59,6 +59,7 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<UserAccount> Accounts { get; } = [];
     public ObservableCollection<PcapDeviceInfo> Interfaces { get; } = [];
     public ObservableCollection<ServerRecord> Servers { get; } = [];
+    public DebugViewModel Debug { get; } = new();
 
     public IReadOnlyList<DhcpOption> DhcpModes { get; } =
     [

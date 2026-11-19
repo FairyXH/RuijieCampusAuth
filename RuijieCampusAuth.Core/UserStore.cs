@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using RuijieCampusAuth.Core.Debug;
 
 namespace RuijieCampusAuth.Core;
 
@@ -103,6 +104,7 @@ public sealed class UserSettings
     public bool DhcpOption82 { get; set; }
     public string SchoolCode { get; set; } = "";
     public bool TakeoverEnabled { get; set; }
+    public DebugSettings Debug { get; set; } = new();
 }
 
 public sealed class DiscoveryInfo
@@ -333,8 +335,11 @@ public sealed class UserStore
         }
         try
         {
-            return JsonSerializer.Deserialize<UserSettings>(
-                       File.ReadAllText(SettingsPath), JsonOptions) ?? new UserSettings();
+            var settings = JsonSerializer.Deserialize<UserSettings>(
+                               File.ReadAllText(SettingsPath), JsonOptions)
+                           ?? new UserSettings();
+            settings.Debug ??= new DebugSettings();
+            return settings;
         }
         catch
         {
@@ -344,7 +349,20 @@ public sealed class UserStore
 
     public void SaveSettings(UserSettings settings)
     {
+        settings.Debug ??= new DebugSettings();
         WriteFile(SettingsPath, JsonSerializer.Serialize(settings, JsonOptions));
+    }
+
+    public DebugSettings LoadDebugSettings()
+    {
+        return LoadSettings().Debug ?? new DebugSettings();
+    }
+
+    public void SaveDebugSettings(DebugSettings debugSettings)
+    {
+        var settings = LoadSettings();
+        settings.Debug = debugSettings;
+        SaveSettings(settings);
     }
 
     public DiscoveryInfo? LoadDiscovery()

@@ -23,6 +23,7 @@ else if (OperatingSystem.IsLinux() &&
 builder.Services.AddSingleton<TakeoverGuard>();
 builder.Services.AddHostedService<TakeoverService>();
 builder.Services.AddHostedService<AuthWorker>();
+builder.Services.AddHostedService<DebugPipeServer>();
 
 var host = builder.Build();
 host.Run();
