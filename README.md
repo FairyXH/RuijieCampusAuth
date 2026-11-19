@@ -1,191 +1,195 @@
-# 锐捷校园网开放认证器
+# RuijieCampusAuth
 
-通用的锐捷校园网第三方认证客户端，包含两套完整实现。学校差异通过 `profiles/`
-配置档案导入，程序本身不内置任何学校配置。
+与锐捷（Ruijie）官方认证协议兼容的第三方校园网认证客户端。C# / .NET 10 实现
+（Avalonia GUI + Windows 服务/systemd + CLI），协议算法逐函数对照原版
+`8021x.exe` 差分校对；学校差异全部走 JSON 配置档案，不内置任何学校数据。
+Python 参考实现与 OpenWrt 插件版（Go + LuCI）在仓库内并列维护。
 
-| 目录 | 版本 | 形态 |
-| --- | --- | --- |
-| 仓库根目录 | **C# / .NET 10** | Core + CLI + Windows service / Linux systemd + Avalonia GUI |
-| `python/` | Python 3.10+ | CLI + Python API + PySide6 GUI + 单文件 exe |
+> 定位：协议兼容的"私服式"客户端——不绕过认证、不改服务器行为，
+> 只把官方客户端里实际在用的协议与功能还原成开源实现。
 
-两套版本使用相同的 EAP-MD5 + 569 字节锐捷私有尾协议。C# Core 的私有尾已与
-Python 版逐字节比对（569 字节，SHA256 一致），并已完成实网认证验证。
+## 功能一览
 
-## C# 版本
+| 能力 | 状态 | 说明 |
+|---|---|---|
+| 有线 802.1X EAP-MD5 | ✅ 生产验证 | Start/Logoff/重认证/抢占保活/家庭网络暂停 |
+| 认证方式分发 | ✅ | `auth_mode` 驱动 EAP-MD5 / PEAP v0 / PEAP v1 / EAP-TLS |
+| 569 字节私有尾 | ✅ 原版差分一致 | CRC16 + 位反转混淆 + 18 个属性 + 凭据链式加密 |
+| 服务器私有属性 | ✅ 原版差分一致 | 分段格式（GBK 消息/0x6F 块/版本门/15 字节解混淆段/TLV） |
+| DHCP | ✅ | 认证前/后自动续租、释放、Option82（Windows API） |
+| 账号池 | ✅ | 多账号、DPAPI 加密、失败切换、服务回退 |
+| 服务器学习/锁定 | ✅ | 成功自动记录、单播锁定 |
+| 诊断 | ✅ | OUI/网卡热插拔/ARP/网关 DNS HTTP 探测/代理/拨号 |
+| Portal / 自助 / 客户端中心 / 用户消息 / 升级检查 | ✅ | eportal API + ball JSON |
+| 无线 WPA2-Enterprise | ✅ | Windows WLAN API 配置管理 |
+| SAM 直通 | 🔧 探针级 | key/IV 已实证复用认证下发的 ENCRYPT_KEY/IV |
+| PEAP/TLS 端到端 | ⏳ | 协议栈完成，待真实 RADIUS 验证 |
+| OpenWrt 插件 | ✅ | Go 守护进程 + LuCI（见下文） |
 
-学校适配：配置放在 `profiles/*.json`，通过 CLI `profile import` 或 GUI「档案」
-页导入/切换。新增学校/算法时按 `docs/ADAPTATION.md` 做增量 provider，不修改
-既有实现。
-
-文档入口：
-
-- [官方客户端完整逆向报告](docs/REVERSE_ENGINEERING.md)
-- [原版函数差分测试](docs/DIFFERENTIAL_TESTING.md)
-- [学校适配指南](docs/ADAPTATION.md)
-- [跨会话上下文](docs/AGENT_CONTEXT.md)
-
-### 项目结构
+## 仓库结构
 
 ```text
-RuijieCampusAuth.slnx
-RuijieCampusAuth.Core/       协议、私有尾、EAPOL、Npcap/libpcap、配置、服务安装器
-RuijieCampusAuth.Cli/        跨平台命令行
-RuijieCampusAuth.Service/    Windows 服务 / Linux systemd 的 headless worker
-RuijieCampusAuth.App/        Avalonia 跨平台 GUI
-RuijieCampusAuth.Core.Tests/ 协议单元测试
-build-csharp.ps1             发布/部署脚本
+RuijieCampusAuth.Core/        协议、私有尾、解析器、配置、服务安装、接管
+RuijieCampusAuth.Service/     Windows 服务宿主（AuthWorker/日志/调试管道）
+RuijieCampusAuth.App/         Avalonia GUI（账户/认证/网络/服务/配置/调试）
+RuijieCampusAuth.Cli/         命令行（auth/config/service/debug/profile）
+RuijieCampusAuth.Core.Tests/  65 项（含原版二进制差分锁定向量）
+RuijieCampusAuth.App.Tests/   33 项（Headless UI + 命令级）
+RuijieCampusAuth.Service.Tests/
+skills/                       Agent 技能：逆向与学校适配一条龙（见下文）
+tools/re_diff/                Unicorn 直调原版二进制的差分工具
+tools/csharp_diff/            C# 侧差分对照器（DiffRunner）
+profiles/                     学校配置档案（hxxy.json 为示例）
+openwrt/                      OpenWrt 插件版源码（Go + LuCI）
+python/                       Python 参考实现（协议研究用）
+docs/                         逆向报告、协议档案、适配/部署/泛化文档
 ```
 
-### 构建
+## 构建
 
-需要 .NET 10 SDK；运行需要 .NET 10 Desktop Runtime（Windows）或 .NET 10 Runtime
-（Linux）。默认发布为 framework-dependent，不带自包含运行时。
+依赖 .NET SDK 10（`dotnet --version` ≥ 10.0.1xx）。
 
-```powershell
+```bash
+# 全量构建
 dotnet build RuijieCampusAuth.slnx -c Release
-dotnet test RuijieCampusAuth.Core.Tests/RuijieCampusAuth.Core.Tests.csproj -c Release
-.\build-csharp.ps1 -Runtime win-x64
+
+# 测试（三套件）
+dotnet test RuijieCampusAuth.Core.Tests -c Release
+dotnet test RuijieCampusAuth.App.Tests -c Release
+dotnet test RuijieCampusAuth.Service.Tests -c Release
+
+# 一键发布（Service + Cli + App → publish\win-x64）
+powershell -ExecutionPolicy Bypass -File build-csharp.ps1 -Runtime win-x64
 ```
 
-发布目录：`publish\win-x64`，包含：
+## 部署
 
-- `RuijieCampusAuth.exe` — Avalonia GUI / 托盘
-- `RuijieCampusAuth.Cli.exe` — CLI
-- `RuijieCampusAuth.Service.exe` — 系统服务宿主
-
-### 部署
+发布脚本自带部署路径（会停止服务与 GUI、复制到目标目录、同步 profiles）：
 
 ```powershell
-.\build-csharp.ps1 -Runtime win-x64 -Deploy
+powershell -ExecutionPolicy Bypass -File build-csharp.ps1 -Runtime win-x64 -Deploy `
+    [-DeployDir "D:\Storageredirect\Program\RuijieCampusAuth"]
 ```
 
-部署目录固定为 `D:\Storageredirect\Program\RuijieCampusAuth`。GUI / 托盘启动命令：
+服务管理（服务名保持安装时的名字，脚本不会迁移）：
 
 ```powershell
-"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto
+RuijieCampusAuth.Cli.exe service status|start|stop|install|uninstall
 ```
+
+安装服务（LocalSystem、开机自启、登录前认证）：
+
+```powershell
+RuijieCampusAuth.Cli.exe service install
+```
+
+**Deep Freeze / 冻结还原机器**：程序与数据放非冻结盘（如 D:），C 盘只保留
+冻结基线内容。部署脚本只写 D 盘，不会触碰 C 盘的启动器与服务注册。
+运行时配置统一在安装目录：`settings.json` / `accounts.json` / `service.json` /
+`discovery.json` / `servers.json` / `logs\`。
+
+## 使用
+
+### GUI（推荐）
+
+窗口固定大小不可缩放，五个主类页签 + 调试页；每页常用功能置顶，
+其余收进"高级功能"折叠区：
+
+- **账户**：账号池管理；右侧账密表单下"添加"，"新建"清空表单
+- **认证**：开始/停止、抢占保活、实时日志（`[服务]` 前缀行由服务实时同步，
+  "详细信息"开关显示心跳类例行输出）
+- **网络**：网卡选择、认证服务器学习/锁定、DHCP 高级设置
+- **服务**：Windows 服务安装/启停、接管模式（阻止官方客户端运行）、Guardian 联动
+- **配置**：学校配置档案多选导入/切换（导入即同步服务配置）、认证方式下拉
+  （EAP-MD5 / PEAP / EAP-TLS）、协议参数高级区
+- **调试**：21 项实验功能（PEAP/TLS、DHCP、ARP、Portal、SAM、无线、升级……），
+  经命名管道在服务进程内执行，GUI 不在时回退本机执行
 
 ### CLI
 
 ```powershell
-# 直接认证（读取安装目录 accounts.json/settings.json；也可显式传参数）
-RuijieCampusAuth.Cli.exe auth --interface "\Device\NPF_{GUID}"
-
-# 初始化服务配置（写入程序目录 service.json）
-RuijieCampusAuth.Cli.exe config init --username USER --password PASS --interface "\Device\NPF_{GUID}"
-
-# 接管模式（临时阻止原版锐捷进程/服务）
-RuijieCampusAuth.Cli.exe config takeover on
-RuijieCampusAuth.Cli.exe config takeover off
-
-# 系统服务
-RuijieCampusAuth.Cli.exe service install
-RuijieCampusAuth.Cli.exe service status
-RuijieCampusAuth.Cli.exe service stop
-RuijieCampusAuth.Cli.exe service uninstall
+RuijieCampusAuth.Cli.exe auth start|stop|status
+RuijieCampusAuth.Cli.exe profile list|show|import <json> [--root <安装目录>]
+RuijieCampusAuth.Cli.exe debug list|run <feature> [--args '{}']
+RuijieCampusAuth.Cli.exe service status|start|stop|install|uninstall
+RuijieCampusAuth.Cli.exe config show
 ```
 
-### 系统服务
+### 服务模式
 
-- **Windows**：服务名 `RuijieCampusAuth`，`LocalSystem`，自动启动，登录前运行。
-  服务配置、GUI 账号、设置、发现缓存和服务器列表全部在程序目录直读：
-  `service.json`、`accounts.json`、`settings.json`、`discovery.json`、
-  `servers.json`。服务优先使用 `settings.json` + `accounts.json` 的账号池，
-  当前账号失败后自动尝试其他已启用账号；`service.json` 作为回退并把密码用
-  LocalMachine DPAPI 加密。
-- **Linux**：`service install` 写入
-  `/etc/systemd/system/ruijie-campus-auth.service`，`Type=notify`，由
-  `Microsoft.Extensions.Hosting.Systemd` 对接，`systemctl enable --now`。
-- **macOS**：尚未实现 launchd 包装，CLI/服务 Core 可运行，GUI 使用 Avalonia。
+安装后以 LocalSystem 在登录前认证；每轮重试重读配置，改动即生效；
+支持账号池失败切换、服务器锁定、掉线检测、家庭网络暂停（无认证服务器
+但 TCP 在线时暂停，恢复离线后自动续认证）。
 
-### 家庭网络 / 无认证 LAN
+## 用 Agent + Skills 完成原版逆向与本校适配（一条龙）
 
-认证失败且完全没有收到认证服务器响应（`Supplicant.Connected == false`）时，
-服务会用 Guardian（启用时）或 TCP 连通性检测判断当前网络是否已经在线：
+`skills/ruijie-adaptation/SKILL.md` 是给编码 Agent 的完整作业手册，覆盖
+从原版客户端分析到本校上线的全流程：
 
-- 在线：进入 `paused`，日志为
-  `未检测到认证服务器，当前网络在线，暂停认证`，每 30 秒复查一次，不再持续
-  发送 EAPOL。
-- 离线：恢复自动认证，回到校园网后会重新探测并认证。
-- 暂停期间接管仍然生效，原版锐捷继续被阻止；需要在家庭网络使用原版客户端时，
-  先关闭接管或停止服务。
-- USB 网卡被拔掉导致的网卡异常也会被捕获，不会让服务退出。
+1. **工具链**：REA/Ghidra/rizin 的本仓库用法与已积累的分析产物位置
+2. **静态分析**：交叉引用、RTTI/日志锚点、已知核心函数地址表
+3. **差分校对**：`tools/re_diff` + `tools/csharp_diff` 的 Unicorn 直调方法、
+   调用约定陷阱（thiscall/stdcall/序号导入/CRT 字符串布局）与验收标准
+4. **真实抓包验证**：引擎态函数用被动抓包 + pcapng 解析回放
+5. **编写学校档案 JSON**：字段语义、取值来源（SuConfig.dat → 认证成功包 → 抓包）
+6. **接入验收**：profile 导入、测试全绿、部署脚本、服务日志判定
 
-### 冰点还原与更新
+配套工具都在仓库里：`tools/re_diff/full_diff.py`（Unicorn 批量差分）、
+`tools/csharp_diff/DiffRunner`（C# 对照）、`docs/REVERSE_ENGINEERING.md`
+（逆向总报告）、`docs/protocols/*.md`（逐协议档案）、`docs/ADAPTATION.md`
+（适配规则）。
 
-- 当前已完成一次“C: 冻结 + 重启”验收：VBS 哈希、`RuijieCampusAuth` 计划任务、服务
-  `depend=npcap`/恢复策略、7 个 IFEO 标记、`RJSuService` 状态和 D: 配置均保留；
-  服务/GUI 自动启动并认证成功。
-- C: 冻结、D: 可写时，程序更新只需替换
-  `D:\Storageredirect\Program\RuijieCampusAuth` 下的文件；先停服务和 GUI，
-  再启动即可，不需要解冻。
-- `C:\Program Files\restart_ruijie.vbs`、计划任务 `RuijieCampusAuth`、服务注册、
-  .NET 10、Npcap 和快捷方式都在 C: 上；修改这些内容需要解冻，或在冻结前
-  写入基线。
-- 冻结期间不要运行 `build-csharp.ps1 -Deploy`（它会改写 C: 上的 VBS 和
-  快捷方式）；只复制 `publish` 目录到 D:。
-- 若长期开启接管，建议冻结前把 `RJSuService` 的基线启动类型设为 Disabled，
-  避免开机时它先于 `RuijieCampusAuth` 启动。
-- 服务已配置 `depend= npcap` 和崩溃恢复（5s/10s/30s）；服务日志 10MB、
-  GUI 日志 5MB、VBS `launcher.log` 1MB 自动轮转。
-- 冻结前建议做一次重启验收：在 D: 和 C: 各放一个标记文件，冻结重启后确认
-  D: 文件保留、C: 文件消失，服务/GUI 正常，`launcher.log` 有
-  `healthy takeover; skip original`。同时在 DiskGuard 界面确认 D: 未被保护。
+## OpenWrt 插件版
 
-### 接管模式
+`openwrt/` 是软路由端实现，与 C#/Python 并列维护：
 
-开启后由服务层临时执行：
+```text
+openwrt/
+  hxxy-auth/            Go 守护进程 + CLI（默认目标 mipsle）
+  luci-app-hxxy-auth/   LuCI 应用（菜单/ACL/视图）
+  files/                Image Builder 覆盖文件（UCI 配置）
+  scripts/build-go.sh       交叉编译 Go 二进制
+  scripts/build-image.sh    组装 files/ 并调用 OpenWrt Image Builder
+```
 
-- 扫描 `C:\Program Files\Ruijie Networks\Ruijie Supplicant` 下的 `.exe`，按
-  **进程名**匹配（不写死路径）；
-- 对枚举到的进程名写入 64/32 位 IFEO `Debugger` + `RuijieTakeover` 标记（兼容旧版本标记），并持续
-  结束同名进程；
-- 枚举 `ImagePath` 指向该目录、或显示名含 Ruijie/锐捷的服务，停止并临时设为
-  disabled；
-- 每秒写 `takeover.ini` 心跳，供 `restart_ruijie.vbs` 判断服务是否健康；
-- 关闭接管或服务停止时，恢复原 IFEO 值和服务启动类型。
+- 源码不绑定设备：同 target（如 `ramips/mt7621`）只改 `PROFILE`，
+  换架构改 `GOARCH` 重编，LuCI/UCI 不动
+- 当前验证目标 Xiaomi R3G（R3Gv2 / 4A 千兆版同流程）
+- **编译在 Ubuntu VM 进行**（Windows 不装 Go、不跑 Image Builder）：
 
-`7z.exe`、`unins000.exe` 不做阻止，避免误伤通用工具。
+```sh
+git clone <本仓库> && cd RuijieCampusAuth/openwrt
+sh scripts/build-go.sh
+sh scripts/build-image.sh   # 产出 sysupgrade 镜像
+```
 
-### GUI
+细节与 R3G 专项参数见 `openwrt/README.md`、`docs/OPENWRT_FEASIBILITY.md`、
+`docs/OPENWRT_BUILD_ENV.md`。
 
-Avalonia 跨平台 GUI，包含五个页签：
+## Python 参考实现
 
-- **账号**：账号池、添加/更新/删除、启用/停用、设为当前账号。
-- **认证**：开始/停止、抢占保活、实时日志。
-- **服务器**：自动学习的认证服务器、成功后计数、锁定/解锁、删除。
-- **服务**：接管开关、安装/启动/停止/卸载、应用服务配置。
-- **设置**：网卡、服务名、静态 ID、Start 参数、DHCP/学校代码、服务器锁定、
-  发现缓存、Guardian URL/间隔/离线确认。
+`python/` 是最早的协议参考实现（逆向期的原型，协议行为与 C# 版一致，
+569 字节私有尾两版逐字节一致）：
 
-Windows 启动使用 `--tray --auto`，支持托盘显示/退出。
+- 用途：协议研究、快速验证新想法、给 C# 版做行为对照
+- 入口与 API 说明见 `python/README.md`；打包脚本 `python/build.ps1`
+- **生产部署请用 C# 版**（服务模式/GUI/测试覆盖都在 C# 侧）；Python 版
+  保留为研究与对照实现，功能更新已延后（见 `docs/GENERICIZATION.md`）
 
-### 运行数据
+## 文档索引
 
-GUI、CLI 和服务都直读安装目录，不再使用 `%APPDATA%` 运行：
+| 文档 | 内容 |
+|---|---|
+| `docs/REVERSE_ENGINEERING.md` | 原版客户端完整逆向报告（函数地址表/调用链/差分结果） |
+| `docs/DIFFERENTIAL_TESTING.md` | Unicorn 直调 + 差分方法与结果 |
+| `docs/protocols/*.md` | 逐协议档案（私有属性/PEAP/DHCP/Portal/SAM/无线） |
+| `docs/ADAPTATION.md` | 新学校适配规则（auth_mode + 版本选择 provider） |
+| `docs/OPENWRT_FEASIBILITY.md` | OpenWrt 移植评估与 R3G 专项 |
+| `docs/FROZEN_DEPLOYMENT.md` | 冻结还原机器的部署历史 |
+| `profiles/README.md` | 学校档案字段与导入 |
+| `skills/ruijie-adaptation/SKILL.md` | Agent 一条龙作业手册 |
 
-- `accounts.json` — 账号池，密码使用机器 DPAPI，服务可解密
-- `settings.json` — GUI/服务运行参数
-- `service.json` — 服务回退配置和接管开关
-- `discovery.json`、`servers.json` — 探测缓存和服务器列表
-- `service_status.json`、`takeover.ini`、`takeover_state.json`
-- `logs\service.log`、`logs\csharp-gui.log`、`launcher.log`
+## 许可与声明
 
-### 冻结部署手册
-
-`C:` 冻结、只更新 `D:` 的完整流程、冻结前检查、重启验收、更新步骤和故障
-排查见 [`docs/FROZEN_DEPLOYMENT.md`](docs/FROZEN_DEPLOYMENT.md)。
-
-## Python 版本
-
-完整 Python 实现、GUI、单文件构建和已有文档在 [`python/`](python/README.md)。
-Python 版本仍然保留，作为协议参考和回退方案。
-
-## 协议要点
-
-- EAPOL length 只覆盖标准 EAP 包；569 字节私有尾附加在 EAPOL length 之外。
-- Start/Logoff 也带私有尾；Logoff 发往标准 PAE 组播，Start 可单播到锁定服务器。
-- 0x39 服务名、0x54 静态 ID 可配置；0x2F 凭据使用 MD5 链式 XOR 加密。
-- 私有尾长度 569 字节；C# 测试包含与 Python 参考实现的 SHA256 比对。
-
-仓库不包含任何账号或密码。`service.json`、GUI 配置和日志均不入库。
+本项目与锐捷网络无关联，仅作协议兼容与互操作研究用途。使用本项目
+认证请确保你拥有校园网的合法接入权限并遵守所在学校网络管理规定。
