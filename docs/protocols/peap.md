@@ -69,6 +69,22 @@
 | PEAP 分片/phase2 | `Core/Protocols/PeapSession.cs` | 完成，待实验服务器 |
 | EAPOL 传输 | `Core/Protocols/PcapEapTransport.cs` | 完成，待实验服务器 |
 | 调试页 `peap` / `eap-tls` | `Core/Debug/PeapDebugFeatures.cs` | 完成 |
+| PEAP 凭据段 0x5F | `Core/Protocols/PeapVendorSegments.cs` | 完成，原版固定 IV 验证 |
+
+### PEAP vendor segments（从原版反编译）
+
+段格式 `[type][len][payload]`：
+
+| type | 内容 | 原版证据 |
+|---|---|---|
+| `0x11` | client version，36 字节 | `FUN_00518950` |
+| `0x2D` | MAC，6 字节 | `FUN_005195b0` |
+| `0x39` | service name，0x20/0x40 | `FUN_00519620` |
+| `0x5F` | PEAP 凭据密文 | `FUN_00519c70` |
+| `0x63` | DHCP phase | `FUN_00518c70` |
+
+`0x5F` 使用硬编码 IV `!jierui9002pmsus`，加密算法与 0x2F 相同
+（`FUN_0053c970`，MD5 链式 XOR）。已用原版函数输出锁定测试向量。
 
 调试参数：
 

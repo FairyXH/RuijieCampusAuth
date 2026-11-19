@@ -81,6 +81,22 @@ to the Python tree under `python/`.
   layout capture; password-change/config-update endpoints.
 - Next: P9 commit / deployment validation.
 
+## 2026-11-19 Differential Testing (original binary)
+
+- `8021x.exe` has no exports; built a Unicorn PE harness
+  (`tools/re_diff/pe_call.py`) that maps the image, stubs imports, simulates
+  FS:[0] for SEH, and calls internal functions by RVA.
+- Verified against the original binary: CRC16 (`0x53dc20`), byte obfuscation
+  (`0x53de90`), private header (`0x53dc80`), header+obfuscation (`0x53cbb0`),
+  MD5 (`0x53cb50`), credential cipher (`0x53c970`). All outputs match C#.
+- Recovered PEAP segment formats (0x2D/0x39/0x5F/0x63) and the fixed 0x5F IV
+  `!jierui9002pmsus`; added `PeapVendorSegments` + original-output tests.
+- Full 569-byte tail assembly order confirmed through attribute 0x4D; the
+  conditional tail is documented in `docs/DIFFERENTIAL_TESTING.md`.
+- Not directly callable without object state: `GetClientVersion`,
+  `GetServiceName`, `GetUserPasswd4Peap` wrapper, `GetMACAddr`.
+- Tests: Core 44 passed (including 9 original-binary vectors).
+
 ## Verified State
 
 - 2026-11-17: real-account validation on Windows/Npcap.
