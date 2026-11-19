@@ -85,6 +85,11 @@ if ($Deploy) {
     Start-Sleep -Seconds 1
 
     Copy-Item (Join-Path $publishDir "*") $DeployDir -Recurse -Force
+    $profilesSource = Join-Path $PSScriptRoot "profiles"
+    if (Test-Path $profilesSource) {
+        Copy-Item $profilesSource (Join-Path $DeployDir "profiles") -Recurse -Force
+        Write-Host "Deployed profiles: $(Join-Path $DeployDir 'profiles')"
+    }
     $target = Join-Path $DeployDir "RuijieCampusAuth.exe"
     Write-Host "Deployed GUI: $target"
 

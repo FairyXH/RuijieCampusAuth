@@ -73,7 +73,13 @@ to the Python tree under `python/`.
 - P8: `upgrade-check` (GET only, no install) and `sam-direct` UDP probe with
   optional DES-CBC/ECB transform. Both verified against local fake services.
   SAM packet layout remains unknown; no fake handshake. Tests: Core 35 passed.
-- Next: P9 multi-profile GUI switch, adaptation guide, final regression.
+- P9: multi-profile discovery (`ProfileStore.Discover`), GUI `档案` tab with
+  import/switch, CLI `profile list` default discovery, publish script copies
+  `profiles/`, and `docs/ADAPTATION.md` (reverse → profile → additive protocol
+  provider, version switching rules). Final build green; 35 tests pass.
+- Remaining lab work: real RADIUS PEAP/EAP-TLS, WPA2-Enterprise AP, SAM packet
+  layout capture; password-change/config-update endpoints.
+- Next: P9 commit / deployment validation.
 
 ## Verified State
 

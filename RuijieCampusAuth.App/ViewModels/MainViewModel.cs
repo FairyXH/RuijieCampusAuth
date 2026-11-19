@@ -52,6 +52,8 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private PcapDeviceInfo? _selectedInterface;
     [ObservableProperty] private string _status = "就绪";
     [ObservableProperty] private string _profileNameLabel = "配置档案: 未导入";
+    [ObservableProperty] private ProfileOption? _selectedProfile;
+    [ObservableProperty] private string _profileStatus = "未发现配置档案";
     [ObservableProperty] private string _serviceStatus = "未检测";
     [ObservableProperty] private string _discoveryStatus = "自动探测";
     [ObservableProperty] private string _logText = "";
@@ -60,6 +62,7 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<UserAccount> Accounts { get; } = [];
     public ObservableCollection<PcapDeviceInfo> Interfaces { get; } = [];
     public ObservableCollection<ServerRecord> Servers { get; } = [];
+    public ObservableCollection<ProfileOption> AvailableProfiles { get; } = [];
     public DebugViewModel Debug { get; } = new();
 
     public IReadOnlyList<DhcpOption> DhcpModes { get; } =
@@ -90,8 +93,64 @@ public partial class MainViewModel : ViewModelBase
             SelectedInterface = Interfaces.FirstOrDefault();
         }
         AppendLog($"账号池已加载: {Accounts.Count} 个账号");
+        RefreshProfiles();
         LoadServerList();
         RefreshService();
+    }
+
+    [RelayCommand]
+    private void RefreshProfiles()
+    {
+        var settings = _store.LoadSettings();
+        AvailableProfiles.Clear();
+        foreach (var path in ProfileStore.Discover())
+        {
+            try
+            {
+                var profile = ProfileStore.Load(path);
+                AvailableProfiles.Add(new ProfileOption(
+                    path,
+                    profile.Name,
+                    profile.AuthMode,
+                    profile.ServiceName));
+            }
+            catch
+            {
+                // Ignore malformed profile files in the picker.
+            }
+        }
+        SelectedProfile = AvailableProfiles.FirstOrDefault(item =>
+                              string.Equals(
+                                  item.Path,
+                                  settings.ProfilePath,
+                                  StringComparison.OrdinalIgnoreCase))
+                          ?? AvailableProfiles.FirstOrDefault();
+        ProfileStatus = AvailableProfiles.Count == 0
+            ? "未发现档案：把 JSON 放到程序目录 profiles/ 或当前目录 profiles/"
+            : $"发现 {AvailableProfiles.Count} 个档案，导入会覆盖 settings.json 中同名字段";
+    }
+
+    [RelayCommand]
+    private void ImportProfile()
+    {
+        if (SelectedProfile is null)
+        {
+            ProfileStatus = "请先选择档案";
+            return;
+        }
+        try
+        {
+            var profile = ProfileStore.Load(SelectedProfile.Path);
+            var result = ProfileStore.Import(profile, _store, SelectedProfile.Path);
+            ApplySettings(_store.LoadSettings());
+            ProfileStatus = $"已导入 {result.ProfileName}；备份: {result.BackupPath ?? "(none)"}";
+            AppendLog($"已导入配置档案: {result.ProfileName} ({SelectedProfile.Path})");
+            RefreshService();
+        }
+        catch (Exception ex)
+        {
+            ProfileStatus = $"导入失败: {ex.Message}";
+        }
     }
 
     partial void OnSelectedAccountChanged(UserAccount? value)

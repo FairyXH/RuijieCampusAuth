@@ -13,6 +13,10 @@ Python 版逐字节比对（569 字节，SHA256 一致），并已完成实网�
 
 ## C# 版本
 
+学校适配：配置放在 `profiles/*.json`，通过 CLI `profile import` 或 GUI「档案」
+页导入/切换。新增学校/算法时按 `docs/ADAPTATION.md` 做增量 provider，不修改
+既有实现。
+
 ### 项目结构
 
 ```text

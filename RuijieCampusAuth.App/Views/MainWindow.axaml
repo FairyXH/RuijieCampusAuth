@@ -201,6 +201,33 @@
         </ScrollViewer>
       </TabItem>
 
+      <TabItem Header="档案">
+        <Grid Margin="14" RowDefinitions="Auto,Auto,Auto,*">
+          <TextBlock Text="配置档案（通用壳 + 学校档案）" FontSize="16" FontWeight="SemiBold" />
+          <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="0,10,0,0">
+            <ComboBox ItemsSource="{Binding AvailableProfiles}"
+                      SelectedItem="{Binding SelectedProfile}">
+              <ComboBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ProfileOption">
+                  <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding Display}" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Path}" FontSize="10" Opacity="0.55" />
+                  </StackPanel>
+                </DataTemplate>
+              </ComboBox.ItemTemplate>
+            </ComboBox>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" Margin="10,0,0,0">
+              <Button Content="导入/切换" Command="{Binding ImportProfileCommand}" />
+              <Button Content="刷新档案" Command="{Binding RefreshProfilesCommand}" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Grid.Row="2" Text="{Binding ProfileStatus}" TextWrapping="Wrap"
+                     Opacity="0.7" Margin="0,10,0,0" />
+          <TextBlock Grid.Row="3" TextWrapping="Wrap" Opacity="0.55" FontSize="11" Margin="0,10,0,0"
+                     Text="档案目录：程序目录 profiles/ 或当前目录 profiles/。导入只覆盖档案声明的字段，账号、网卡、接管开关保持不变；导入前自动备份 settings.json。" />
+        </Grid>
+      </TabItem>
+
       <TabItem Header="调试">
         <Grid Margin="14" DataContext="{Binding Debug}" x:DataType="vm:DebugViewModel"
               RowDefinitions="Auto,*" ColumnDefinitions="300,*">

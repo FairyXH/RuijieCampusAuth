@@ -145,12 +145,12 @@ if (command == "profile")
     {
         case "list":
         {
-            var directory = options.GetValueOrDefault("--dir")
-                ?? Path.Combine(Environment.CurrentDirectory, "profiles");
-            var profiles = ProfileStore.ListProfiles(directory);
+            var profiles = options.GetValueOrDefault("--dir") is { Length: > 0 } directory
+                ? ProfileStore.ListProfiles(directory)
+                : ProfileStore.Discover();
             if (profiles.Count == 0)
             {
-                Console.WriteLine($"没有可用档案: {directory}");
+                Console.WriteLine("没有可用档案（检查程序目录/当前目录的 profiles/）");
                 return 1;
             }
             foreach (var path in profiles)

@@ -65,6 +65,34 @@ public static class ProfileStore
             .ToList();
     }
 
+    public static IReadOnlyList<string> Discover(string? extraDirectory = null)
+    {
+        var directories = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, "profiles"),
+            Path.Combine(Environment.CurrentDirectory, "profiles"),
+            extraDirectory,
+        };
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var directory in directories)
+        {
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                continue;
+            }
+            foreach (var path in ListProfiles(directory))
+            {
+                var full = Path.GetFullPath(path);
+                if (seen.Add(full))
+                {
+                    result.Add(full);
+                }
+            }
+        }
+        return result;
+    }
+
     public static ProfileImportResult Import(
         SchoolProfile profile,
         UserStore store,
