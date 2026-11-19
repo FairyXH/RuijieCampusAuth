@@ -1,0 +1,8 @@
+module ruijie-auth
+
+go 1.25.0
+
+require (
+	golang.org/x/sys v0.37.0
+	golang.org/x/text v0.29.0
+)
