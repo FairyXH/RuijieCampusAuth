@@ -88,7 +88,11 @@ public sealed class ServiceConfig
     public string Password { get; init; } = "";
     public ServiceSettings Settings { get; init; } = new();
 
-    public static string ServiceRoot => AppContext.BaseDirectory;
+    private static string? _rootOverride;
+    /// <summary>Tests may point service.json at an isolated directory.</summary>
+    public static void SetRootOverride(string? directory) => _rootOverride = directory;
+
+    public static string ServiceRoot => _rootOverride ?? AppContext.BaseDirectory;
     public static string ConfigPath => Path.Combine(ServiceRoot, "service.json");
 
     public static ServiceConfig Load(string path)

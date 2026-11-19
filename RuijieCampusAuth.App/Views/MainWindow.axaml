@@ -340,8 +340,8 @@
             </Border>
 
             <Expander Grid.Row="1" Classes="adv" Header="高级功能：认证与协议参数" IsExpanded="False">
-              <ScrollViewer MaxHeight="300">
-                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
+              <ScrollViewer MaxHeight="360">
+                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto">
                   <TextBlock Grid.Row="0" Text="服务名" VerticalAlignment="Center" />
                   <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding ServiceName}" />
                   <TextBlock Grid.Row="1" Text="静态 ID" VerticalAlignment="Center" Margin="0,8,0,0" />
@@ -372,10 +372,42 @@
                                  Margin="0,8,0,0" />
                   <TextBlock Grid.Row="8" Text="连通检测" VerticalAlignment="Center" Margin="0,8,0,0" />
                   <TextBox Grid.Row="8" Grid.Column="1" Text="{Binding ConnectivityUrl}" Margin="0,8,0,0" />
-                  <TextBlock Grid.Row="9" Text="学校代码" VerticalAlignment="Center" Margin="0,8,0,0" />
-                  <TextBox Grid.Row="9" Grid.Column="1" Text="{Binding SchoolCode}" Margin="0,8,0,0"
+                  <TextBlock Grid.Row="10" Text="认证方式" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <ComboBox Grid.Row="10" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                            ItemsSource="{Binding AuthModes}" SelectedItem="{Binding SelectedAuthMode}"
+                            Margin="0,8,0,0">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DhcpOption">
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBlock Grid.Row="11" Text="学校代码" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="11" Grid.Column="1" Text="{Binding SchoolCode}" Margin="0,8,0,0"
                            PlaceholderText="可选，例如 HPVTC" />
-                  <Button Grid.Row="10" Grid.Column="1" Classes="primary" Content="保存配置"
+                  <TextBlock Grid.Row="12" Text="AD 域" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="12" Grid.Column="1" Text="{Binding AdDomain}" Margin="0,8,0,0"
+                           PlaceholderText="可选，PEAP 安全校验域" />
+                  <TextBlock Grid.Row="13" Text="AD 超时" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="13" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding AdTimeout}" Minimum="5" Maximum="600" Increment="5"
+                                 Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="14" Text="引擎版本" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="14" Grid.Column="1" Text="{Binding EngineVersion}" Margin="0,8,0,0"
+                           PlaceholderText="例如 5.0.2014.108" />
+                  <TextBlock Grid.Row="15" Text="自助服务 URL" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="15" Grid.Column="1" Text="{Binding SelfServiceUrl}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="16" Text="升级 URL" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="16" Grid.Column="1" Text="{Binding UpdateUrl}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="17" Text="Portal URL" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="17" Grid.Column="1" Text="{Binding PortalUrl}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="18" Text="SAM 主机" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <TextBox Grid.Row="18" Grid.Column="1" Text="{Binding SamHost}" Margin="0,8,0,0" />
+                  <TextBlock Grid.Row="19" Text="SAM 端口" VerticalAlignment="Center" Margin="0,8,0,0" />
+                  <NumericUpDown Grid.Row="19" Grid.Column="1" HorizontalAlignment="Left" MinWidth="220"
+                                 Value="{Binding SamPort}" Minimum="0" Maximum="65535" Increment="1"
+                                 Margin="0,8,0,0" />
+                  <Button Grid.Row="20" Grid.Column="1" Classes="primary" Content="保存配置"
                           Command="{Binding SaveCommand}" HorizontalAlignment="Left" Margin="0,12,0,0" />
                 </Grid>
               </ScrollViewer>

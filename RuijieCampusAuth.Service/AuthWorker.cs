@@ -1,5 +1,6 @@
 using System.Net.Sockets;
 using RuijieCampusAuth.Core;
+using RuijieCampusAuth.Core.Protocols;
 
 namespace RuijieCampusAuth.Service;
 
@@ -63,12 +64,10 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     int? reauth) result;
                 try
                 {
-                    result = await Task.Run(
-                        () => Authenticate(
-                            settings,
-                            account.Username,
-                            account.Password,
-                            stoppingToken),
+                    result = await Authenticate(
+                        settings,
+                        account.Username,
+                        account.Password,
                         stoppingToken);
                 }
                 catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
@@ -242,8 +241,49 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         }
     }
 
-    private (bool ok, bool attempted, bool connected, string? server, string interfaceName,
-        int? reauth) Authenticate(
+    private async Task RunDhcpPhaseAsync(
+        ServiceSettings settings,
+        string interfaceName,
+        string phase,
+        CancellationToken stoppingToken)
+    {
+        var wants = phase == "before"
+            ? AuthMethodOptions.WantsDhcpBefore(settings.DhcpMode)
+            : AuthMethodOptions.WantsDhcpAfter(settings.DhcpMode);
+        if (!wants)
+        {
+            return;
+        }
+        try
+        {
+            logger.LogInformation(
+                "DHCP {Phase}: dhcp_mode={Mode} 开始续租",
+                phase,
+                settings.DhcpMode);
+            var result = await DhcpControl.RunAsync(
+                interfaceName,
+                DhcpOperation.Renew,
+                TimeSpan.FromSeconds(Math.Max(1, settings.DhcpTimeout)),
+                settings.DhcpOption82,
+                stoppingToken);
+            logger.LogInformation(
+                "DHCP {Phase} 完成: {Message} 租约 {Lease}",
+                phase,
+                result.Message,
+                result.Lease?.Ip ?? "-");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "DHCP {Phase} 失败，继续认证流程", phase);
+        }
+    }
+
+    private async Task<(bool ok, bool attempted, bool connected, string? server, string interfaceName,
+        int? reauth)> Authenticate(
         ServiceSettings settings,
         string username,
         string password,
@@ -267,10 +307,16 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
             lockedServer: locked,
             serviceName: settings.ServiceName,
             staticId: settings.StaticId,
+            authMode: settings.AuthMode,
             log: message => logger.LogInformation("{Message}", message),
             error: message => logger.LogError("{Message}", message));
         using var registration = stoppingToken.Register(supplicant.Stop);
+        await RunDhcpPhaseAsync(settings, interfaceName, "before", stoppingToken);
         var ok = supplicant.Authenticate();
+        if (ok)
+        {
+            await RunDhcpPhaseAsync(settings, interfaceName, "after", stoppingToken);
+        }
         var description = PcapNative.ListDevices()
             .FirstOrDefault(item => item.Name.Equals(interfaceName, StringComparison.OrdinalIgnoreCase))
             ?.Description ?? interfaceName;

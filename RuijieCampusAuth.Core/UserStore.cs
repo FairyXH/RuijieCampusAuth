@@ -572,20 +572,46 @@ public sealed class UserStore
     private void WriteFile(string path, string content)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-        var temp = path + ".tmp";
-        File.WriteAllText(temp, content);
-        File.Move(temp, path, true);
-        if (!OperatingSystem.IsWindows())
+        // Transient locks (AV/indexer) can deny the atomic replace; retry and
+        // fall back to a direct overwrite rather than losing the save.
+        for (var attempt = 0; ; attempt++)
         {
             try
             {
-                File.SetUnixFileMode(
-                    path,
-                    UnixFileMode.UserRead | UnixFileMode.UserWrite);
+                var temp = path + ".tmp";
+                File.WriteAllText(temp, content);
+                try
+                {
+                    File.Move(temp, path, true);
+                    return;
+                }
+                catch (Exception ex)
+                    when (ex is IOException or UnauthorizedAccessException &&
+                          attempt < 4)
+                {
+                    Thread.Sleep(300);
+                    continue;
+                }
+                // Final attempt failed on the atomic replace: remove the temp
+                // and try a direct overwrite before giving up.
+                try
+                {
+                    if (File.Exists(temp))
+                    {
+                        File.Delete(temp);
+                    }
+                }
+                catch (IOException)
+                {
+                }
+                File.WriteAllText(path, content);
+                return;
             }
-            catch
+            catch (Exception ex)
+                when (ex is IOException or UnauthorizedAccessException &&
+                      attempt < 4)
             {
-                // Best effort.
+                Thread.Sleep(300);
             }
         }
     }

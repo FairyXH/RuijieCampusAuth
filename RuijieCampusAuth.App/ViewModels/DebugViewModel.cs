@@ -12,7 +12,7 @@ namespace RuijieCampusAuth.App.ViewModels;
 
 public partial class DebugViewModel : ViewModelBase
 {
-    private readonly UserStore _store = new();
+    private readonly UserStore _store;
     private readonly DebugGateway _gateway;
 
     [ObservableProperty] private DebugFeatureDescriptor? _selectedFeature;
@@ -28,8 +28,9 @@ public partial class DebugViewModel : ViewModelBase
 
     public ObservableCollection<DebugFeatureDescriptor> Features { get; } = [];
 
-    public DebugViewModel()
+    public DebugViewModel(UserStore? store = null)
     {
+        _store = store ?? new UserStore();
         _gateway = new DebugGateway(_store);
         Enabled = _store.LoadSettings().Debug.Enabled;
         _ = RefreshAsync();

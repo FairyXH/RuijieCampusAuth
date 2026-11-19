@@ -14,15 +14,15 @@ namespace RuijieCampusAuth.App.Tests;
 /// </summary>
 public sealed class MainViewModelTests : IDisposable
 {
-    private static readonly string BaseDir = AppContext.BaseDirectory;
     private readonly FakeServiceBridge _bridge = new();
     private readonly List<string> _opened = [];
+    private string _workDir = AppContext.BaseDirectory;
 
     public MainViewModelTests()
     {
         foreach (var name in new[] { "accounts.json", "settings.json", "discovery.json", "servers.json" })
         {
-            var path = Path.Combine(BaseDir, name);
+            var path = Path.Combine(_workDir, name);
             for (var attempt = 0; attempt < 5; attempt++)
             {
                 try
@@ -48,6 +48,9 @@ public sealed class MainViewModelTests : IDisposable
     private MainViewModel CreateVm(bool serviceRunning = false)
     {
         _bridge.Running = serviceRunning;
+        _workDir = Path.Combine(
+            Path.GetTempPath(), "rj-guitest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_workDir);
         return new MainViewModel(
             _bridge,
             () =>
@@ -56,12 +59,13 @@ public sealed class MainViewModelTests : IDisposable
                     @"\Device\NPF_{TEST-GUID}",
                     "Test Adapter"),
             ],
-            path => _opened.Add(path));
+            path => _opened.Add(path),
+            new UserStore(_workDir));
     }
 
-    private static void SeedServer(string mac = "00:1a:a9:17:ff:ff")
+    private void SeedServer(string mac = "00:1a:a9:17:ff:ff")
     {
-        new UserStore().SaveServers(
+        new UserStore(_workDir).SaveServers(
         [
             new ServerRecord
             {
@@ -98,7 +102,7 @@ public sealed class MainViewModelTests : IDisposable
         Assert.Single(vm.Accounts);
         Assert.Equal("student01", vm.Accounts[0].Username);
         Assert.Equal("账号已添加", vm.Status);
-        Assert.NotEmpty(new UserStore().LoadAccounts());
+        Assert.NotEmpty(new UserStore(_workDir).LoadAccounts());
         Assert.Contains("账号已添加", vm.LogText);
     }
 
@@ -132,7 +136,7 @@ public sealed class MainViewModelTests : IDisposable
         vm.Note = "updated";
         vm.UpdateAccountCommand.Execute(null);
         Assert.Equal("user2", vm.Accounts[0].Username);
-        Assert.Equal("user2", new UserStore().LoadAccounts()[0].Username);
+        Assert.Equal("user2", new UserStore(_workDir).LoadAccounts()[0].Username);
     }
 
     [AvaloniaFact]
@@ -158,7 +162,7 @@ public sealed class MainViewModelTests : IDisposable
         vm.Password = "p";
         vm.AddAccountCommand.Execute(null);
         vm.UseAccountCommand.Execute(null);
-        var settings = new UserStore().LoadSettings();
+        var settings = new UserStore(_workDir).LoadSettings();
         Assert.Equal(vm.Accounts[0].Id, settings.ActiveAccountId);
     }
 
@@ -171,7 +175,7 @@ public sealed class MainViewModelTests : IDisposable
         vm.AddAccountCommand.Execute(null);
         vm.DeleteAccountCommand.Execute(null);
         Assert.Empty(vm.Accounts);
-        Assert.Empty(new UserStore().LoadAccounts());
+        Assert.Empty(new UserStore(_workDir).LoadAccounts());
         Assert.Contains("账号已删除", vm.Status);
     }
 
@@ -182,7 +186,7 @@ public sealed class MainViewModelTests : IDisposable
         vm.ServiceName = "电信宽带服务";
         vm.StaticId = "Static:AB45A862";
         vm.SaveCommand.Execute(null);
-        var settings = new UserStore().LoadSettings();
+        var settings = new UserStore(_workDir).LoadSettings();
         Assert.Equal("电信宽带服务", settings.ServiceName);
         Assert.Equal("Static:AB45A862", settings.StaticId);
         Assert.Equal("配置已保存", vm.Status);
@@ -249,7 +253,7 @@ public sealed class MainViewModelTests : IDisposable
     public async Task ServiceLog_lines_appear_live_and_filter_by_verbose()
     {
         var vm = CreateVm();
-        var logDir = Path.Combine(BaseDir, "logs");
+        var logDir = Path.Combine(_workDir, "logs");
         Directory.CreateDirectory(logDir);
         var serviceLog = Path.Combine(logDir, "service.log");
         await File.AppendAllTextAsync(
@@ -286,8 +290,8 @@ public sealed class MainViewModelTests : IDisposable
     [AvaloniaFact]
     public void Server_lock_unlock_delete_flow()
     {
-        SeedServer();
         var vm = CreateVm();
+        SeedServer(); // after CreateVm: _workDir is assigned there
         vm.RefreshServersCommand.Execute(null);
         Assert.Single(vm.Servers);
         vm.SelectedServer = vm.Servers[0];
@@ -295,15 +299,15 @@ public sealed class MainViewModelTests : IDisposable
         vm.LockSelectedServerCommand.Execute(null);
         Assert.True(vm.ServerLock);
         Assert.Equal("00:1a:a9:17:ff:ff", vm.LockedServer);
-        Assert.True(new UserStore().LoadSettings().ServerLock);
+        Assert.True(new UserStore(_workDir).LoadSettings().ServerLock);
 
         vm.UnlockServerCommand.Execute(null);
         Assert.False(vm.ServerLock);
-        Assert.False(new UserStore().LoadSettings().ServerLock);
+        Assert.False(new UserStore(_workDir).LoadSettings().ServerLock);
 
         vm.DeleteServerCommand.Execute(null);
         Assert.Empty(vm.Servers);
-        Assert.Empty(new UserStore().LoadServers());
+        Assert.Empty(new UserStore(_workDir).LoadServers());
     }
 
     [AvaloniaFact]
@@ -319,12 +323,12 @@ public sealed class MainViewModelTests : IDisposable
     [AvaloniaFact]
     public void ForceRediscover_clears_cache()
     {
-        new UserStore().SaveDiscovery(
+        new UserStore(_workDir).SaveDiscovery(
             @"\Device\NPF_{TEST-GUID}", "Test Adapter", "00:11:22:33:44:55", "66:77:88:99:aa:bb");
         var vm = CreateVm();
         vm.ForceRediscoverCommand.Execute(null);
         Assert.Contains("已清除发现缓存", vm.DiscoveryStatus);
-        Assert.Null(new UserStore().LoadDiscovery());
+        Assert.Null(new UserStore(_workDir).LoadDiscovery());
     }
 
     // ---------- 服务页 ----------
@@ -380,7 +384,7 @@ public sealed class MainViewModelTests : IDisposable
     [AvaloniaFact]
     public void Profile_discover_import_switch()
     {
-        var profileDir = Path.Combine(BaseDir, "profiles");
+        var profileDir = Path.Combine(_workDir, "profiles");
         Directory.CreateDirectory(profileDir);
         File.WriteAllText(
             Path.Combine(profileDir, "test-school.json"),
@@ -394,37 +398,67 @@ public sealed class MainViewModelTests : IDisposable
             }
             """);
         var vm = CreateVm();
+        vm.Username = "user";
+        vm.Password = "p";
+        vm.AddAccountCommand.Execute(null); // service.json propagation needs credentials.
         vm.SaveCommand.Execute(null); // Ensure settings.json exists so Import takes a backup.
+        vm.ApplyServiceConfigCommand.Execute(null); // Create service.json: import then propagates into it.
         vm.RefreshProfilesCommand.Execute(null);
         Assert.Contains(vm.AvailableProfiles, p => p.Name == "测试大学");
 
         vm.SelectedProfile = vm.AvailableProfiles.First(p => p.Name == "测试大学");
         vm.ImportProfileCommand.Execute(null);
         Assert.Contains("已切换到 测试大学", vm.ProfileStatus);
-        var settings = new UserStore().LoadSettings();
+        var settings = new UserStore(_workDir).LoadSettings();
         Assert.Equal("测试大学", settings.ProfileName);
         Assert.Equal("电信宽带服务", settings.ServiceName);
         Assert.Equal("Static:TEST01", settings.StaticId);
         Assert.Equal("配置档案: 测试大学", vm.ProfileNameLabel);
         // Backup created next to settings.json.
-        var bin = new DirectoryInfo(BaseDir);
+        var bin = new DirectoryInfo(_workDir);
         Assert.NotEmpty(bin.GetFiles("settings.json.bak-*"));
+
+        // 切换学校 → service.json 立即同步（服务下一轮生效，无需手动应用）。
+        Assert.True(File.Exists(Path.Combine(_workDir, "service.json")), "service.json should exist");
+        var svc = ServiceConfig.Load(Path.Combine(_workDir, "service.json"));
+        Assert.Equal("测试大学", svc.Settings.ProfileName);
+        Assert.Equal("电信宽带服务", svc.Settings.ServiceName);
+        Assert.Equal("Static:TEST01", svc.Settings.StaticId);
+    }
+
+    [AvaloniaFact]
+    public void AuthMode_switches_without_reimport()
+    {
+        var vm = CreateVm();
+        vm.Username = "user";
+        vm.Password = "p";
+        vm.AddAccountCommand.Execute(null);
+        Assert.Equal("EAPMD5", vm.AuthModes[0].Value);
+        vm.SelectedAuthMode = vm.AuthModes.First(m => m.Value == "PEAP");
+        Assert.Equal("PEAP", vm.SelectedAuthMode.Value);
+        vm.SaveCommand.Execute(null);
+        Assert.True(File.Exists(Path.Combine(_workDir, "settings.json")));
+        var settings = new UserStore(_workDir).LoadSettings();
+        Assert.Equal("PEAP", settings.AuthMode);
+        vm.ApplyServiceConfigCommand.Execute(null);
+        Assert.Contains("服务配置已更新", vm.Status);
+        var svc = ServiceConfig.Load(Path.Combine(_workDir, "service.json"));
+        Assert.Equal("PEAP", svc.Settings.AuthMode);
     }
 
     public void Dispose()
     {
-        _tailers();
-    }
-
-    private static void _tailers()
-    {
-        // Service log tailers created by the view models above run on the
-        // test-bin path; they are harmless across tests but stop them to
-        // avoid file-watcher accumulation by clearing their watched file.
-        var path = Path.Combine(BaseDir, "logs", "service.log");
-        if (File.Exists(path))
+        try
         {
-            try { File.Delete(path); } catch (IOException) { }
+            if (Directory.Exists(_workDir) &&
+                _workDir.StartsWith(Path.GetTempPath(), StringComparison.OrdinalIgnoreCase))
+            {
+                Directory.Delete(_workDir, recursive: true);
+            }
+        }
+        catch (IOException)
+        {
+            // Best effort cleanup.
         }
     }
 

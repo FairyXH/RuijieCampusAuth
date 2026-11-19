@@ -9,6 +9,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using RuijieCampusAuth.App.Services;
 using RuijieCampusAuth.Core;
+using RuijieCampusAuth.Core.Protocols;
 
 namespace RuijieCampusAuth.App.ViewModels;
 
@@ -90,12 +91,21 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _logText = "";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _verboseLog;
+    [ObservableProperty] private DhcpOption? _selectedAuthMode;
+    [ObservableProperty] private string _adDomain = "";
+    [ObservableProperty] private double _adTimeout = 120;
+    [ObservableProperty] private string _engineVersion = "";
+    [ObservableProperty] private string _selfServiceUrl = "";
+    [ObservableProperty] private string _updateUrl = "";
+    [ObservableProperty] private string _portalUrl = "";
+    [ObservableProperty] private string _samHost = "";
+    [ObservableProperty] private double _samPort;
 
     public ObservableCollection<UserAccount> Accounts { get; } = [];
     public ObservableCollection<PcapDeviceInfo> Interfaces { get; } = [];
     public ObservableCollection<ServerRecord> Servers { get; } = [];
     public ObservableCollection<ProfileOption> AvailableProfiles { get; } = [];
-    public DebugViewModel Debug { get; } = new();
+    public DebugViewModel Debug { get; }
 
     public IReadOnlyList<DhcpOption> DhcpModes { get; } =
     [
@@ -104,19 +114,32 @@ public partial class MainViewModel : ViewModelBase
         new("none", "不使用"),
     ];
 
-    public MainViewModel() : this(new SystemServiceBridge(), null, null)
+    public IReadOnlyList<DhcpOption> AuthModes { get; } =
+    [
+        new("EAPMD5", "EAP-MD5"),
+        new("PEAP", "PEAPv0 + MSCHAPv2"),
+        new("PEAPV1", "PEAPv1 + MSCHAPv2"),
+        new("EAPTLS", "EAP-TLS"),
+    ];
+
+    public MainViewModel() : this(new SystemServiceBridge(), null, null, null)
     {
     }
 
     public MainViewModel(
         IServiceBridge serviceBridge,
         Func<List<PcapDeviceInfo>>? listInterfaces,
-        Action<string>? openPath = null)
+        Action<string>? openPath = null,
+        UserStore? store = null)
     {
         _service = serviceBridge;
         _listInterfaces = listInterfaces ?? (() => PcapNative.ListDevices());
         _openPath = openPath;
-        _store = new UserStore();
+        _store = store ?? new UserStore();
+        if (store is not null)
+        {
+            ServiceConfig.SetRootOverride(store.BaseDirectory);
+        }
         foreach (var device in _listInterfaces())
         {
             Interfaces.Add(device);
@@ -136,6 +159,7 @@ public partial class MainViewModel : ViewModelBase
             SelectedInterface = Interfaces.FirstOrDefault();
         }
         AppendLog($"账号池已加载: {Accounts.Count} 个账号");
+        Debug = new DebugViewModel(_store);
         RefreshProfiles();
         LoadServerList();
         RefreshService();
@@ -413,6 +437,17 @@ public partial class MainViewModel : ViewModelBase
         GuardianUrl = settings.GuardianUrl;
         GuardianInterval = settings.GuardianInterval;
         GuardianFailures = settings.GuardianFailures;
+        SelectedAuthMode = AuthModes.FirstOrDefault(item =>
+            item.Value.Equals(settings.AuthMode, StringComparison.OrdinalIgnoreCase))
+            ?? AuthModes[0];
+        AdDomain = settings.AdDomain;
+        AdTimeout = settings.AdTimeout;
+        EngineVersion = settings.EngineVersion;
+        SelfServiceUrl = settings.SelfServiceUrl;
+        UpdateUrl = settings.UpdateUrl;
+        PortalUrl = settings.PortalUrl;
+        SamHost = settings.SamHost;
+        SamPort = settings.SamPort;
 
         var discovery = _store.LoadDiscovery();
         if (!string.IsNullOrWhiteSpace(settings.Interface))
@@ -733,6 +768,7 @@ public partial class MainViewModel : ViewModelBase
                     lockedServer: settings.ServerLock ? settings.LockedServer : null,
                     serviceName: settings.ServiceName,
                     staticId: settings.StaticId,
+                    authMode: settings.AuthMode,
                     log: AppendLog,
                     error: message =>
                     {
@@ -740,6 +776,7 @@ public partial class MainViewModel : ViewModelBase
                         Status = message;
                     });
                 _activeSupplicant = supplicant;
+                await RunDhcpPhaseAsync(settings, "before", _cancellation.Token);
                 bool ok;
                 try
                 {
@@ -800,6 +837,7 @@ public partial class MainViewModel : ViewModelBase
                 }
                 Status = "认证成功";
                 AppendLog("认证成功");
+                await RunDhcpPhaseAsync(settings, "after", _cancellation.Token);
                 if (!settings.Preempt)
                 {
                     break;
@@ -994,6 +1032,15 @@ public partial class MainViewModel : ViewModelBase
         settings.GuardianUrl = GuardianUrl;
         settings.GuardianInterval = GuardianInterval;
         settings.GuardianFailures = GuardianFailures;
+        settings.AuthMode = SelectedAuthMode?.Value ?? "EAPMD5";
+        settings.AdDomain = AdDomain.Trim();
+        settings.AdTimeout = AdTimeout;
+        settings.EngineVersion = EngineVersion.Trim();
+        settings.SelfServiceUrl = SelfServiceUrl.Trim();
+        settings.UpdateUrl = UpdateUrl.Trim();
+        settings.PortalUrl = PortalUrl.Trim();
+        settings.SamHost = SamHost.Trim();
+        settings.SamPort = (int)SamPort;
         return settings;
     }
 
@@ -1035,6 +1082,39 @@ public partial class MainViewModel : ViewModelBase
             GuardianInterval = settings.GuardianInterval,
             GuardianFailures = settings.GuardianFailures,
         };
+    }
+
+    private async Task RunDhcpPhaseAsync(
+        UserSettings settings,
+        string phase,
+        CancellationToken token)
+    {
+        var wants = phase == "before"
+            ? AuthMethodOptions.WantsDhcpBefore(settings.DhcpMode)
+            : AuthMethodOptions.WantsDhcpAfter(settings.DhcpMode);
+        if (!wants || SelectedInterface is null)
+        {
+            return;
+        }
+        try
+        {
+            AppendLog($"DHCP {phase}: dhcp_mode={settings.DhcpMode} 开始续租");
+            var result = await DhcpControl.RunAsync(
+                SelectedInterface.Name,
+                DhcpOperation.Renew,
+                TimeSpan.FromSeconds(Math.Max(1, settings.DhcpTimeout)),
+                settings.DhcpOption82,
+                token);
+            AppendLog($"DHCP {phase} 完成: {result.Message} 租约 {result.Lease?.Ip ?? "-"}");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            AppendLog($"DHCP {phase} 失败，继续认证流程: {ex.Message}");
+        }
     }
 
     private async Task PauseForHomeNetworkAsync(

@@ -10,6 +10,9 @@ public sealed class Supplicant : IDisposable
     private readonly string _interface;
     private readonly byte[] _identity;
     private readonly byte[] _password;
+    private readonly string _usernameText;
+    private readonly string _passwordText;
+    private readonly AuthMethodKind _authMethod;
     private readonly double _timeout;
     private readonly int _retries;
     private readonly int _repeats;
@@ -47,14 +50,18 @@ public sealed class Supplicant : IDisposable
         string? lockedServer = null,
         string? serviceName = null,
         string? staticId = null,
+        string? authMode = null,
         NetworkInfo? network = null,
         Action<string>? log = null,
         Action<string>? error = null)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
         _interface = interfaceName;
+        _usernameText = username;
+        _passwordText = password;
         _identity = Encoding.GetEncoding("GB18030").GetBytes(username);
         _password = Encoding.GetEncoding("GB18030").GetBytes(password);
+        _authMethod = AuthMethodOptions.Parse(authMode);
         _timeout = Math.Max(1, timeout);
         _retries = Math.Max(1, retries);
         _repeats = Math.Max(1, repeats);
@@ -89,6 +96,64 @@ public sealed class Supplicant : IDisposable
     public void Stop()
     {
         _cancellation.Cancel();
+    }
+
+    private bool RunPeapFlow(AuthMethodKind kind)
+    {
+        Connected = false;
+        ConnectedAt = null;
+        ServerMac = null;
+        LastPrivateProperties = null;
+        ServerReauthIntervalSeconds = null;
+        _log?.Invoke($"认证方式: {AuthMethodOptions.Display(kind)}（auth_mode 配置驱动）");
+        var logBuffer = new List<string>();
+        try
+        {
+            using var transport = new PcapEapTransport(
+                _interface,
+                AuthMethodOptions.ToTunnelMode(kind),
+                logoffFirst: _logoffFirst,
+                repeats: _repeats,
+                timeout: TimeSpan.FromSeconds(_timeout),
+                log: message =>
+                {
+                    logBuffer.Add(message);
+                    _log?.Invoke(message);
+                });
+            var options = new PeapOptions
+            {
+                Mode = AuthMethodOptions.ToTunnelMode(kind),
+                UserName = _usernameText,
+                Password = _passwordText,
+                VerifyServerCertificate = false,
+                Timeout = TimeSpan.FromSeconds(Math.Max(5, _timeout * 2)),
+                IdentityTail = Tail(new byte[16]),
+            };
+            var result = PeapSession.Run(transport, options);
+            foreach (var step in result.Steps)
+            {
+                _log?.Invoke($"[PEAP] {step}");
+            }
+            if (transport.ServerMac is { } serverMac)
+            {
+                ServerMac = serverMac;
+            }
+            Connected = result.Ok && transport.OuterSuccess;
+            if (Connected)
+            {
+                ConnectedAt = DateTimeOffset.UtcNow;
+                _log?.Invoke("认证成功");
+                return true;
+            }
+            var failure = result.Message ?? transport.OuterFailure ?? "PEAP 认证未完成";
+            _error?.Invoke(failure);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            _error?.Invoke($"PEAP 认证异常: {ex.Message}");
+            return false;
+        }
     }
 
     private byte[] Tail(byte[] iv, byte[]? nonce = null)
@@ -148,6 +213,12 @@ public sealed class Supplicant : IDisposable
 
     public bool Authenticate()
     {
+        if (_authMethod != AuthMethodKind.EapMd5)
+        {
+            // PEAP / EAP-TLS run their own transport (Start, tunnel, phase2)
+            // driven by the configured auth mode.
+            return RunPeapFlow(_authMethod);
+        }
         Connected = false;
         ConnectedAt = null;
         ServerMac = null;

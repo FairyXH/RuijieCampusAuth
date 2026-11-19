@@ -332,6 +332,7 @@ using var supplicant = new Supplicant(
     lockedServer: context.LockedServer,
     serviceName: context.ServiceName,
     staticId: context.StaticId,
+    authMode: context.AuthMode,
     log: Console.WriteLine,
     error: message => Console.Error.WriteLine(message));
 var ok = supplicant.Authenticate();
@@ -416,7 +417,8 @@ internal sealed record LegacyContext(
     int Retries,
     int Repeats,
     double StartTimeout,
-    string? LockedServer);
+    string? LockedServer,
+    string AuthMode = "EAPMD5");
 
 internal static class ConfigStore
 {
@@ -494,7 +496,8 @@ internal static class ConfigStore
             retries,
             repeats,
             startTimeout,
-            string.IsNullOrWhiteSpace(locked) ? null : locked);
+            string.IsNullOrWhiteSpace(locked) ? null : locked,
+            settingsRoot is null ? "EAPMD5" : GetString(settings, "auth_mode") ?? "EAPMD5");
     }
 
     private static JsonElement? LoadRoot(string path)

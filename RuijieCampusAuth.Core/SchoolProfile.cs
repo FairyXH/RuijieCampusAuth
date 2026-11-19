@@ -175,6 +175,36 @@ public static class ProfileStore
         });
 
         store.SaveSettings(settings);
+
+        // Propagate to service.json so a running service picks the switch up
+        // on its next retry cycle without pressing 应用服务配置.
+        string? serviceNote = null;
+        try
+        {
+            if (File.Exists(ServiceConfig.ConfigPath))
+            {
+                var account = store.ActiveAccount();
+                if (account is not null)
+                {
+                    ServiceConfig.Save(
+                        ServiceConfig.ConfigPath,
+                        account.Username,
+                        account.Password,
+                        ServiceSettings.FromUser(settings));
+                    serviceNote = "service.json";
+                }
+            }
+        }
+        catch
+        {
+            // service.json may be protected (LocalSystem); the GUI's
+            // 应用服务配置 button can refresh it later.
+        }
+        if (serviceNote is not null)
+        {
+            applied.Add("service_config");
+        }
+
         return new ProfileImportResult(
             profile.Name,
             settingsPath,
