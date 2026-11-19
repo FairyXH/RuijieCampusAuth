@@ -110,8 +110,20 @@ public sealed class DebugPipeServer(ILogger<DebugPipeServer> logger) : Backgroun
         }
 
         var response = await DispatchAsync(request, cancellationToken);
-        await writer.WriteLineAsync(
-            JsonSerializer.Serialize(response, DebugPipeProtocol.JsonOptions));
+        try
+        {
+            await writer.WriteLineAsync(
+                JsonSerializer.Serialize(response, DebugPipeProtocol.JsonOptions));
+        }
+        catch (IOException)
+        {
+            // GUI 断开（退出/崩溃/闪断）：管道损坏不是错误，静默收线。
+            return;
+        }
+        catch (ObjectDisposedException)
+        {
+            return;
+        }
     }
 
     private static async Task<DebugPipeResponse> DispatchAsync(

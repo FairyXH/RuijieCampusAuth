@@ -161,7 +161,7 @@
             <Button Content="打开日志目录" Command="{Binding OpenLogFolderCommand}" />
           </StackPanel>
           <Border Grid.Row="2" Classes="card" Margin="0,10,0,0" Padding="6">
-            <TextBox Classes="log" Text="{Binding LogText}"
+            <TextBox x:Name="AuthLog" Classes="log" Text="{Binding LogText}"
                      ScrollViewer.VerticalScrollBarVisibility="Auto"
                      ScrollViewer.HorizontalScrollBarVisibility="Auto" />
           </Border>
