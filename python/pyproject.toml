@@ -11,18 +11,15 @@ requires-python = ">=3.10"
 dependencies = ["scapy>=2.6,<3"]
 
 [project.optional-dependencies]
-gui = ["PySide6-Essentials>=6.8"]
 build = ["pyinstaller>=6.11", "pillow>=10"]
 
 [project.urls]
-Homepage = "https://github.com/FairyXH/ruijie-campus-auth-hxxy"
-Repository = "https://github.com/FairyXH/ruijie-campus-auth-hxxy.git"
+Homepage = "https://github.com/FairyXH/RuijieCampusAuth"
+Repository = "https://github.com/FairyXH/RuijieCampusAuth.git"
 
 [project.scripts]
 ruijie-auth = "ruijie_auth.cli:main"
-
-[project.gui-scripts]
-ruijie-auth-gui = "ruijie_auth.gui:main"
+ruijie-auth-menu = "ruijie_auth.menu:run_menu"
 
 [tool.setuptools.packages.find]
 where = ["src"]

@@ -166,15 +166,70 @@ sh scripts/build-image.sh   # 产出 sysupgrade 镜像
 细节与 R3G 专项参数见 `openwrt/README.md`、`docs/OPENWRT_FEASIBILITY.md`、
 `docs/OPENWRT_BUILD_ENV.md`。
 
-## Python 参考实现
+## Python 版（纯 CLI 菜单）
 
-`python/` 是最早的协议参考实现（逆向期的原型，协议行为与 C# 版一致，
-569 字节私有尾两版逐字节一致）：
+`python/` 是完整的 Python 转译实现，协议算法、调用链、函数签名与 C# 版
+逐模块对应，已通过原版二进制差分向量和真实抓包数据校验。**无 GUI**，
+使用宝塔风格的数字菜单 CLI：
 
-- 用途：协议研究、快速验证新想法、给 C# 版做行为对照
-- 入口与 API 说明见 `python/README.md`；打包脚本 `python/build.ps1`
-- **生产部署请用 C# 版**（服务模式/GUI/测试覆盖都在 C# 侧）；Python 版
-  保留为研究与对照实现，功能更新已延后（见 `docs/GENERICIZATION.md`）
+```bash
+# 安装（需要 scapy）
+cd python && pip install -e .
+
+# 交互菜单（无参数时默认进入）
+python -m ruijie_auth
+
+# 脚本/自动化模式（argparse 子命令不变）
+ruijie-auth --help
+```
+
+### 菜单结构
+
+```text
+ 1) 认证管理       开始/注销/连通测试
+ 2) 账号池         添加/更新/删除/启用停用/设为当前
+ 3) 认证服务器     锁定/取消锁定/清空
+ 4) 网络与 DHCP    续租/释放/查看租约/设置模式
+ 5) 诊断工具       网络探测/ARP 监控/代理检测/拨号检测/OUI 识别/医生管道
+ 6) 调试功能       Portal 登录注销/在线信息/自助/客户端中心/升级检查/SAM 探测/私有属性解析
+ 7) 系统服务       安装/启动/停止/卸载/应用服务配置
+ 8) 学校配置档案   多选导入/切换（导入自动同步 service.json）
+ 9) 查看日志       服务日志尾部
+```
+
+### 协议模块（`src/ruijie_auth/protocols/`）
+
+| 模块 | 对应 C# | 说明 |
+|---|---|---|
+| `rc4.py` | Rc4.cs | RC4 流加密 |
+| `private_properties.py` | PrivateProperties.cs | 分段格式解析（消息/0x6F 块/版本门/混淆段/TLV） |
+| `mschap_v2.py` | MschapV2.cs | MD4 + ChallengeHash + NT-Response + DES |
+| `auth_method.py` | AuthMethod.cs | auth_mode 解析 + DHCP 模式门控 |
+| `peap_session.py` | PeapSession.cs + EapTlsStream.cs | SSLObject over MemoryBIO 隧道 |
+| `pcap_eap_transport.py` | PcapEapTransport.cs | scapy L2 传输（Start/Identity/tunnel Exchange） |
+| `peap_vendor_segments.py` | PeapVendorSegments.cs | 0x11/0x2D/0x39/0x5F/0x63 段组装 |
+| `dhcp_control.py` | DhcpControl.cs | iphlpapi ctypes 续租/释放 |
+| `http_json_client.py` | HttpJsonClient.cs | stdlib HTTP GET/POST JSON |
+| `clients.py` | PortalClient + ClientCenterClient + SelfServiceClient + UpgradeClient + SamDirectClient | Portal API + 自助 + 客户端中心 + SAM + 升级 |
+| `wlan_profile_manager.py` | WlanProfileManager.cs | netsh 无线配置 |
+
+### 诊断模块（`src/ruijie_auth/diagnostics/`）
+
+`oui_detect` / `nic_inventory` / `arp_monitor` / `network_probe` /
+`proxy_detect` / `doctor_pipe` — 对应 C# Diagnostics 同名文件。
+
+### 与 C# 版的一致性
+
+- CRC16/混淆/凭据加密/RC4/私有属性解析：**与原版二进制和真实抓包逐字节一致**
+- `auth_mode`/`dhcp_mode`/学校档案字段：**与 C# 版运行时语义完全相同**
+- 测试：`python/tests/test_protocols.py`（21 项向量）+
+  `test_menu.py`（5 项菜单逻辑）= 38 项
+
+### 生产部署说明
+
+Python 版适合脚本/嵌入式场景；**桌面端生产部署请用 C# 版**（服务模式
+和 GUI 都在 C# 侧）。Python 版的服务模式（`system_service.py`）支持
+Linux systemd 和 Windows SCM，但功能覆盖以 C# 版为准。
 
 ## 文档索引
 

@@ -13,6 +13,7 @@ import ctypes
 import json
 import logging
 import os
+import time
 import sys
 import threading
 import uuid
@@ -72,6 +73,19 @@ def _dpapi(data: bytes, protect: bool, machine: bool = False) -> bytes:
         return ctypes.string_at(out_blob.pbData, out_blob.cbData)
     finally:
         kernel32.LocalFree(out_blob.pbData)
+
+
+def _replace_with_retry(temp: Path, path: Path) -> None:
+    """Retry direct write: sync/AV clients intermittently hold open handles
+    on newly written files, denying both os.replace and write_text."""
+    for attempt in range(60):
+        try:
+            path.write_text(temp.read_text(encoding="utf-8"), encoding="utf-8")
+            return
+        except PermissionError:
+            if attempt >= 59:
+                raise
+            time.sleep(1)
 
 
 def protect_password(password: str) -> str:
@@ -204,6 +218,17 @@ class AppSettings:
     dhcp_timeout: float = 30.0
     dhcp_option82: bool = False
     school_code: str = ""
+    auth_mode: str = "EAPMD5"
+    profile_name: str = ""
+    ad_domain: str = ""
+    ad_timeout: float = 120.0
+    engine_version: str = ""
+    self_service_url: str = ""
+    update_url: str = ""
+    portal_url: str = ""
+    sam_host: str = ""
+    sam_port: int = 0
+    use_server_reauth: bool = True
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AppSettings":
@@ -303,7 +328,7 @@ class DiscoveryCache:
                     json.dumps(payload, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-                os.replace(temp, self.path)
+                _replace_with_retry(temp, self.path)
             except OSError as exc:
                 LOG.warning("写入认证通道缓存失败: %s", exc)
 
@@ -387,7 +412,7 @@ class ServerStore:
         temp.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
         )
-        os.replace(temp, self.path)
+        _replace_with_retry(temp, self.path)
 
     def load(self) -> list[ServerRecord]:
         with self._lock:
@@ -507,18 +532,8 @@ class AccountStore:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
     def _write_json(self, path: Path, payload: dict[str, Any]) -> None:
-        temp = path.with_suffix(path.suffix + ".tmp")
-        temp.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-        os.replace(temp, path)
-        if os.name != "nt":
-            try:
-                os.chmod(path, 0o600)
-            except OSError:
-                pass
-
+        content = json.dumps(payload, ensure_ascii=False, indent=2)
+        path.write_text(content, encoding="utf-8")
     def load_accounts(self) -> list[Account]:
         if not self.accounts_path.exists():
             return []

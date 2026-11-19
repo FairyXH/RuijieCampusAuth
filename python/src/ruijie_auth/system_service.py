@@ -337,11 +337,13 @@ class SystemAgent:
             else None
         )
         self._status("authenticating", f"正在认证 {self.account.username}")
+        self._run_dhcp_phase("before")
         supp = Supplicant(
             interface=self._resolved,
             identity=self.account.username.encode("gb18030"),
             password=self.account.password.encode("gb18030"),
             timeout=self.settings.timeout,
+            auth_mode=self.settings.auth_mode,
             retries=self.settings.retries,
             repeats=self.settings.repeats,
             private=True,
@@ -469,11 +471,43 @@ class SystemAgent:
             if self.stop_event.wait(self.settings.check_interval):
                 return
 
+    def _run_dhcp_phase(self, phase: str) -> None:
+        """Mirror C# AuthWorker: dhcp_mode before/after renewal."""
+        mode = (self.settings.dhcp_mode or "").strip().lower()
+        if phase == "before":
+            wants = mode == "before"
+        else:
+            wants = mode == "after"
+        if not wants or not self._resolved:
+            return
+        try:
+            from .protocols.dhcp_control import DhcpOperation, run as dhcp_run
+
+            LOG.info("DHCP %s: dhcp_mode=%s 开始续租", phase, mode)
+            result = dhcp_run(
+                self._resolved,
+                DhcpOperation.RENEW,
+                max(1.0, float(self.settings.dhcp_timeout)),
+                bool(self.settings.dhcp_option82),
+            )
+            LOG.info("DHCP %s 完成: %s 租约 %s", phase, result.message,
+                     result.lease.ip if result.lease else "-")
+        except Exception as exc:  # noqa: BLE001
+            LOG.warning("DHCP %s 失败，继续认证流程: %s", phase, exc)
+
     def run(self) -> None:
         _setup_service_logging(service_log_path())
         LOG.info("系统认证服务启动")
         self._status("starting", "服务启动")
         while not self.stop_event.is_set():
+            try:
+                # Mirror C# AuthWorker: reload account/settings every attempt
+                # so config/profile changes apply without reinstalling.
+                account, settings = load_service_config()
+                self.account = account
+                self.settings = settings
+            except Exception as exc:  # noqa: BLE001
+                LOG.warning("系统服务配置读取失败，沿用上一轮: %s", exc)
             try:
                 ok = self._logon()
             except SystemExit:
@@ -488,6 +522,7 @@ class SystemAgent:
                 break
             if ok:
                 self._status("authenticated", "认证成功")
+                self._run_dhcp_phase("after")
                 if not self.settings.preempt:
                     self._status("idle", "认证成功，服务保持运行")
                     while not self.stop_event.wait(5):

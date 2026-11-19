@@ -454,7 +454,11 @@ class Supplicant:
         service_name: str | None = None,
         static_id: str | None = None,
         start_timeout: float = 3.0,
+        auth_mode: str | None = None,
     ) -> None:
+        from .protocols.auth_method import AuthMethodKind, parse as parse_auth_mode
+
+        self.auth_method = parse_auth_mode(auth_mode)
         self.interface = interface
         self.identity = identity
         self.password = password
@@ -575,7 +579,60 @@ class Supplicant:
         else:
             LOG.info("正在寻找认证服务器...")
 
+    def _run_peap_flow(self, kind) -> bool:
+        from .protocols.peap_session import (
+            PeapOptions,
+            TunnelMode,
+            run as run_peap,
+        )
+        from .protocols.auth_method import display
+
+        LOG.info("认证方式: %s（auth_mode 配置驱动）", display(kind))
+        self.connected = False
+        self.connected_at = None
+        self.server_mac = None
+        mode = TunnelMode.PEAP if kind != AuthMethodKind.EAP_TLS else TunnelMode.EAP_TLS
+        try:
+            from .protocols.pcap_eap_transport import PcapEapTransport
+
+            transport = PcapEapTransport(
+                self.interface,
+                mode,
+                logoff_first=self.logoff_first,
+                repeats=self.repeats,
+                timeout=self.timeout,
+                log=LOG.info,
+            )
+            options = PeapOptions(
+                mode=mode,
+                user_name=self.identity.decode("utf-8", errors="replace"),
+                password=self.password.decode("utf-8", errors="replace"),
+                verify_server_certificate=False,
+                timeout=max(5.0, self.timeout * 2),
+                identity_tail=self._tail(b"" * 16),
+            )
+            result = run_peap(transport, options)
+            for step in result.steps:
+                LOG.info("[PEAP] %s", step)
+            if transport.server_mac:
+                self.server_mac = transport.server_mac
+            self.connected = bool(result.ok and transport.outer_success)
+            if self.connected:
+                self.connected_at = time.time()
+                LOG.info("认证成功")
+                return True
+            message = result.message or transport.outer_failure or "PEAP 认证未完成"
+            LOG.error("%s", message)
+            return False
+        except Exception as exc:
+            LOG.error("PEAP 认证异常: %s", exc)
+            return False
+
     def authenticate(self) -> bool:
+        if self.auth_method != AuthMethodKind.EAP_MD5:
+            # PEAP/EAP-TLS run their own transport (Start, tunnel, phase2),
+            # driven by the configured auth mode — mirrors C# RunPeapFlow.
+            return self._run_peap_flow(self.auth_method)
         self.connected = False
         self.connected_at = None
         sniffer = AsyncSniffer(
