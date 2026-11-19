@@ -64,34 +64,6 @@ public static class DebugFeatureCatalog
             "EAP-TLS 客户端证书认证实验台。",
             supportsArguments: true),
         new PlannedDebugFeature(
-            "portal-auth",
-            "Portal 认证",
-            "portal",
-            "P5",
-            "eportal login/logout/getOnlineUserInfo/pageInfo。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "portal-udp",
-            "Portal 消息",
-            "portal",
-            "P5",
-            "监听 Portal UDP 通知。",
-            requiresService: true),
-        new PlannedDebugFeature(
-            "client-center",
-            "客户端中心",
-            "portal",
-            "P5",
-            "上报/查询客户端中心。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
-            "self-service",
-            "自助服务/余额",
-            "portal",
-            "P5",
-            "拉取自助 ball JSON、余额、套餐、在线时长。",
-            supportsArguments: true),
-        new PlannedDebugFeature(
             "password-change",
             "修改密码",
             "portal",
@@ -107,23 +79,11 @@ public static class DebugFeatureCatalog
             requiresService: true,
             supportsArguments: true),
         new PlannedDebugFeature(
-            "server-list-update",
-            "服务器列表更新",
-            "ops",
-            "P5",
-            "处理服务器下发的列表更新。"),
-        new PlannedDebugFeature(
             "config-update",
             "配置更新",
             "ops",
             "P5",
             "处理配置更新事件。"),
-        new PlannedDebugFeature(
-            "user-messages",
-            "用户消息",
-            "ops",
-            "P5",
-            "读取服务器广播/用户消息。"),
         new PlannedDebugFeature(
             "upgrade-check",
             "升级检查",

@@ -199,6 +199,12 @@ public static class DebugFeatureFactory
             new ProxyDetectDebugFeature(store),
             new DialupDetectDebugFeature(),
             new DoctorPipeDebugFeature(),
+            new PortalDebugFeature(store),
+            new ClientCenterDebugFeature(store),
+            new SelfServiceDebugFeature(store),
+            new ServerListUpdateDebugFeature(),
+            new PortalUdpDebugFeature(),
+            new UserMessagesDebugFeature(),
         };
         features.AddRange(DebugFeatureCatalog.Planned);
         return new DebugFeatureRegistry(

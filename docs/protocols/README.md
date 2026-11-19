@@ -17,8 +17,8 @@
 | 服务器私有属性 TLV / RC4 | `private-properties.md` | P2 已实现 |
 | DHCP + Option 82 | `dhcp.md` | P3 已实现 |
 | ARP / 代理 / 拨号检测 | `diagnostics.md` | P4 已实现 |
-| Portal eportal / Portal UDP | `portal.md` | P5 |
-| 客户端中心 / 自助服务 | `client-center.md` | P5 |
+| Portal eportal / Portal UDP | `portal.md` | P5 已实现 |
+| 客户端中心 / 自助服务 | `portal.md` | P5 已实现 |
 | PEAP / EAP-TLS | `peap.md` | P6 |
 | 无线 WPA2-Enterprise | `wireless.md` | P7 |
 | SAM 直通 / 升级 | `sam-upgrade.md` | P8 |

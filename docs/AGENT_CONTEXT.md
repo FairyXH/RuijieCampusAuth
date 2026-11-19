@@ -51,7 +51,12 @@ to the Python tree under `python/`.
   ARP gateway monitor, network probe, proxy port probe, dialup detection,
   doctor pipe. Live checks: OUI 00:1a:a9, 13 NICs, ARP stable, gateway/DNS/HTTP
   OK, no proxy ports, no active dialup. Tests: Core 22 passed.
-- Next: P5 Portal / client center / self-service / password change.
+- P5: Portal eportal HTTP (login/logout/online/pageInfo, JSON POST, `PC` service
+  suffix), client center query, self-service GET, server-list TLV view, user
+  message TLV view, Portal UDP listener. Portal HTTP verified against a local
+  TCP fixture. Tests: Core 26 passed. `password-change` and `config-update`
+  remain planned (endpoint/format not evidenced).
+- Next: P6 PEAP/MSCHAPv2 + EAP-TLS.
 
 ## Verified State
 

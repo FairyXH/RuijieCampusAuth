@@ -55,6 +55,12 @@ internal static class DebugArgs
             ? flag
             : null;
     }
+
+    public static string FirstNonEmpty(params string?[] values)
+    {
+        return values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))
+               ?? "";
+    }
 }
 
 public sealed class OuiDetectDebugFeature(UserStore store) : DebugFeatureBase

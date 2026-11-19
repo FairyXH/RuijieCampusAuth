@@ -67,7 +67,6 @@ public static class PrivateProperties
         (byte)PrivatePropertyType.ServerListUpdateLegacy,
         (byte)PrivatePropertyType.UserLoginUrl,
         (byte)PrivatePropertyType.UtrustUrl,
-        (byte)PrivatePropertyType.AutoOpenSsoUrl,
     ];
 
     private static readonly Dictionary<byte, string> Names = new()
