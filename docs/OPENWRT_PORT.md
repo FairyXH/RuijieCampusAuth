@@ -76,6 +76,7 @@
 | PEAP 分片 | 首片 `0xC0`、中间 `0x40`、末片 `0x00`，长度头 500、重组一致 |
 | UCI 导入 | 保留账号与未知选项、写 backup、忽略空字段、单引号转义 |
 | 中文 .lmo | 与 24.10 镜像的 `https-dns-proxy.zh-cn.lmo` 154/154 键值/偏移一致 |
+| QEMU 运行 | x86_64 OpenWrt：selftest、interfaces、EAPOL 循环、profile import、LuCI 页面与 zh-cn 词条均通过 |
 
 未验证：真实 RADIUS 上的 PEAP/EAP-TLS 端到端；真实校园网 WAN 上的
 EAP-MD5 上线（需现场账号）。

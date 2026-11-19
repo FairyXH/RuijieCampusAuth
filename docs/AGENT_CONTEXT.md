@@ -164,10 +164,14 @@ Deep Freeze：
   PEAP 分片布局全部有 Go 测试。
 - amd64 原生与 mipsle（`qemu-mipsel`）`ruijie-auth selftest` 通过。
 - ipk 构建通过；R3G 整机镜像 8.8MB，SHA256
-  `e6255f9ffe535be1ba83335adbcdb68e014e223c378f33bb6298a36a8d7c86ff`，
+  `54c0f8981253efabb577079b6b6cb45f97d7dd0a50731e9fac2077167afec5c7`，
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`。
 - `scripts/po2lmo.py` 生成的 `.lmo` 与 24.10 官方
   `https-dns-proxy.zh-cn.lmo` 逐键值一致（154/154）。
+- x86_64 OpenWrt QEMU 冒烟：`selftest` 通过；`interfaces` 将 br-lan 标为
+  WAN；daemon 在 br-lan 上完成 Logoff→4×Start→paused；`profile import`
+  写入 8 字段并生成 backup，reload 后状态显示 profile；LuCI 页面 200、
+  `lang_zh-cn`、translations 端点返回「锐捷认证器」等词条。
 - 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
 
 ## 8. 已知问题 / 限制

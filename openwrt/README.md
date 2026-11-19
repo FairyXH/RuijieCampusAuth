@@ -158,4 +158,15 @@ ruijie-auth selftest
 - amd64 原生与 mipsle（`qemu-mipsel`）`selftest` 均通过。
 - ipk 构建通过，内容包含二进制、init、hotplug、UCI 默认值、8 个 LuCI
   页面、菜单/ACL 和 `ruijie-auth.zh-cn.lmo`。
+- x86_64 OpenWrt QEMU 端到端冒烟（把文件直接放进 rootfs）：
+  - `selftest` 通过；`interfaces` 把 `br-lan` 识别为校园网 WAN；
+  - 守护进程在 `br-lan` 上真实打开 AF_PACKET，日志完整走完
+    Logoff → 4 次 Start → 未找到服务器 → `paused`，状态文件含
+    `auth_mode`、`devices`、`account`；
+  - `profile import` 在设备上写入 8 个字段、生成 backup、触发 reload，
+    状态随后显示 `profile=测试学校`；
+  - LuCI 登录后 `data-page=admin-services-ruijie-auth-overview`、
+    `body class=lang_zh-cn`，`/admin/translations/zh-cn` 返回
+    `锐捷认证器`、`认证方式`、`学校档案`、`服务器私有属性` 等中文词条
+    （说明 `.lmo` 被正确加载）。
 - 未在真实校园网环境上做端到端认证（需要现场 WAN 与账号）。
