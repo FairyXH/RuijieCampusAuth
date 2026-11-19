@@ -216,6 +216,9 @@ Deep Freeze：
 - 最近提交：
 
 ```
+dc7f363 docs: record the OpenWrt port mapping and verification
+f624c36 feat: rebuild LuCI for the authenticator with a zh-cn catalog
+56fa153 feat: port the C# protocol core to the OpenWrt daemon
 4ea64d1 test: verify C# algorithms against original binary functions
 11efd64 feat: add multi-profile GUI switching and adaptation guide
 df1723c feat: add wireless profiles, SAM probe, and upgrade check

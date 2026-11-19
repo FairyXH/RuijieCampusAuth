@@ -22,6 +22,18 @@ dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root "D:\Sto
 GUI 的「档案」页会扫描程序目录/当前目录的 `profiles/`，选择后点击“导入/切换”即可；
 可以放多个学校档案，随时切换。CLI `profile list` 默认扫描同样的目录。
 
+OpenWrt 端使用完全相同的 JSON：
+
+```sh
+# 路由器上执行
+ruijie-auth profile list
+ruijie-auth profile import --file /tmp/hxxy.json
+```
+
+也可以把档案放到 `/etc/ruijie-auth/profiles/`，或直接在 LuCI
+「锐捷认证器 → 学校档案」页上传/粘贴。导入会先备份
+`/etc/config/ruijie-auth`，账号池保持不变。
+
 ## 字段
 
 | 字段 | 说明 |
