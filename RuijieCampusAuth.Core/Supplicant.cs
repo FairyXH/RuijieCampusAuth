@@ -236,8 +236,9 @@ public sealed class Supplicant : IDisposable
                 ServerMac = source;
                 if (code == Eapol.EapSuccess)
                 {
-                    CaptureServerProperties(eap);
-                    foreach (var message in Eapol.ExtractServerMessages(eap))
+                    var properties = CaptureServerProperties(eap);
+                    foreach (var message in properties?.Messages ??
+                             Eapol.ExtractServerMessages(eap))
                     {
                         _log?.Invoke($"服务器消息: {message}");
                     }
@@ -246,7 +247,10 @@ public sealed class Supplicant : IDisposable
                 }
                 if (code == Eapol.EapFailure)
                 {
-                    var messages = Eapol.ExtractServerMessages(eap);
+                    var properties = CaptureServerProperties(eap);
+                    var messages = properties?.Messages.Count > 0
+                        ? properties.Messages
+                        : Eapol.ExtractServerMessages(eap);
                     if (messages.Count > 0)
                     {
                         foreach (var message in messages)
@@ -320,11 +324,11 @@ public sealed class Supplicant : IDisposable
         }
     }
 
-    private void CaptureServerProperties(byte[] eap)
+    private PrivatePropertiesResult? CaptureServerProperties(byte[] eap)
     {
         if (eap.Length <= 4)
         {
-            return;
+            return null;
         }
         try
         {
@@ -361,10 +365,12 @@ public sealed class Supplicant : IDisposable
                 _log?.Invoke(
                     $"服务器私有属性解析告警: {string.Join("; ", parsed.Errors)}");
             }
+            return parsed;
         }
         catch (Exception ex)
         {
             _log?.Invoke($"服务器私有属性解析失败: {ex.Message}");
+            return null;
         }
     }
 

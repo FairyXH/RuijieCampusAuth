@@ -88,12 +88,13 @@ public sealed class PortalTests
         settings.SetFeature("server-list-update", true);
         var registry = DebugFeatureFactory.Create(store, settings);
 
-        var payload = new List<byte>();
-        Add(payload, 66, Encoding.ASCII.GetBytes("http://portal.example/"));
-        Add(payload, 119, [0x01]);
+        var payload = PrivatePropertiesTests.BuildSectioned(
+            [],
+            (66, Encoding.ASCII.GetBytes("http://portal.example/")),
+            (119, [0x01]));
         var result = await registry.RunAsync(
             "server-list-update",
-            "{\"hex\":\"" + Convert.ToHexString(payload.ToArray()).ToLowerInvariant() + "\"}",
+            "{\"hex\":\"" + Convert.ToHexString(payload).ToLowerInvariant() + "\"}",
             CancellationToken.None);
 
         Assert.True(result.Ok, result.Message);
@@ -114,12 +115,13 @@ public sealed class PortalTests
         var settings = new DebugSettings { Enabled = true };
         settings.SetFeature("user-messages", true);
         var registry = DebugFeatureFactory.Create(store, settings);
-        var payload = new List<byte>();
-        Add(payload, 82, Encoding.ASCII.GetBytes("hello"));
-        Add(payload, 83, Encoding.ASCII.GetBytes("denied"));
+        var payload = PrivatePropertiesTests.BuildSectioned(
+            [],
+            (82, Encoding.ASCII.GetBytes("hello")),
+            (83, Encoding.ASCII.GetBytes("denied")));
         var result = await registry.RunAsync(
             "user-messages",
-            "{\"hex\":\"" + Convert.ToHexString(payload.ToArray()).ToLowerInvariant() + "\"}",
+            "{\"hex\":\"" + Convert.ToHexString(payload).ToLowerInvariant() + "\"}",
             CancellationToken.None);
         Assert.True(result.Ok, result.Message);
         var messages = JsonNode.Parse(result.Data!)!["messages"]!.AsArray();

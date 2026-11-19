@@ -47,14 +47,36 @@ public sealed record PrivateProperty(
 
 public sealed record PrivatePropertiesResult(
     IReadOnlyList<PrivateProperty> Properties,
-    int DeclaredLength,
+    IReadOnlyList<string> Messages,
+    long? Section2Value,
+    long? Section5Hash,
+    long? Section5IntervalMs,
+    int ConsumedBytes,
     IReadOnlyList<string> Errors);
 
+/// <summary>
+/// Parser for the server private-property block carried by EAP Success and
+/// Failure packets, byte-compatible with 8021x.exe
+/// ParsePrivateProperty (0x537ee0):
+///
+///   [00 00 13 11][2B len][GBK message]                    section 1
+///   [00 00 13 11][2B][4B value][...][1B count][count*32]  section 2 (0x6F layout)
+///   [00 00 13 11][ver][ver][4B]                           section 3 (ver==1, sub<2)
+///   [00 00 13 11][ver][ver][4B]                           section 4 (ver==1, sub<2)
+///   [15 obfuscated bytes]                                 section 5, de-obfuscated
+///     in place: [1311][0x0A gate][sub][4B hash][4B sec][1B]
+///   [00 00 13 11][type][len=value+2][value] ...           property TLV loop
+///
+/// The 15-byte section 5 chunk uses the same bit-reverse+invert transform as
+/// the EAPOL private tail (FUN_0053df40 == FUN_0053de90), so PrivateTail.
+/// Obfuscate is its own inverse.
+/// </summary>
 public static class PrivateProperties
 {
     public const int MaximumPacketLength = 0x578;
     public const int MaximumValueLength = 0xfe;
     public static readonly byte[] Rc4Key = Encoding.ASCII.GetBytes("com.ruijie.www");
+    private static readonly byte[] Marker = [0x00, 0x00, 0x13, 0x11];
 
     private static readonly HashSet<byte> StringTypes =
     [
@@ -106,50 +128,178 @@ public static class PrivateProperties
     public static PrivatePropertiesResult Parse(ReadOnlySpan<byte> payload)
     {
         var properties = new List<PrivateProperty>();
+        var messages = new List<string>();
         var errors = new List<string>();
-        if (payload.Length > MaximumPacketLength)
+        var data = payload.ToArray();
+        var total = data.Length;
+        if (total > MaximumPacketLength)
         {
-            errors.Add(
-                $"payload length {payload.Length} exceeds {MaximumPacketLength}");
-            return new PrivatePropertiesResult(properties, payload.Length, errors);
+            errors.Add($"payload length {total} exceeds {MaximumPacketLength}");
+            return new PrivatePropertiesResult(properties, messages, null, null,
+                null, 0, errors);
         }
 
-        var offset = 0;
-        while (offset + 2 <= payload.Length)
+        var pos = 0;
+        // Section 1: marker + 2B length + GBK message
+        if (total < 6 || !MarkerAt(data, 0))
         {
-            var type = payload[offset];
-            var length = payload[offset + 1];
-            offset += 2;
+            errors.Add("missing section 1 marker");
+            return new PrivatePropertiesResult(properties, messages, null, null,
+                null, 0, errors);
+        }
+        var messageLength = ReadUInt16BE(data, 4);
+        if (messageLength + 6 > total)
+        {
+            errors.Add($"section 1 length {messageLength} overruns payload");
+            return new PrivatePropertiesResult(properties, messages, null, null,
+                null, 0, errors);
+        }
+        var message = DecodeText(data.AsSpan(6, messageLength).ToArray());
+        if (!string.IsNullOrWhiteSpace(message))
+        {
+            messages.Add(message);
+        }
+        pos = 6 + messageLength;
 
-            if (type == 0)
+        // Section 2: fixed 0x6F layout with count-prefixed 32-byte entries
+        long? section2Value = null;
+        if (pos + 0x6F <= total)
+        {
+            if (MarkerAt(data, pos))
             {
-                errors.Add($"type 0 at offset {offset - 2}");
-                offset = payload.Length;
-                break;
+                pos += 6;
+                section2Value = ReadUInt32BE(data, pos);
+                var count = data[pos + 0x68];
+                pos += 0x69;
+                if (count * 0x20 + pos <= total)
+                {
+                    pos += count * 0x20;
+                }
+                else
+                {
+                    errors.Add($"section 2 count {count} overruns payload");
+                    return new PrivatePropertiesResult(properties, messages,
+                        section2Value, null, null, pos, errors);
+                }
             }
-            if (length > MaximumValueLength)
+            else
             {
-                errors.Add($"length {length} for type {type} exceeds {MaximumValueLength}");
-                offset = payload.Length;
-                break;
+                errors.Add($"missing section 2 marker at offset {pos}");
+                return new PrivatePropertiesResult(properties, messages,
+                    section2Value, null, null, pos, errors);
             }
-            if (offset + length > payload.Length)
-            {
-                errors.Add($"type {type} overruns payload at offset {offset - 2}");
-                offset = payload.Length;
-                break;
-            }
+        }
+        else
+        {
+            return new PrivatePropertiesResult(properties, messages,
+                section2Value, null, null, pos, errors);
+        }
 
-            var value = payload.Slice(offset, length).ToArray();
-            offset += length;
+        // Sections 3/4: marker + ver + sub + 4B, ver must be 1 and sub < 2
+        for (var section = 3; section <= 4; section++)
+        {
+            if (pos + 6 > total)
+            {
+                return new PrivatePropertiesResult(properties, messages,
+                    section2Value, null, null, pos, errors);
+            }
+            if (!MarkerAt(data, pos))
+            {
+                errors.Add($"missing section {section} marker at offset {pos}");
+                return new PrivatePropertiesResult(properties, messages,
+                    section2Value, null, null, pos, errors);
+            }
+            var version = data[pos + 4];
+            var sub = data[pos + 5];
+            if (version == 1 && sub < 2)
+            {
+                pos += 6;
+            }
+            else
+            {
+                errors.Add(
+                    $"section {section} version {version}/sub {sub} rejected");
+                return new PrivatePropertiesResult(properties, messages,
+                    section2Value, null, null, pos, errors);
+            }
+        }
+
+        // Section 5: 15 obfuscated bytes, de-obfuscated in place
+        long? hash = null;
+        long? intervalMs = null;
+        if (pos + 15 > total)
+        {
+            return new PrivatePropertiesResult(properties, messages,
+                section2Value, null, null, pos, errors);
+        }
+        var plain = new byte[15];
+        var obfuscated = data.AsSpan(pos, 15).ToArray();
+        PrivateTail.Obfuscate(obfuscated).CopyTo(plain, 0);
+        if (!MarkerAt(plain, 0))
+        {
+            errors.Add($"section 5 de-obfuscated marker mismatch: {Convert.ToHexString(plain)}");
+            return new PrivatePropertiesResult(properties, messages,
+                section2Value, null, null, pos, errors);
+        }
+        if (plain[4] != 0x0A)
+        {
+            errors.Add($"section 5 gate byte {plain[4]:X2} != 0x0A");
+            return new PrivatePropertiesResult(properties, messages,
+                section2Value, hash, intervalMs, pos, errors);
+        }
+        hash = ReadUInt32BE(plain, 6);
+        intervalMs = ReadUInt32BE(plain, 10) * 1000;
+        pos += 15;
+
+        // Property TLV loop: [1311][type][len=value+2][value]
+        while (pos + 6 <= total)
+        {
+            if (!MarkerAt(data, pos))
+            {
+                break;
+            }
+            var type = data[pos + 4];
+            var declared = data[pos + 5];
+            if (declared < 2)
+            {
+                errors.Add($"type {type} length {declared} too small at offset {pos}");
+                break;
+            }
+            var valueLength = declared - 2;
+            if (pos + 6 + valueLength > total)
+            {
+                errors.Add($"type {type} overruns payload at offset {pos}");
+                break;
+            }
+            var value = data.AsSpan(pos + 6, valueLength).ToArray();
+            pos += 6 + valueLength;
             properties.Add(Decode(type, value));
         }
 
-        if (offset != payload.Length)
+        if (pos != total)
         {
-            errors.Add($"trailing {payload.Length - offset} byte(s)");
+            errors.Add($"trailing {total - pos} byte(s)");
         }
-        return new PrivatePropertiesResult(properties, payload.Length, errors);
+        return new PrivatePropertiesResult(properties, messages, section2Value,
+            hash, intervalMs, pos, errors);
+    }
+
+    private static bool MarkerAt(byte[] data, int offset)
+    {
+        return offset + 4 <= data.Length &&
+               data[offset] == Marker[0] && data[offset + 1] == Marker[1] &&
+               data[offset + 2] == Marker[2] && data[offset + 3] == Marker[3];
+    }
+
+    private static ushort ReadUInt16BE(byte[] data, int offset)
+    {
+        return (ushort)((data[offset] << 8) | data[offset + 1]);
+    }
+
+    private static int ReadUInt32BE(byte[] data, int offset)
+    {
+        return (data[offset] << 24) | (data[offset + 1] << 16) |
+               (data[offset + 2] << 8) | data[offset + 3];
     }
 
     private static PrivateProperty Decode(byte type, byte[] value)

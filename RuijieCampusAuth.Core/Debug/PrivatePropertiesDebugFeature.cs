@@ -60,7 +60,12 @@ public sealed class PrivatePropertiesDebugFeature : DebugFeatureBase
         }
         var data = new JsonObject
         {
-            ["declared_length"] = parsed.DeclaredLength,
+            ["consumed_bytes"] = parsed.ConsumedBytes,
+            ["messages"] = new JsonArray(parsed.Messages
+                .Select(message => (JsonNode)message).ToArray()),
+            ["section2_value"] = parsed.Section2Value,
+            ["section5_hash"] = parsed.Section5Hash,
+            ["section5_interval_ms"] = parsed.Section5IntervalMs,
             ["property_count"] = parsed.Properties.Count,
             ["properties"] = array,
             ["errors"] = BuildErrors(parsed.Errors),
