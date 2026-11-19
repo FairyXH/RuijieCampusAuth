@@ -122,30 +122,47 @@ Deep Freeze：
 
 每个功能都有 `debug` 功能名，GUI「调试」页和 CLI `debug` 命令共用。
 
-## 7. 已验证状态（2026-11-19）
+## 7. 已验证状态（2026-11-19 全量校对轮）
 
-- 私有属性解析：TLV/字段表；`ACCOUNT_INFO`、`INDICATE_PORT` 实测。
-- DHCP：`GetInterfaceInfo` 适配器 index 14，租约读取成功。
-- 诊断：OUI `00:1a:a9`；13 个主网卡；ARP 网关稳定；网关/DNS/HTTP 200；
-  无常见代理端口；无活动拨号；医生管道不存在。
-- Portal：本地 TCP 假服务器验证路径/JSON/Content-Type。
-- SAM：本机 UDP echo `pong:00001311`，15ms。
-- 升级：本机 HTTP 假服务 JSON 解析成功。
-- 无线：WLAN 列表 1 接口 5 配置；未做 create/connect。
-- 原版差分：CRC、混淆、头、头+混淆、MD5、凭据加密全部一致。
-- PEAP/MSCHAPv2：RFC 2759 NT-Response 向量通过；TLS 流桥本机握手通过。
+- **核心算法差分（Unicorn 直调原版二进制，全新随机向量）**：CRC16、
+  字节混淆、私有头构建、MD5、凭据加密 —— 20/21 一致；唯一"不一致"是
+  47 字节向量（原版要求 len%16==0 否则拒绝执行，C# 内部填充，调用契约
+  差异而非算法差异）。
+- **完整 569 字节私有尾**：本机真实抓包（live-auth.pcap，服务器接受并
+  认证成功）的 Identity 与 MD5 Response 两份尾包，用 C# `BuildTail`
+  以捕获的 nonce/fingerprint/MAC/IP/静态 ID/GB10 服务名输入重建，
+  **569/569 字节逐字节一致**（两份）。`build/capture/tail-compare.json`。
+- **服务器私有属性解析器重写**：原格式是分段结构（GBK 消息段 + 0x6F
+  固定块 + 两个版本门 + 15 字节解混淆段 + `[1311][type][len=value+2]`
+  TLV 循环），不是平铺 TLV。C# 重写后与原版 `ParsePrivateProperty`
+  (0x537ee0) 在真实抓包字节上逐字段一致（消息、hash 0x19594C7A、
+  interval 20000ms、全部 10 个 TLV、RC4 key/IV）。
+  `build/capture/original-parse-truth.json`。
+- **实测互证**：ENCRYPT_KEY=7C73533126403871 / ENCRYPT_IV=4163332331215164
+  与 dircomm.log 的 SAM DES key/IV 一致（SAM 复用认证下发的 key/IV）；
+  MSG_CLIENT_PORT=138、INDICATE_SERV_IP=172.22.11.1 与 dircomm 一致。
+- **GetDHCPAuthPhase 差分**：phase=3+首次+DHCP 激活 → `63 01 03`
+  len 3，与 C# `DhcpPhase(3)` 一致；非首次 → len 0。
+- **GetServiceName 差分**：空配置 → len 0（无段），与原版一致。
+- 测试：Core 46/46（含真实抓包 554 字节锁定向量）、Service 1/1。
 
 ## 8. 已知问题 / 限制
 
 1. PEAP/EAP-TLS 没有真实 RADIUS 端到端验证；证书策略待确认。
 2. WPA2-Enterprise 只验证列表，创建/连接需实验 AP。
-3. SAM 报文布局未复现，只有探针/DES 工具。
+3. SAM 报文布局未复现，只有探针/DES 工具；SAM key/IV 来源已实证
+   （ENCRYPT_KEY/ENCRYPT_IV 属性）。
 4. `password-change`、`config-update` 未实现（无证据）。
-5. 完整 569 字节私有尾的动态全量比对未做；前 11 个属性顺序已确认。
-6. 原版 `GetClientVersion/GetServiceName/GetMACAddr` 需要对象/设备状态，
-   不能零状态直接调用。
+5. PEAP vendor segments 中 6 个未还原段函数（FUN_0051a510/00518bc0/
+   0051bec0/0051bf40/0051bdb0/0051c020）待补；0x5F 凭据段已锁定。
+6. 原版 GetClientVersion/GetMACAddr/GetIPv4Info 需要设备/全局版本状态，
+   Unicorn 无法构造（GetServiceName/GetDHCPAuthPhase 已差分）。
 7. GUI 单实例互斥锁：若生产 GUI 在运行，开发构建会静默退出（正常）。
 8. 新服务名尚未部署；当前机器仍运行旧 `HXXY-CampusAuth` 服务与旧二进制。
+9. MSCHAPv2：C# 通过 RFC 2759 官方向量；原版 CEapPEAPThread 内部函数
+   依赖 TLS 引擎状态，无法零状态直调，未做二进制差分。
+10. C# 缺 MSCHAPv2 AuthenticatorResponse（S=）校验（服务端 Success
+    消息验证）——待补。
 
 ## 9. 安全/运维注意
 
@@ -189,11 +206,16 @@ a8e8b91 feat: add debug feature framework, service pipe, and debug page
 
 ## 12. 下一步
 
-1. 完整私有尾动态比对：构造原版 `this` + 全局网络对象，调用 `0x53A590`，
-   与 C# `BuildTail` 逐字节比较。
-2. PEAP 完整 vendor segment：补齐 0x11/0x39/0x54 之外的 V3 hash、HDD SN、
-   SecDomain、SecCheck 等字段。
-3. 实验 RADIUS/AP 验证 PEAP 与 WPA2-Enterprise。
-4. 抓取真实 SAM 交互，补 `SamDirectClient` 报文编解码。
+1. PEAP 完整 vendor segment：补齐 6 个未还原段函数
+   （FUN_0051a510/00518bc0/0051bec0/0051bf40/0051bdb0/0051c020）。
+2. 实验 RADIUS/AP 验证 PEAP 与 WPA2-Enterprise。
+3. 抓取真实 SAM 交互，用实证的 key/IV（ENCRYPT_KEY/ENCRYPT_IV）补
+   `SamDirectClient` 报文编解码。
+4. 补 MSCHAPv2 AuthenticatorResponse（S=）校验。
 5. 部署新构建：停旧服务/GUI → 复制到 D: → `service install`（迁移服务名）。
 6. Python/OpenWrt 通用化（延期）。
+
+差分校对工具链：`tools/re_diff/full_diff.py`（Unicorn 直调原版）+
+`tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
+`build/capture/`（live-auth.pcap、original-parse-truth.json、
+tail-compare.json、full-diff-report.json）。

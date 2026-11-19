@@ -271,6 +271,9 @@ class DiffSession:
         # emulated image (in-memory only, the file is untouched).
         for va in (0x4D64C0, 0x4D6220, 0x4D6720):
             self.img.write(self.img.base + va - 0x400000, b"\xc3")
+        # CRT _write(fd, buf, count): pretend the write succeeded so console
+        # paths taken by CRT string helpers stay stack-balanced.
+        self.img.write(self.img.base + 0x664481 - 0x400000, b"\x8b\x44\x24\x0c\xc3")
 
     # ---------- infra ----------
 
