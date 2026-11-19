@@ -65,14 +65,18 @@ dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root "D:\Sto
 
 ### OpenWrt 插件（`openwrt/`）
 
-用户明确要求先不动代码，仅记录改造方案：
+已完成（2026-11-20）：
 
-1. 包名/目录：`hxxy-auth`、`luci-app-hxxy-auth` → `ruijie-auth`、`luci-app-ruijie-auth`。
-2. UCI 配置：新增 `ruijie_auth.profile` 指向 `/etc/ruijie-auth/profile.json`。
-3. 默认配置不再写学校代码/服务名；首次启动要求导入 profile。
-4. 保留旧包名兼容：安装时迁移 `/etc/config/hxxy-auth` 到新配置并保留旧 init 脚本别名。
-5. 构建脚本里的 `hxxy` 路径同步改名，镜像/ipk 版本号递增。
-6. 等 C# 的 PEAP/Portal/SAM 协议层完成后，再决定 Go 端是否跟进。
+1. 包名/目录：`ruijie-auth`、`luci-app-ruijie-auth`，配置
+   `/etc/config/ruijie-auth`，零 `hxxy` 字样。
+2. 默认配置不含学校代码/服务名/静态 ID；`auth_mode` 默认 EAPMD5。
+3. 学校档案走 `profiles/*.json`，与 C# 同一 schema；LuCI 可上传/粘贴，
+   CLI 为 `ruijie-auth profile import`。
+4. 算法层逐函数移植（私有尾、CRC、混淆、凭据加密、私有属性、RC4、
+   MSCHAPv2、PEAP/EAP-TLS），测试向量与 C# 共用。
+5. 纯用户态、零 kmod 依赖；UA3F/NFQUEUE 已移除，防检测只保留 nft
+   TTL/MSS。
+6. 构建脚本改名并加入 `.po → .lmo` 编译；ipk/固件均已验证可构建。
 
 ## 5. 部署迁移（现有 Windows 安装）
 

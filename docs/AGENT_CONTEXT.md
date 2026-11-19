@@ -1,7 +1,7 @@
 # Agent Context
 
 > 跨会话交接文档。描述项目当前状态、架构、验证结果与下一步，不记录完整对话历史。
-> 最后更新：2026-11-19
+> 最后更新：2026-11-20
 
 ## 1. 项目是什么
 
@@ -13,9 +13,11 @@
 
 - **根目录 C# / .NET 10**：Core + CLI + Windows 服务/Linux systemd + Avalonia GUI。
 - **`python/`**：Python 参考实现（本轮未改动，后续通用化）。
+- **`openwrt/`**：Go 守护进程 + LuCI（2026-11-20 完成移植，见
+  `docs/OPENWRT_PORT.md`）。
 
-Python 与 OpenWrt 的通用化延期；OpenWrt 当前不动代码，方案见
-`docs/GENERICIZATION.md`。
+Python 通用化仍延期；OpenWrt 已按 `docs/GENERICIZATION.md` 完成改名、
+档案化与零 kmod 改造。
 
 ## 2. 仓库结构
 
@@ -45,7 +47,7 @@ RuijieCampusAuth.Service.Tests/ 管道集成测试
 profiles/                    学校档案（hxxy.json 为当前示例）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
-openwrt/                     延期，不动
+openwrt/                     锐捷认证器 OpenWrt 版：ruijie-auth（Go）+ luci-app-ruijie-auth
 python/                      延期，不动
 ```
 
@@ -98,6 +100,8 @@ Deep Freeze：
   `settings.json.bak-<时间戳>`。
 - 当前部署已导入 `profiles/hxxy.json`：`profile_name=厦门华厦学院`、
   `service_name=电信宽带服务`、`static_id=Static:AB45A862`、`school_code=HPVTC`。
+- OpenWrt 端用同一份档案：`ruijie-auth profile import --file hxxy.json`
+  写入 `/etc/config/ruijie-auth`，或 LuCI「学校档案」页上传/粘贴。
 
 档案字段与适配流程见 `profiles/README.md`、`docs/ADAPTATION.md`。
 
@@ -117,6 +121,11 @@ Deep Freeze：
 | SAM | UDP/DES 探针，报文布局待抓包 |
 | 升级 | GET 检查；下载/安装未实现 |
 | 多档案 GUI/CLI 切换 | 已实现 |
+| OpenWrt EAP-MD5 + 私有尾 | 已实现，go test + qemu selftest |
+| OpenWrt 服务器私有属性 + RC4 | 已实现，真实抓包向量测试 |
+| OpenWrt PEAP / EAP-TLS | 已实现，待真实 RADIUS |
+| OpenWrt 学校档案导入 | 已实现（CLI + LuCI 上传） |
+| OpenWrt LuCI 8 页 + zh-cn | 已实现，ipk 含 .lmo |
 | password-change / config-update | 计划态（端点/字段无证据） |
 | 小锐 WiFi 分享 | 计划态（驱动级） |
 
@@ -145,6 +154,21 @@ Deep Freeze：
   len 3，与 C# `DhcpPhase(3)` 一致；非首次 → len 0。
 - **GetServiceName 差分**：空配置 → len 0（无段），与原版一致。
 - 测试：Core 46/46（含真实抓包 554 字节锁定向量）、Service 1/1。
+
+### OpenWrt 端口（2026-11-20）
+
+- `go test ./...` 全通过（protocol/config/profile/supplicant/servers/network）；
+  `go vet` 干净；`gofmt -l` 无输出。
+- 私有尾 569 字节、真实抓包私有属性块（10 属性 / hash 0x19594C7A /
+  interval 20000 / ENCRYPT_KEY+IV）、RC4、MD4、MSCHAPv2 RFC 向量、
+  PEAP 分片布局全部有 Go 测试。
+- amd64 原生与 mipsle（`qemu-mipsel`）`ruijie-auth selftest` 通过。
+- ipk 构建通过；R3G 整机镜像 8.8MB，SHA256
+  `e6255f9ffe535be1ba83335adbcdb68e014e223c378f33bb6298a36a8d7c86ff`，
+  rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`。
+- `scripts/po2lmo.py` 生成的 `.lmo` 与 24.10 官方
+  `https-dns-proxy.zh-cn.lmo` 逐键值一致（154/154）。
+- 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
 
 ## 8. 已知问题 / 限制
 
@@ -182,6 +206,7 @@ Deep Freeze：
 | `docs/GENERICIZATION.md` | 通用化改造与延期项 |
 | `docs/protocols/*.md` | 各协议证据、字段、实现、未知项 |
 | `docs/OFFICIAL_CLIENT_FEATURE_MATRIX.md` | 功能矩阵与落位 |
+| `docs/OPENWRT_PORT.md` | C# → OpenWrt 移植对照与验证 |
 | `docs/FROZEN_DEPLOYMENT.md` | 冻结环境部署历史 |
 | `profiles/README.md` | 档案字段与导入 |
 
@@ -213,7 +238,9 @@ a8e8b91 feat: add debug feature framework, service pipe, and debug page
    `SamDirectClient` 报文编解码。
 4. 补 MSCHAPv2 AuthenticatorResponse（S=）校验。
 5. 部署新构建：停旧服务/GUI → 复制到 D: → `service install`（迁移服务名）。
-6. Python/OpenWrt 通用化（延期）。
+6. OpenWrt 现场验证：刷入 R3G 镜像，导入学校档案，确认概览页
+   properties 与桌面版一致；PEAP 学校补一次隧道抓包。
+7. Python 通用化（延期）。
 
 差分校对工具链：`tools/re_diff/full_diff.py`（Unicorn 直调原版）+
 `tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
