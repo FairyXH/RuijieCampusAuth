@@ -91,7 +91,10 @@ public partial class DebugViewModel : ViewModelBase
             }
             _store.SaveSettings(settings);
             Status = "调试开关已保存";
+            var previousResult = ResultText;
             await RefreshAsync();
+            // Keep an already displayed execution result on screen.
+            ResultText = previousResult;
         }
         catch (Exception ex)
         {
@@ -113,9 +116,12 @@ public partial class DebugViewModel : ViewModelBase
             var result = await _gateway.RunAsync(
                 SelectedFeature.Name,
                 ArgumentsJson);
+            // Refresh first (it rebuilds the feature list and resets the
+            // selection, which clears ResultText), then write the output so
+            // it stays visible.
+            await RefreshAsync();
             ResultText = FormatResult(result);
             Status = result.Ok ? "执行成功" : "执行失败";
-            await RefreshAsync();
         }
         catch (Exception ex)
         {

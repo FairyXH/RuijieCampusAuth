@@ -42,6 +42,14 @@ public sealed class DebugViewModelTests
         await vm.SaveCommand.ExecuteAsync(null);
         await vm.RunCommand.ExecuteAsync(null);
         Assert.Contains("OK", vm.ResultText);
+
+        // 执行后的结果必须留在屏幕上：Refresh 重建列表（选中项的 State 已变）
+        // 不得清空 ResultText —— 这正是“输出闪一下消失”的回归点。
+        await vm.RefreshCommand.ExecuteAsync(null);
+        Assert.Contains("OK", vm.ResultText);
+        vm.FeatureEnabled = !vm.FeatureEnabled;
+        await vm.SaveCommand.ExecuteAsync(null);
+        Assert.Contains("OK", vm.ResultText);
     }
 
     [AvaloniaFact]
