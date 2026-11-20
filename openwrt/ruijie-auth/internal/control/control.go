@@ -70,15 +70,15 @@ func handle(conn net.Conn, commands chan<- string) {
 	var request Request
 	response := Response{}
 	if err := json.NewDecoder(conn).Decode(&request); err != nil {
-		response.Error = "invalid request"
+		response.Error = "请求无效"
 	} else if !validCommands[request.Command] {
-		response.Error = "unknown command"
+		response.Error = "未知命令"
 	} else {
 		select {
 		case commands <- request.Command:
 			response.OK = true
 		default:
-			response.Error = "daemon busy"
+			response.Error = "守护进程忙"
 		}
 	}
 	_ = json.NewEncoder(conn).Encode(response)
@@ -87,11 +87,11 @@ func handle(conn net.Conn, commands chan<- string) {
 // Send asks the daemon to run one command.
 func Send(path, command string) error {
 	if !validCommands[command] {
-		return fmt.Errorf("unknown command: %s", command)
+		return fmt.Errorf("未知命令: %s", command)
 	}
 	conn, err := net.DialTimeout("unix", path, 3*time.Second)
 	if err != nil {
-		return fmt.Errorf("daemon not running: %w", err)
+		return fmt.Errorf("守护进程未运行: %w", err)
 	}
 	defer conn.Close()
 	_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
@@ -104,7 +104,7 @@ func Send(path, command string) error {
 	}
 	if !response.OK {
 		if response.Error == "" {
-			response.Error = "command rejected"
+			response.Error = "命令被拒绝"
 		}
 		return fmt.Errorf("%s", response.Error)
 	}

@@ -92,7 +92,7 @@ func TestParseRealCapturedServerBlock(t *testing.T) {
 
 func TestParseRejectsMissingMarker(t *testing.T) {
 	result := ParsePrivateProperties([]byte("garbage"))
-	if len(result.Errors) == 0 || result.Errors[0] != "missing section 1 marker" {
+	if len(result.Errors) == 0 || result.Errors[0] != "缺少段 1 标记" {
 		t.Fatalf("errors = %#v", result.Errors)
 	}
 }

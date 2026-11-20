@@ -42,7 +42,8 @@
   flag `01` 与 C# 默认一致。
 - Control 尾：session nonce + 128 字节零 fingerprint；Identity 尾用
   session nonce；MD5 尾用 challenge 作 IV；PEAP Identity 尾用随机 nonce。
-  `private_tail=0` 时全部不发。
+  `private_tail=0` 时全部不发。EAP-MD5 与 PEAP/EAP-TLS 两条路径的
+  EAPOL-Start/Logoff 都使用 Control 尾；真实抓包已验证该组合。
 - EAPOL-Start 目标 `01:d0:f8:00:00:03`，Logoff 目标
   `01:80:c2:00:00:03`；`logoff_first` 控制首包。
 - 私有属性：段 2 的 4 字节按有符号 int 读取、段 5 interval 按 32 位乘法
@@ -62,6 +63,8 @@
 | 错误返回 | C# 抛异常，Go 返回 `error`；调用链与失败条件一致 |
 | 状态输出 | C# 写 `status.json` + 日志；Go 额外把私有属性写进 status 供 LuCI 展示 |
 | 重认证循环 | C# 由 Service/AuthWorker 外层驱动；Go 在 session 内驻留（行为等价） |
+| PEAP 控制帧尾 | C# `PcapEapTransport` 把 identity 尾复用于 Start/Logoff；Go 用 Control 尾（会话 nonce + 零 fingerprint），与真实抓包及原版控制帧语义一致 |
+| PEAP vendor segment | C#/Python 也只实现了协议辅助函数，`PeapSession` 活动路径不发送 0x5F 等段；Go 保持同样边界，待真实 RADIUS 抓包后再接入 |
 | DH 续租 | `dhcp_mode` 仅记录，不驱动 udhcpc |
 
 ## 5. 验证
@@ -69,17 +72,19 @@
 | 项 | 证据 |
 |---|---|
 | 私有尾 569 字节 | `selftest`（amd64 + mipsle/qemu）通过 |
+| 私有尾三类语义 | `capture_vector_test.go`：真实抓包的 Start / Identity / MD5 Response 三份尾包均 569/569 逐字节一致（含 Control 尾全零指纹） |
 | 真实抓包私有属性块 | `internal/protocol/vectors_test.go`：10 个属性、hash `0x19594C7A`、interval 20000、ENCRYPT_KEY/IV 与 C# 断言一致 |
 | RC4 | 标准向量 `bbf316e8d940af0ad3` |
 | MD4 | 空串/`abc` 向量 |
 | MSCHAPv2 | RFC 2759 NT-Response `82309ecd...d6df`、ChallengeHash `d02e4386bce91226` |
 | PEAP 分片 | 首片 `0xC0`、中间 `0x40`、末片 `0x00`，长度头 500、重组一致 |
 | UCI 导入 | 保留账号与未知选项、写 backup、忽略空字段、单引号转义 |
-| 中文 .lmo | 与 24.10 镜像的 `https-dns-proxy.zh-cn.lmo` 154/154 键值/偏移一致 |
-| QEMU 运行 | x86_64 OpenWrt：selftest、interfaces、EAPOL 循环、profile import、LuCI 页面与 zh-cn 词条均通过 |
+| 中文 .lmo | 与 24.10 镜像的 `https-dns-proxy.zh-cn.lmo` 154/154 键值/偏移一致；本应用 187 条 PO 编译为 182 条 LMO（5 条与 msgid 相同的协议名省略），JS 侧 0 缺失 |
+| QEMU 运行 | x86_64 OpenWrt：selftest、interfaces、EAPOL 循环、profile import、LuCI 页面均通过；运行时目录按 hash 校验 8 个菜单标题与 8 个页面全部中文命中 |
 
 未验证：真实 RADIUS 上的 PEAP/EAP-TLS 端到端；真实校园网 WAN 上的
-EAP-MD5 上线（需现场账号）。
+EAP-MD5 上线（需现场账号）。PEAP vendor segment（0x5F 凭据段等）尚未
+接入活动会话；EAP-TLS 需要客户端证书，OpenWrt 版未开放证书配置入口。
 
 ## 6. 后续
 

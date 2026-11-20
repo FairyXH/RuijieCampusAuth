@@ -11,6 +11,25 @@ function slugify(name) {
 	return base.replace(/^_+|_+$/g, '') || 'profile';
 }
 
+function authModeLabel(mode) {
+	var labels = {
+		EAPMD5: _('EAP-MD5'),
+		PEAP: _('PEAP + MSCHAPv2'),
+		PEAPV1: _('PEAPv1 + MSCHAPv2'),
+		'EAP-TLS': _('EAP-TLS')
+	};
+	return labels[mode] || mode || '-';
+}
+
+function dhcpModeLabel(mode) {
+	var labels = {
+		none: _('None'),
+		before: _('Renew before authentication'),
+		after: _('Renew after authentication')
+	};
+	return labels[mode] || mode || '-';
+}
+
 return view.extend({
 	load: function() {
 		return Promise.all([
@@ -48,14 +67,14 @@ return view.extend({
 
 		var currentTable = E('table', { 'class': 'table' }, [
 			currentRow(_('Profile name'), current.name),
-			currentRow(_('Authentication mode'), current.auth_mode),
+			currentRow(_('Authentication mode'), authModeLabel(current.auth_mode)),
 			currentRow(_('School code'), current.school_code),
 			currentRow(_('Service name'), current.service_name),
 			currentRow(_('Static ID'), current.static_id),
 			currentRow(_('Self-service URL'), current.self_service_url),
 			currentRow(_('Update URL'), current.update_url),
 			currentRow(_('Portal URL'), current.portal_url),
-			currentRow(_('DHCP mode'), current.dhcp_mode),
+			currentRow(_('DHCP mode'), dhcpModeLabel(current.dhcp_mode)),
 			currentRow(_('Engine version'), current.engine_version)
 		]);
 
@@ -177,7 +196,7 @@ return view.extend({
 			try {
 				var doc = JSON.parse(text);
 				if (!doc || typeof doc !== 'object' || Array.isArray(doc))
-					throw new Error('not an object');
+					throw new Error(_('the JSON document must be an object'));
 				pending = { doc: doc, text: text };
 				preview.appendChild(E('table', { 'class': 'table' }, [
 					E('tr', { 'class': 'tr' }, [
@@ -186,7 +205,7 @@ return view.extend({
 					]),
 					E('tr', { 'class': 'tr' }, [
 						E('td', { 'class': 'td' }, _('Authentication mode')),
-						E('td', { 'class': 'td' }, doc.auth_mode || 'EAPMD5')
+						E('td', { 'class': 'td' }, authModeLabel(doc.auth_mode || 'EAPMD5'))
 					]),
 					E('tr', { 'class': 'tr' }, [
 						E('td', { 'class': 'td' }, _('Service name')),

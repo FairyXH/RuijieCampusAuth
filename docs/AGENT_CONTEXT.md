@@ -45,7 +45,7 @@ RuijieCampusAuth.App/        Avalonia GUI：账号/认证/服务器/服务/设�
 RuijieCampusAuth.Cli/        auth/config/service/debug/profile
 RuijieCampusAuth.Core.Tests/ 44 tests
 RuijieCampusAuth.Service.Tests/ 管道集成测试
-profiles/                    学校档案（hxxy.json 为当前示例）
+profiles/                    学校档案（厦门华厦学院.json 为正式档案）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
 openwrt/                     锐捷认证器 OpenWrt 版：ruijie-auth（Go）+ luci-app-ruijie-auth
@@ -99,9 +99,9 @@ Deep Freeze：
 - GUI：`档案` 页选择后“导入/切换”。
 - 导入只覆盖档案声明字段；账号、网卡、接管、Guardian 不变；自动备份
   `settings.json.bak-<时间戳>`。
-- 当前部署已导入 `profiles/hxxy.json`：`profile_name=厦门华厦学院`、
+- 正式档案为 `profiles/厦门华厦学院.json`：`profile_name=厦门华厦学院`、
   `service_name=电信宽带服务`、`static_id=Static:AB45A862`、`school_code=HPVTC`。
-- OpenWrt 端用同一份档案：`ruijie-auth profile import --file hxxy.json`
+- OpenWrt 端用同一份档案：`ruijie-auth profile import --file "厦门华厦学院.json"`
   写入 `/etc/config/ruijie-auth`，或 LuCI「学校档案」页上传/粘贴。
 
 档案字段与适配流程见 `profiles/README.md`、`docs/ADAPTATION.md`。
@@ -163,21 +163,45 @@ Deep Freeze：
 - 私有尾 569 字节、真实抓包私有属性块（10 属性 / hash 0x19594C7A /
   interval 20000 / ENCRYPT_KEY+IV）、RC4、MD4、MSCHAPv2 RFC 向量、
   PEAP 分片布局全部有 Go 测试。
+- **2026-11-20 认证链路复核**：用 `live-auth.pcap` 的三份真实尾包
+  （EAPOL-Start、Identity、MD5 Response）做 Go `BuildTail` 逐字节向量，
+  三份均 569/569 一致；Start 用会话 nonce + 全零指纹，Identity 用会话
+  nonce + 随机指纹，MD5 用随机 nonce/指纹 + challenge 作 IV。
+- 复核中修复：服务器应答后仍补发 EAPOL-Start；常驻会话重认证时
+  `handled` 去重表未清空（成功和主动重认证两处）；服务器主动重认证
+  缺少超时兜底（现已重置认证定时器，失联会返回超时）；TLS 桥接关闭与
+  并发读写的 channel 竞争；2 字节私有属性按 signed 解码（C# 为
+  unsigned）；PEAP TLS 版本窗口收窄到 1.0-1.2（排除 PEAP 不支持的 1.3）。
 - amd64 原生与 mipsle（`qemu-mipsel`）`ruijie-auth selftest` 通过。
-- ipk 构建通过；R3G 整机镜像 8.8MB，SHA256
-  `54c0f8981253efabb577079b6b6cb45f97d7dd0a50731e9fac2077167afec5c7`，
-  rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`。
+- ipk 重新构建：`ruijie-auth_0.2.0_mipsel_24kc.ipk` 2,299,694 字节，
+  SHA256 `377e8d4e07470e11df84822aa828a3c729460ffc98ed928d8f283319a96a3fe1`。
+- R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
+  `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
+  rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
+  已在 squashfs 内逐项核对。
+- 产物整理到 `dist/openwrt/`（gitignored）：ipk、sysupgrade、Breed
+  镜像、kernel1/rootfs0、manifest、mipsle/amd64 daemon、zh-cn lmo、
+  `SHA256SUMS.txt`、`BUILD_INFO.txt`。刷机包
+  `D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt` 已同步新镜像/新 ipk，
+  删除旧 `hxxy-auth` ipk，并更新 checksums、README、刷写教程、自启示例
+  和智能检测脚本（移除 DoH 守护）。
 - `scripts/po2lmo.py` 生成的 `.lmo` 与 24.10 官方
   `https-dns-proxy.zh-cn.lmo` 逐键值一致（154/154）。
+- **中文 i18n 100%**：185 个 JS `_()` 词条全部有译文（0 缺失、0 空、
+  0 fuzzy）；`.po` 187 条编译为 182 条 LMO（5 条与 msgid 相同的协议名
+  按 LuCI 规则省略）；x86_64 QEMU 运行时目录按 hash 逐条验证 8 个菜单
+  标题和 8 个页面全部命中，含账号池/WAN 多选/自检三条长说明。CLI 的
+  `selftest`、`status`、`interfaces`、`accounts` 与日志级别标签也已中文化。
 - x86_64 OpenWrt QEMU 冒烟：`selftest` 通过；`interfaces` 将 br-lan 标为
   WAN；daemon 在 br-lan 上完成 Logoff→4×Start→paused；`profile import`
   写入 8 字段并生成 backup，reload 后状态显示 profile；LuCI 页面 200、
-  `lang_zh-cn`、translations 端点返回「锐捷认证器」等词条。
+  `lang_zh-cn`、translations 端点全量中文命中。
 - 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
 
 ## 8. 已知问题 / 限制
 
 1. PEAP/EAP-TLS 没有真实 RADIUS 端到端验证；证书策略待确认。
+   EAP-TLS 需要客户端证书，OpenWrt 版尚未提供证书配置入口。
 2. WPA2-Enterprise 只验证列表，创建/连接需实验 AP。
 3. SAM 报文布局未复现，只有探针/DES 工具；SAM key/IV 来源已实证
    （ENCRYPT_KEY/ENCRYPT_IV 属性）。

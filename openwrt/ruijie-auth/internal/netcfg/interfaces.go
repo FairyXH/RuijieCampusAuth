@@ -200,17 +200,18 @@ func defaultRouteInterface() string {
 }
 
 func describe(name, logical string, carrier, isWAN bool) string {
-	parts := []string{name}
+	label := name
 	if logical != "" && logical != name {
-		parts = append(parts, "("+logical+")")
+		label += "（" + logical + "）"
 	}
+	parts := []string{label}
 	if isWAN {
-		parts = append(parts, "WAN")
+		parts = append(parts, "校园网 WAN")
 	}
 	if carrier {
-		parts = append(parts, "link up")
+		parts = append(parts, "已连接")
 	} else {
-		parts = append(parts, "no link")
+		parts = append(parts, "无链路")
 	}
 	return strings.Join(parts, " ")
 }

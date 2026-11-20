@@ -88,6 +88,9 @@ msgstr "校园网 WAN"
 msgid "Change MAC"
 msgstr "修改 MAC"
 
+msgid "Checks RC4, MD4, MSCHAPv2, the 569-byte private tail, the obfuscation transform and the private-property parser."
+msgstr "检查 RC4、MD4、MSCHAPv2、569 字节私有尾、混淆变换与服务器私有属性解析器。"
+
 msgid "Clear cache"
 msgstr "清除缓存"
 
@@ -107,7 +110,7 @@ msgid "Current"
 msgstr "当前"
 
 msgid "DHCP Option 82"
-msgstr "DHCP Option 82"
+msgstr "DHCP 选项 82"
 
 msgid "DHCP mode"
 msgstr "DHCP 模式"
@@ -181,6 +184,9 @@ msgstr "请输入 MAC 地址"
 msgid "Error"
 msgstr "错误"
 
+msgid "exit code"
+msgstr "退出码"
+
 msgid "File"
 msgstr "文件"
 
@@ -225,6 +231,9 @@ msgstr "最近成功"
 
 msgid "Learned authenticators"
 msgstr "已学习的认证服务器"
+
+msgid "Leave only Auto-detect, or pick the physical ports that may carry the campus network. The daemon tries them in this order and prefers one with link."
+msgstr "只保留“自动识别”，或选择可能承载校园网的物理网口。守护进程按此顺序尝试，并优先选择有链路的网口。"
 
 msgid "Link"
 msgstr "链路"
@@ -312,6 +321,9 @@ msgstr "概览"
 
 msgid "PEAP + MSCHAPv2"
 msgstr "PEAP + MSCHAPv2"
+
+msgid "PEAPv1 + MSCHAPv2"
+msgstr "PEAPv1 + MSCHAPv2"
 
 msgid "Password"
 msgstr "密码"
@@ -430,6 +442,9 @@ msgstr "运行自检"
 msgid "Running..."
 msgstr "运行中..."
 
+msgid "s"
+msgstr "秒"
+
 msgid "SAM host"
 msgstr "SAM 主机"
 
@@ -484,6 +499,9 @@ msgstr "启动重试间隔（秒）"
 msgid "Starting"
 msgstr "启动中"
 
+msgid "stderr"
+msgstr "错误输出"
+
 msgid "State"
 msgstr "状态"
 
@@ -499,6 +517,9 @@ msgstr "已停止"
 msgid "Successes"
 msgstr "成功次数"
 
+msgid "the JSON document must be an object"
+msgstr "JSON 文档必须是对象"
+
 msgid "The JSON schema is identical to the desktop client profiles/*.json."
 msgstr "JSON 结构与桌面客户端 profiles/*.json 完全一致。"
 
@@ -510,6 +531,9 @@ msgstr "未知"
 
 msgid "Unlock"
 msgstr "解锁"
+
+msgid "Up to 5 accounts. The account marked Current is tried first; if it fails, the remaining enabled accounts are tried in order."
+msgstr "最多 5 个账号。“当前”账号优先尝试；失败后按顺序尝试其余已启用账号。"
 
 msgid "Update URL"
 msgstr "升级地址"

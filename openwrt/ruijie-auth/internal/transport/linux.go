@@ -30,19 +30,19 @@ func Open(device string) (Transport, error) {
 	}
 	iface, err := net.InterfaceByName(name)
 	if err != nil {
-		return nil, fmt.Errorf("interface %q: %w", name, err)
+		return nil, fmt.Errorf("接口 %q: %w", name, err)
 	}
 	protocol := int(htons(uint16(unix.ETH_P_PAE)))
 	fd, err := unix.Socket(unix.AF_PACKET, unix.SOCK_RAW, protocol)
 	if err != nil {
-		return nil, fmt.Errorf("socket AF_PACKET: %w", err)
+		return nil, fmt.Errorf("创建 AF_PACKET 套接字失败: %w", err)
 	}
 	if err := unix.Bind(fd, &unix.SockaddrLinklayer{
 		Protocol: htons(uint16(unix.ETH_P_PAE)),
 		Ifindex:  iface.Index,
 	}); err != nil {
 		_ = unix.Close(fd)
-		return nil, fmt.Errorf("bind %s: %w", name, err)
+		return nil, fmt.Errorf("绑定 %s 失败: %w", name, err)
 	}
 
 	promisc := &unix.PacketMreq{
@@ -59,7 +59,7 @@ func Open(device string) (Transport, error) {
 		}
 		if err2 := unix.SetsockoptPacketMreq(fd, unix.SOL_PACKET, unix.PACKET_ADD_MEMBERSHIP, multicast); err2 != nil {
 			_ = unix.Close(fd)
-			return nil, fmt.Errorf("promiscuous mode: %v; PAE multicast: %v", err, err2)
+			return nil, fmt.Errorf("启用混杂模式失败: %v；加入 PAE 组播失败: %v", err, err2)
 		}
 	}
 
@@ -134,24 +134,24 @@ func ResolveDevice(device string) (string, error) {
 	}
 	output, err := exec.Command("ubus", "call", "network.interface."+device, "status").Output()
 	if err != nil {
-		return "", fmt.Errorf("interface %q not found: %w", device, err)
+		return "", fmt.Errorf("接口 %q 不存在: %w", device, err)
 	}
 	var status struct {
 		L3Device string `json:"l3_device"`
 		Device   string `json:"device"`
 	}
 	if err := json.Unmarshal(output, &status); err != nil {
-		return "", fmt.Errorf("parse ubus status for %q: %w", device, err)
+		return "", fmt.Errorf("解析 %q 的 ubus 状态失败: %w", device, err)
 	}
 	name := status.L3Device
 	if name == "" {
 		name = status.Device
 	}
 	if name == "" {
-		return "", fmt.Errorf("interface %q has no l3_device", device)
+		return "", fmt.Errorf("接口 %q 没有 l3_device", device)
 	}
 	if _, err := net.InterfaceByName(name); err != nil {
-		return "", fmt.Errorf("resolved device %q: %w", name, err)
+		return "", fmt.Errorf("解析后的设备 %q 不可用: %w", name, err)
 	}
 	return name, nil
 }

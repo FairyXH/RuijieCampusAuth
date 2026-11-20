@@ -11,14 +11,20 @@ import (
 // EapTLSConn bridges crypto/tls to EAP/PEAP payloads, the Go counterpart of
 // EapTlsStream: Read blocks until the transport feeds a server fragment,
 // Write hands TLS records to the PEAP pump.
+//
+// The queues are never closed. Shutdown is signalled through `closed`, so a
+// concurrent Write or a deferred Feed can never panic with "send on closed
+// channel"; the same ordering as the C# BlockingCollection (CompleteAdding on
+// the inbound side only) is preserved.
 type EapTLSConn struct {
-	mu       sync.Mutex
-	incoming chan []byte
-	current  []byte
-	offset   int
-	outgoing chan []byte
-	closed   chan struct{}
-	once     sync.Once
+	incoming  chan []byte
+	outgoing  chan []byte
+	closed    chan struct{}
+	closeOnce sync.Once
+
+	mu      sync.Mutex
+	current []byte
+	offset  int
 
 	deadlineMu   sync.Mutex
 	readDeadline time.Time
@@ -33,32 +39,34 @@ func NewEapTLSConn() *EapTLSConn {
 	}
 }
 
-// Feed queues a server TLS fragment.
+// Feed queues a server TLS fragment. Fragments are queued in order; a full
+// queue never blocks the PEAP pump.
 func (c *EapTLSConn) Feed(data []byte) {
 	if len(data) == 0 {
 		return
 	}
-	c.mu.Lock()
+	copied := append([]byte(nil), data...)
 	select {
 	case <-c.closed:
+		return
 	default:
-		select {
-		case c.incoming <- append([]byte(nil), data...):
-		default:
-			// Keep the pump from blocking forever on a slow TLS reader.
-			go func() { c.incoming <- append([]byte(nil), data...) }()
-		}
 	}
-	c.mu.Unlock()
+	select {
+	case c.incoming <- copied:
+	default:
+		go func() {
+			select {
+			case c.incoming <- copied:
+			case <-c.closed:
+			}
+		}()
+	}
 }
 
-// CompleteInput closes the inbound stream; pending and future reads see EOF.
+// CompleteInput closes the inbound stream; pending data is still readable,
+// then reads see EOF. Pending TLS output can still be drained by the pump.
 func (c *EapTLSConn) CompleteInput() {
-	c.once.Do(func() {
-		close(c.closed)
-		close(c.incoming)
-		close(c.outgoing)
-	})
+	c.closeOnce.Do(func() { close(c.closed) })
 }
 
 // Read implements net.Conn.
@@ -90,22 +98,29 @@ func (c *EapTLSConn) Read(buffer []byte) (int, error) {
 
 // next waits for the next inbound fragment, honouring the read deadline.
 func (c *EapTLSConn) next() ([]byte, error) {
+	select {
+	case chunk := <-c.incoming:
+		return chunk, nil
+	default:
+	}
+
 	timeout, hasTimeout := c.readTimeout()
 	if !hasTimeout {
-		chunk, ok := <-c.incoming
-		if !ok {
+		select {
+		case chunk := <-c.incoming:
+			return chunk, nil
+		case <-c.closed:
 			return nil, io.EOF
 		}
-		return chunk, nil
 	}
+
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
-	case chunk, ok := <-c.incoming:
-		if !ok {
-			return nil, io.EOF
-		}
+	case chunk := <-c.incoming:
 		return chunk, nil
+	case <-c.closed:
+		return nil, io.EOF
 	case <-timer.C:
 		return nil, errDeadline
 	}
@@ -116,21 +131,39 @@ func (c *EapTLSConn) Write(buffer []byte) (int, error) {
 	if len(buffer) == 0 {
 		return 0, nil
 	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	copied := append([]byte(nil), buffer...)
 	select {
 	case <-c.closed:
-		return 0, errors.New("TLS bridge closed")
+		return 0, errors.New("EAP TLS 通道已关闭")
 	default:
 	}
-	c.outgoing <- append([]byte(nil), buffer...)
-	return len(buffer), nil
+	select {
+	case c.outgoing <- copied:
+		return len(buffer), nil
+	case <-c.closed:
+		return 0, errors.New("EAP TLS 通道已关闭")
+	}
 }
 
-// TakeOutgoing returns the next TLS record, or false when the bridge closed.
+// TakeOutgoing returns the next TLS record, or false when the bridge closed
+// and no record is pending.
 func (c *EapTLSConn) TakeOutgoing() ([]byte, bool) {
-	chunk, ok := <-c.outgoing
-	return chunk, ok
+	select {
+	case chunk := <-c.outgoing:
+		return chunk, true
+	default:
+	}
+	select {
+	case chunk := <-c.outgoing:
+		return chunk, true
+	case <-c.closed:
+		select {
+		case chunk := <-c.outgoing:
+			return chunk, true
+		default:
+			return nil, false
+		}
+	}
 }
 
 // Close implements net.Conn.
@@ -181,4 +214,4 @@ type netAddr string
 func (a netAddr) Network() string { return "eap" }
 func (a netAddr) String() string  { return string(a) }
 
-var errDeadline = errors.New("EAP TLS read deadline exceeded")
+var errDeadline = errors.New("EAP TLS 读取超时")

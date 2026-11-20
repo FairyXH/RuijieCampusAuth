@@ -51,7 +51,7 @@ func Set(section, mac string) error {
 	}
 	normalized := protocol.NormalizeMAC(mac)
 	if normalized == "" {
-		return fmt.Errorf("invalid MAC address: %s", mac)
+		return fmt.Errorf("MAC 地址无效: %s", mac)
 	}
 	if err := uciSet(section, "macaddr", normalized); err != nil {
 		return err
@@ -137,5 +137,5 @@ func commandPath(name string) (string, error) {
 			return path, nil
 		}
 	}
-	return "", fmt.Errorf("%s not found", name)
+	return "", fmt.Errorf("找不到命令 %s", name)
 }

@@ -30,6 +30,16 @@ return view.extend({
 			return labels[state] || state || _('Unknown');
 		}
 
+		function authModeLabel(mode) {
+			var labels = {
+				EAPMD5: _('EAP-MD5'),
+				PEAP: _('PEAP + MSCHAPv2'),
+				PEAPV1: _('PEAPv1 + MSCHAPv2'),
+				'EAP-TLS': _('EAP-TLS')
+			};
+			return labels[mode] || mode || '-';
+		}
+
 		function badge(state) {
 			var map = {
 				authenticated: 'cbi-button-success',
@@ -49,10 +59,10 @@ return view.extend({
 		var accountCell = E('td', { 'class': 'td' }, status.account || '-');
 		var interfaceCell = E('td', { 'class': 'td' }, status.interface || '-');
 		var serverCell = E('td', { 'class': 'td' }, status.server || '-');
-		var modeCell = E('td', { 'class': 'td' }, status.auth_mode || '-');
+		var modeCell = E('td', { 'class': 'td' }, authModeLabel(status.auth_mode));
 		var profileCell = E('td', { 'class': 'td' }, status.profile || _('Not imported'));
 		var reauthCell = E('td', { 'class': 'td' },
-			status.reauth_interval ? String(status.reauth_interval) + ' s' : '-');
+			status.reauth_interval ? String(status.reauth_interval) + ' ' + _('s') : '-');
 		var updatedCell = E('td', { 'class': 'td' }, status.time || '-');
 
 		function row(label, cell) {
@@ -117,10 +127,10 @@ return view.extend({
 					accountCell.textContent = next.account || '-';
 					interfaceCell.textContent = next.interface || '-';
 					serverCell.textContent = next.server || '-';
-					modeCell.textContent = next.auth_mode || '-';
+					modeCell.textContent = authModeLabel(next.auth_mode);
 					profileCell.textContent = next.profile || _('Not imported');
 					reauthCell.textContent = next.reauth_interval ?
-						String(next.reauth_interval) + ' s' : '-';
+						String(next.reauth_interval) + ' ' + _('s') : '-';
 					updatedCell.textContent = next.time || '-';
 					renderProperties(next.properties);
 				})

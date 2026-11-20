@@ -6,9 +6,10 @@ OpenWrt 软路由端的锐捷校园网 802.1X 认证器：Go 守护进程 + LuCI
 
 ## 设计约束
 
-- **纯用户态，零 kmod 依赖**：只用到 Linux 自带的 AF_PACKET 原始套接字和
-  Go 标准库。`opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；同一二进制
-  在任何同架构 OpenWrt 上都能跑，不需要按机型重编。
+- **纯用户态，无专属 kmod 依赖**：认证器只用到 Linux 自带的 AF_PACKET
+  原始套接字和 Go 标准库。`opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；
+  同一二进制在任何同架构 OpenWrt 上都能跑，不需要按机型重编。镜像里出现
+  的 nftables kmod 来自 LuCI/firewall4 基础系统，不是认证器引入的。
 - **不做机型绑定**：WAN 口由 daemon 自动识别（ubus 逻辑接口 + 默认路由 +
   链路状态），也可在 LuCI 里多选候选网口。
 - **协议一致**：私有尾、CRC16/XMODEM、字节混淆、MD5 链式凭据加密、
@@ -68,8 +69,9 @@ sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 - 服务器私有属性：段 1 GBK 消息、段 2 0x6F 布局、段 3/4 版本门、段 5
   15 字节解混淆、属性 TLV 循环；`ENCRYPT_KEY`/`ENCRYPT_IV` 走 RC4
   (`com.ruijie.www`)；`SU_REAUTH_INTERV` 驱动重认证。
-- PEAPv0 + MSCHAPv2（RFC 2759，含 MD4、DES 展开、奇偶校验）与 EAP-TLS，
-  由 `auth_mode` 选择；隧道分片、ACK、phase2 状态机与 C# 一致。
+- PEAPv0 + MSCHAPv2（RFC 2759，含 MD4、DES 展开、奇偶校验），由
+  `auth_mode` 选择；隧道分片、ACK、phase2 状态机与 C# 一致。EAP-TLS 协议栈
+  已实现，但双向认证需要客户端证书，当前未开放证书配置入口。
 - 账号池（最多 5 个）、服务器学习/锁定、探测缓存、自动守护、定时重认证、
   家庭网络暂停、Unix socket 控制、1MB 日志轮转。
 - WAN 自动识别与多选；MAC 修改（写 `network.<section>.macaddr`）。
@@ -151,9 +153,15 @@ ruijie-auth selftest
 
 ## 验证状态（2026-11-20）
 
-- `go test ./...`：protocol（含真实抓包私有属性向量、RC4、MD4、
-  MSCHAPv2 RFC 向量、PEAP 分片布局）、config、profile、supplicant、
-  servers、network 全部通过。
+- `go test ./...`：protocol（含真实抓包的三份 569 字节私有尾逐字节向量、
+  私有属性向量、RC4、MD4、MSCHAPv2 RFC 向量、PEAP 分片布局）、config、
+  profile、supplicant、servers、network 全部通过。
+- 私有尾三类语义与真实抓包逐字节一致：Start（会话 nonce + 全零指纹）、
+  Identity（会话 nonce + 随机指纹）、MD5 Response（随机 nonce/指纹 +
+  challenge 作 IV）。
+- 常驻会话边界有回归测试：服务器应答后不再补发 EAPOL-Start；重认证时
+  清空重复报文过滤表；服务器主动重认证有超时兜底；TLS 桥接关闭后并发
+  读写不 panic（含 `-race`）。
 - `go vet ./...` 干净；`gofmt` 无差异。
 - amd64 原生与 mipsle（`qemu-mipsel`）`selftest` 均通过。
 - ipk 构建通过，内容包含二进制、init、hotplug、UCI 默认值、8 个 LuCI
@@ -166,7 +174,10 @@ ruijie-auth selftest
   - `profile import` 在设备上写入 8 个字段、生成 backup、触发 reload，
     状态随后显示 `profile=测试学校`；
   - LuCI 登录后 `data-page=admin-services-ruijie-auth-overview`、
-    `body class=lang_zh-cn`，`/admin/translations/zh-cn` 返回
-    `锐捷认证器`、`认证方式`、`学校档案`、`服务器私有属性` 等中文词条
-    （说明 `.lmo` 被正确加载）。
+    `body class=lang_zh-cn`，`/admin/translations/zh-cn` 返回 182 条运行时
+    词条；按 hash 逐条校验 8 个菜单标题与 8 个页面全部命中，包括三条长
+    说明文案（账号池、WAN 多选、协议自检）。
+  - CLI 输出已全中文：`selftest` 显示“通过/自检通过”，`status` 显示
+    “认证中/已认证”，`interfaces` 显示“已连接/无链路”，`accounts` 显示
+    “已启用，当前”；日志级别标签为 `[信息]/[错误]/[调试]`。
 - 未在真实校园网环境上做端到端认证（需要现场 WAN 与账号）。

@@ -37,7 +37,7 @@ func MACBytes(mac string) ([]byte, error) {
 
 type invalidMAC string
 
-func (e invalidMAC) Error() string { return "invalid MAC address: " + string(e) }
+func (e invalidMAC) Error() string { return "MAC 地址无效: " + string(e) }
 
 func errInvalidMAC(mac string) error { return invalidMAC(mac) }
 

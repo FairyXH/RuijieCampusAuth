@@ -84,15 +84,41 @@ func runStatus(args []string) {
 		return
 	}
 	fmt.Printf("%s | %s | %s | %s | %s | %s\n",
-		snapshot.State, snapshot.Message, snapshot.Account,
-		snapshot.Interface, snapshot.Server, snapshot.AuthMode)
+		stateText(snapshot.State), snapshot.Message, snapshot.Account,
+		snapshot.Interface, snapshot.Server,
+		protocol.ParseAuthMethod(snapshot.AuthMode).Display())
+}
+
+func stateText(state string) string {
+	switch state {
+	case "starting":
+		return "启动中"
+	case "authenticating":
+		return "认证中"
+	case "authenticated":
+		return "已认证"
+	case "retrying":
+		return "重试中"
+	case "paused":
+		return "已暂停"
+	case "idle":
+		return "已注销"
+	case "disabled":
+		return "已停用"
+	case "error":
+		return "错误"
+	case "stopped":
+		return "已停止"
+	default:
+		return state
+	}
 }
 
 func runDaemon(args []string) {
 	defaults := daemon.DefaultPaths()
 	fs := flag.NewFlagSet("daemon", flag.ExitOnError)
 	configPath := fs.String("config", defaults.Config, "UCI 配置路径")
-	socketPath := fs.String("socket", defaults.Socket, "控制 socket")
+	socketPath := fs.String("socket", defaults.Socket, "控制套接字")
 	statusPath := fs.String("status", defaults.Status, "状态文件")
 	dataDir := fs.String("data-dir", defaults.DataDir, "服务器/缓存目录")
 	logPath := fs.String("log", defaults.Log, "日志文件")
@@ -111,13 +137,13 @@ func runDaemon(args []string) {
 
 func runControl(command string, args []string) {
 	fs := flag.NewFlagSet(command, flag.ExitOnError)
-	socket := fs.String("socket", control.DefaultSocket, "控制 socket")
+	socket := fs.String("socket", control.DefaultSocket, "控制套接字")
 	_ = fs.Parse(args)
 	if err := control.Send(*socket, command); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Println("ok")
+	fmt.Println("成功")
 }
 
 func runAccounts(args []string) {
@@ -153,12 +179,12 @@ func runAccounts(args []string) {
 		return
 	}
 	for _, account := range list {
-		flags := "disabled"
+		flags := "已停用"
 		if account.Enabled {
-			flags = "enabled"
+			flags = "已启用"
 		}
 		if account.Active {
-			flags += ",active"
+			flags += "，当前"
 		}
 		fmt.Printf("%s | %s | %s | %s\n",
 			account.Section, account.Username, account.Note, flags)
@@ -196,9 +222,9 @@ func runServers(args []string) {
 		for _, record := range store.Servers {
 			lock := ""
 			if record.Locked {
-				lock = " locked"
+				lock = " 已锁定"
 			}
-			fmt.Printf("%s | %s | %s | success=%d%s\n",
+			fmt.Printf("%s | %s | %s | 成功=%d%s\n",
 				record.MAC, record.Name, record.Description, record.SuccessCount, lock)
 		}
 	case "lock":
@@ -210,14 +236,14 @@ func runServers(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("locked", rest[0])
+		fmt.Println("已锁定", rest[0])
 	case "unlock":
 		store.Unlock()
 		if err := store.Save(path); err != nil {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("unlocked")
+		fmt.Println("已解锁")
 	case "remove":
 		if len(rest) < 1 || !store.Remove(rest[0]) {
 			fmt.Fprintln(os.Stderr, "服务器不存在或 MAC 无效")
@@ -227,7 +253,7 @@ func runServers(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("removed", rest[0])
+		fmt.Println("已删除", rest[0])
 	case "rename":
 		if len(rest) < 2 || !store.Rename(rest[0], strings.Join(rest[1:], " ")) {
 			fmt.Fprintln(os.Stderr, "用法: servers rename <mac> <name>")
@@ -237,7 +263,7 @@ func runServers(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("renamed", rest[0])
+		fmt.Println("已重命名", rest[0])
 	default:
 		fmt.Fprintln(os.Stderr, "用法: servers list|lock|unlock|remove|rename")
 		os.Exit(2)
@@ -272,7 +298,7 @@ func runDiscovery(args []string) {
 			return
 		}
 		if discovery == nil {
-			fmt.Println("no cache")
+			fmt.Println("无缓存")
 			return
 		}
 		fmt.Printf("%s | %s | %s -> %s | %s\n",
@@ -283,7 +309,7 @@ func runDiscovery(args []string) {
 			fmt.Fprintln(os.Stderr, err)
 			os.Exit(1)
 		}
-		fmt.Println("cleared")
+		fmt.Println("已清除")
 	default:
 		fmt.Fprintln(os.Stderr, "用法: discovery show|clear")
 		os.Exit(2)
@@ -297,7 +323,7 @@ func runMAC(args []string) {
 	}
 	action := args[0]
 	fs := flag.NewFlagSet("mac "+action, flag.ExitOnError)
-	section := fs.String("section", "wan", "network section")
+	section := fs.String("section", "wan", "网络配置节")
 	asJSON := fs.Bool("json", false, "输出 JSON")
 	_ = fs.Parse(args[1:])
 	rest := fs.Args()
@@ -326,7 +352,7 @@ func runMAC(args []string) {
 			os.Exit(1)
 		}
 		_ = control.Send(control.DefaultSocket, "reload")
-		fmt.Println("mac set", rest[0])
+		fmt.Println("MAC 已设置:", rest[0])
 	case "random":
 		mac, err := netcfg.Random()
 		if err != nil {
@@ -345,7 +371,7 @@ func runMAC(args []string) {
 			os.Exit(1)
 		}
 		_ = control.Send(control.DefaultSocket, "reload")
-		fmt.Println("mac cleared")
+		fmt.Println("MAC 已清除")
 	default:
 		fmt.Fprintln(os.Stderr, "用法: mac show|set|random|clear")
 		os.Exit(2)
@@ -356,7 +382,7 @@ func runMAC(args []string) {
 func runInterfaces(args []string) {
 	fs := flag.NewFlagSet("interfaces", flag.ExitOnError)
 	asJSON := fs.Bool("json", false, "输出 JSON")
-	auto := fs.Bool("auto", false, "只输出 auto 会选择的接口")
+	auto := fs.Bool("auto", false, "只输出自动识别会选择的接口")
 	_ = fs.Parse(args)
 	list := netcfg.Interfaces()
 	if *auto {
@@ -372,8 +398,12 @@ func runInterfaces(args []string) {
 		if item.IsWAN {
 			marker = "*"
 		}
-		fmt.Printf("%s %s | %s | carrier=%v | %s\n",
-			marker, item.Name, item.MAC, item.Carrier, item.Description)
+		link := "无链路"
+		if item.Carrier {
+			link = "已连接"
+		}
+		fmt.Printf("%s %s | %s | 链路=%s | %s\n",
+			marker, item.Name, item.MAC, link, item.Description)
 	}
 }
 
@@ -450,10 +480,10 @@ func runProfile(args []string) {
 			fmt.Println(string(data))
 			return
 		}
-		fmt.Printf("imported %s -> %s (applied %d fields)\n",
+		fmt.Printf("已导入 %s -> %s（应用 %d 个字段）\n",
 			result.ProfileName, result.ConfigPath, len(result.Applied))
 		if result.BackupPath != "" {
-			fmt.Println("backup:", result.BackupPath)
+			fmt.Println("备份:", result.BackupPath)
 		}
 	default:
 		fmt.Fprintln(os.Stderr, "用法: profile list|show|import")
@@ -526,9 +556,9 @@ func runTail(args []string) {
 func runSelftest() {
 	failures := 0
 	check := func(name string, ok bool, detail string) {
-		status := "ok"
+		status := "通过"
 		if !ok {
-			status = "FAIL"
+			status = "失败"
 			failures++
 		}
 		fmt.Printf("%-28s %s %s\n", name, status, detail)
@@ -566,7 +596,7 @@ func runSelftest() {
 			Fingerprint: bytes.Repeat([]byte("B"), 128),
 		})
 	check("private-tail", err == nil && len(tail) == 569,
-		fmt.Sprintf("len=%d err=%v", len(tail), err))
+		fmt.Sprintf("长度=%d 错误=%v", len(tail), err))
 
 	obfuscated := protocol.Obfuscate([]byte{0x00, 0x00, 0x13, 0x11, 0x0A, 0x00})
 	roundTrip := protocol.Obfuscate(obfuscated)
@@ -580,13 +610,13 @@ func runSelftest() {
 		parsed.Properties[0].Name == "SU_REAUTH_INTERV" &&
 		parsed.Properties[0].Number != nil && *parsed.Properties[0].Number == 60
 	check("private-properties", len(parsed.Errors) == 0 && intervalOk && propertyOk,
-		fmt.Sprintf("errors=%v props=%d", parsed.Errors, len(parsed.Properties)))
+		fmt.Sprintf("错误=%v 属性=%d", parsed.Errors, len(parsed.Properties)))
 
 	if failures > 0 {
 		fmt.Fprintf(os.Stderr, "selftest 失败: %d\n", failures)
 		os.Exit(1)
 	}
-	fmt.Println("selftest ok")
+	fmt.Println("自检通过")
 }
 
 // selftestPrivateBlock builds a complete synthetic server private-property

@@ -48,9 +48,9 @@ return view.extend({
 			return exec(args).then(function(result) {
 				output.textContent =
 					'$ ruijie-auth ' + args.join(' ') +
-					'\nexit=' + result.code +
+					'\n' + _('exit code') + '=' + result.code +
 					'\n' + (result.stdout || '') +
-					(result.stderr ? '\n[stderr]\n' + result.stderr : '');
+					(result.stderr ? '\n[' + _('stderr') + ']\n' + result.stderr : '');
 			}).catch(function(err) {
 				output.textContent = String(err);
 			});

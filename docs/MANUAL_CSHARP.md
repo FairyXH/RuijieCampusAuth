@@ -346,10 +346,10 @@ RuijieCampusAuth.Cli.exe status
 
 ```powershell
 RuijieCampusAuth.Cli.exe profile list
-RuijieCampusAuth.Cli.exe profile list --dir D:\profiles
-RuijieCampusAuth.Cli.exe profile show profiles\hxxy.json
-RuijieCampusAuth.Cli.exe profile import profiles\hxxy.json
-RuijieCampusAuth.Cli.exe profile import profiles\hxxy.json --root "D:\Storageredirect\Program\RuijieCampusAuth"
+RuijieCampusAuth.Cli.exe profile list --dir "<档案目录>"
+RuijieCampusAuth.Cli.exe profile show "profiles\厦门华厦学院.json"
+RuijieCampusAuth.Cli.exe profile import "profiles\厦门华厦学院.json"
+RuijieCampusAuth.Cli.exe profile import "profiles\厦门华厦学院.json" --root "<安装目录>"
 ```
 
 `import` 会打印档案名、settings 路径、备份路径、实际应用的字段列表。

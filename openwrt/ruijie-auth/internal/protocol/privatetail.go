@@ -161,7 +161,7 @@ func Pad16(data []byte) []byte {
 // It is wire compatibility, not a confidentiality primitive.
 func EncryptCredentials(username, password, iv []byte) ([]byte, error) {
 	if len(iv) != 16 {
-		return nil, fmt.Errorf("iv must be exactly 16 bytes")
+		return nil, fmt.Errorf("IV 必须为 16 字节")
 	}
 	plain := Pad16(password)
 	previous := iv
@@ -202,7 +202,7 @@ func padded(value []byte, length int) []byte {
 func attribute(typ byte, payload []byte) ([]byte, error) {
 	total := 8 + len(payload)
 	if total > 0xFF {
-		return nil, fmt.Errorf("attribute 0x%02X is too long: %d", typ, total)
+		return nil, fmt.Errorf("私有属性 0x%02X 过长: %d", typ, total)
 	}
 	out := make([]byte, 2+4+2+len(payload))
 	out[0] = AttrTag
@@ -237,10 +237,10 @@ func BuildTail(
 ) ([]byte, error) {
 	macNormalized := NormalizeMAC(mac)
 	if macNormalized == "" {
-		return nil, fmt.Errorf("invalid MAC address: %s", mac)
+		return nil, fmt.Errorf("MAC 地址无效: %s", mac)
 	}
 	if len(iv) != 16 {
-		return nil, fmt.Errorf("iv must be exactly 16 bytes")
+		return nil, fmt.Errorf("IV 必须为 16 字节")
 	}
 	if options == nil {
 		options = DefaultTailOptions()
@@ -250,7 +250,7 @@ func BuildTail(
 
 	macBytes, err := hex.DecodeString(strings.ReplaceAll(macNormalized, ":", ""))
 	if err != nil {
-		return nil, fmt.Errorf("decode MAC: %w", err)
+		return nil, fmt.Errorf("解析 MAC 失败: %w", err)
 	}
 	encrypted, err := EncryptCredentials(username, password, iv)
 	if err != nil {

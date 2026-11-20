@@ -158,20 +158,20 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 	total := len(data)
 	if total > MaximumPrivatePropertyPacket {
 		result.Errors = append(result.Errors,
-			fmt.Sprintf("payload length %d exceeds %d", total, MaximumPrivatePropertyPacket))
+			fmt.Sprintf("私有属性长度 %d 超过上限 %d", total, MaximumPrivatePropertyPacket))
 		return result
 	}
 	pos := 0
 
 	// Section 1: marker + 2B length + GBK message.
 	if total < 6 || !privateMarkerAt(data, 0) {
-		result.Errors = append(result.Errors, "missing section 1 marker")
+		result.Errors = append(result.Errors, "缺少段 1 标记")
 		return result
 	}
 	messageLength := int(readUint16BE(data, 4))
 	if messageLength+6 > total {
 		result.Errors = append(result.Errors,
-			fmt.Sprintf("section 1 length %d overruns payload", messageLength))
+			fmt.Sprintf("段 1 长度 %d 超出数据范围", messageLength))
 		return result
 	}
 	message := decodePrivateText(data[6 : 6+messageLength])
@@ -184,7 +184,7 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 	if pos+0x6F <= total {
 		if !privateMarkerAt(data, pos) {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("missing section 2 marker at offset %d", pos))
+				fmt.Sprintf("偏移 %d 处缺少段 2 标记", pos))
 			result.ConsumedBytes = pos
 			return result
 		}
@@ -197,7 +197,7 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 			pos += count * 0x20
 		} else {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("section 2 count %d overruns payload", count))
+				fmt.Sprintf("段 2 条目数 %d 超出数据范围", count))
 			result.ConsumedBytes = pos
 			return result
 		}
@@ -214,7 +214,7 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 		}
 		if !privateMarkerAt(data, pos) {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("missing section %d marker at offset %d", section, pos))
+				fmt.Sprintf("偏移 %d 处缺少段 %d 标记", pos, section))
 			result.ConsumedBytes = pos
 			return result
 		}
@@ -224,7 +224,7 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 			pos += 6
 		} else {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("section %d version %d/sub %d rejected", section, version, sub))
+				fmt.Sprintf("段 %d 版本 %d/%d 被拒绝", section, version, sub))
 			result.ConsumedBytes = pos
 			return result
 		}
@@ -238,14 +238,14 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 	plain := Obfuscate(data[pos : pos+15])
 	if !privateMarkerAt(plain, 0) {
 		result.Errors = append(result.Errors,
-			fmt.Sprintf("section 5 de-obfuscated marker mismatch: %s",
+			fmt.Sprintf("段 5 解混淆后标记不匹配: %s",
 				strings.ToUpper(hex.EncodeToString(plain))))
 		result.ConsumedBytes = pos
 		return result
 	}
 	if plain[4] != 0x0A {
 		result.Errors = append(result.Errors,
-			fmt.Sprintf("section 5 gate byte %02X != 0x0A", plain[4]))
+			fmt.Sprintf("段 5 门控字节 %02X != 0x0A", plain[4]))
 		result.ConsumedBytes = pos
 		return result
 	}
@@ -266,13 +266,13 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 		declared := int(data[pos+5])
 		if declared < 2 {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("type %d length %d too small at offset %d", typ, declared, pos))
+				fmt.Sprintf("偏移 %d 处类型 %d 长度 %d 过小", pos, typ, declared))
 			break
 		}
 		valueLength := declared - 2
 		if pos+6+valueLength > total {
 			result.Errors = append(result.Errors,
-				fmt.Sprintf("type %d overruns payload at offset %d", typ, pos))
+				fmt.Sprintf("偏移 %d 处类型 %d 超出数据范围", pos, typ))
 			break
 		}
 		value := append([]byte(nil), data[pos+6:pos+6+valueLength]...)
@@ -282,7 +282,7 @@ func ParsePrivateProperties(payload []byte) PrivatePropertiesResult {
 
 	if pos != total {
 		result.Errors = append(result.Errors,
-			fmt.Sprintf("trailing %d byte(s)", total-pos))
+			fmt.Sprintf("尾部残留 %d 字节", total-pos))
 	}
 	result.ConsumedBytes = pos
 	return result
@@ -327,7 +327,9 @@ func decodePrivateNumber(value []byte) *int64 {
 	case 1:
 		number = int64(value[0])
 	case 2:
-		number = int64(int16(uint16(value[0])<<8 | uint16(value[1])))
+		// C# promotes both bytes to int before ORing, so 2-byte values stay
+		// unsigned (0..65535).
+		number = int64(uint16(value[0])<<8 | uint16(value[1]))
 	case 4:
 		// C# widens each byte to long before shifting, so 4-byte values are
 		// always non-negative here (unlike readUint32BE).

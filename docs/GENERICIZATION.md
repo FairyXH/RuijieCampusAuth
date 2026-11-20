@@ -15,15 +15,15 @@
 | 位置 | 用途 |
 |---|---|
 | `profiles/*.json` | 学校档案，随仓库分发，不编进二进制 |
-| `profiles/hxxy.json` | 当前学校的档案（示例/实际使用） |
+| `profiles/厦门华厦学院.json` | 正式档案（已核对，可直接导入） |
 | `profiles/README.md` | 字段说明与导入方法 |
 
 导入命令：
 
 ```bash
-dotnet RuijieCampusAuth.Cli.dll profile show profiles/hxxy.json
-dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json
-dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root "D:\Storageredirect\Program\RuijieCampusAuth"
+dotnet RuijieCampusAuth.Cli.dll profile show "profiles/厦门华厦学院.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json" --root "<安装目录>"
 ```
 
 导入语义：
@@ -82,7 +82,7 @@ dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root "D:\Sto
 
 1. 停止旧 GUI 与服务。
 2. 部署新二进制（D 盘目录可保持 `RuijieCampusAuth`）。
-3. 执行 `RuijieCampusAuth.Cli.exe profile import profiles/hxxy.json --root <安装目录>`。
+3. 执行 `RuijieCampusAuth.Cli.exe profile import "profiles/厦门华厦学院.json" --root <安装目录>`。
 4. 执行 `service install`：安装 `RuijieCampusAuth` 并删除旧 `HXXY-CampusAuth` 服务。
 5. 更新计划任务/VBS 名称时，保留旧名称作为一次性迁移来源，确认新任务可用后再删除。
 6. 重启 GUI，确认标题、托盘、服务状态与认证均正常。
@@ -93,8 +93,8 @@ dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root "D:\Sto
 dotnet build RuijieCampusAuth.slnx -c Release
 dotnet test RuijieCampusAuth.Core.Tests -c Release
 dotnet test RuijieCampusAuth.Service.Tests -c Release
-dotnet RuijieCampusAuth.Cli.dll profile show profiles/hxxy.json
-dotnet RuijieCampusAuth.Cli.dll profile import profiles/hxxy.json --root <安装目录>
+dotnet RuijieCampusAuth.Cli.dll profile show "profiles/厦门华厦学院.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json" --root <安装目录>
 ```
 
 预期：导入后 `settings.json` 的 `profile_name` 为档案名，`service_name`/`static_id`

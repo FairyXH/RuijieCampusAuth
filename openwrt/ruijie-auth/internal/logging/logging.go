@@ -43,7 +43,7 @@ func New(path, level string) *Logger {
 
 // Errorf always logs.
 func (l *Logger) Errorf(format string, args ...any) {
-	l.logger.Printf("[ERROR] "+format, args...)
+	l.logger.Printf("[错误] "+format, args...)
 }
 
 func parseLevel(level string) int {
@@ -73,14 +73,14 @@ func (l *Logger) allows(level int) bool {
 // Infof logs at info/debug level.
 func (l *Logger) Infof(format string, args ...any) {
 	if l.allows(levelInfo) {
-		l.logger.Printf("[INFO] "+format, args...)
+		l.logger.Printf("[信息] "+format, args...)
 	}
 }
 
 // Debugf logs at debug level.
 func (l *Logger) Debugf(format string, args ...any) {
 	if l.allows(levelDebug) {
-		l.logger.Printf("[DEBUG] "+format, args...)
+		l.logger.Printf("[调试] "+format, args...)
 	}
 }
 

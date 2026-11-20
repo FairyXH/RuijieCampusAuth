@@ -29,12 +29,14 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 
 特点：
 
-- **纯用户态、零 kmod 依赖**：不装任何内核模块，同一个二进制在同架构
-  OpenWrt 上都能跑；
+- **纯用户态、无专属 kmod 依赖**：认证器本身不装任何内核模块，同一个
+  二进制在同架构 OpenWrt 上都能跑；镜像中的 nftables kmod 来自
+  LuCI/firewall4 基础系统；
 - **WAN 自动识别**：ubus 逻辑接口 + 默认路由 + 链路状态，下拉框可多选；
 - **学校差异走档案**：与桌面版同一份 `profiles/*.json`；
 - **全中文 LuCI**：8 个页面，随 ipk 安装 `.lmo` 翻译；
-- 支持 EAP-MD5、PEAP+MSCHAPv2、EAP-TLS（由 `auth_mode` 选择）。
+- 支持 EAP-MD5、PEAP+MSCHAPv2；EAP-TLS 协议栈已实现，但需客户端证书，
+  当前未开放配置入口。
 
 ---
 
@@ -46,7 +48,7 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 | 架构 | 默认 `mipsle`（mipsel_24kc）；换架构改 `GOARCH` 重编 |
 | 设备 | 不绑定机型；R3G 只是默认 Image Builder `PROFILE` |
 | 依赖 | 运行时只有 `libc`、`luci-base`、`rpcd` |
-| 不需要 | kmod、UA3F、NFQUEUE、iptables 扩展、USB 网卡驱动 |
+| 认证器不需要 | 专属 kmod、UA3F、NFQUEUE、iptables 扩展、USB 网卡驱动 |
 
 > 只要路由器能跑 OpenWrt 24.10、有可用 WAN 口，就能用。无线中继/AP 模式
 > 不适合 802.1X 有线认证。
@@ -145,7 +147,7 @@ opkg install --force-reinstall /tmp/ruijie-auth_0.2.0_mipsel_24kc.ipk
 把 JSON 放到 `/etc/ruijie-auth/profiles/`：
 
 ```bash
-scp hxxy.json root@192.168.1.1:/etc/ruijie-auth/profiles/
+scp "厦门华厦学院.json" root@192.168.1.1:/etc/ruijie-auth/profiles/
 ```
 
 页面“已安装档案”列表会出现它，点 **导入** 即可。
@@ -301,8 +303,10 @@ scp hxxy.json root@192.168.1.1:/etc/ruijie-auth/profiles/
 | `pause_on_home` | 1 | 无认证服务器但网络在线时暂停 |
 | `dhcp_mode` | none | `before`/`after` 目前只记录，不驱动 udhcpc |
 
-PEAP / EAP-TLS 的证书校验当前关闭（与 C# 版一致），适合校园网自签
-RADIUS；协议栈已实现，但请在真实环境先验证再长期使用。
+PEAP / EAP-TLS 的服务端证书校验当前关闭（与 C# 常规路径一致），适合
+校园网自签 RADIUS；协议栈已实现，但请在真实环境先验证再长期使用。
+EAP-TLS 是双向认证，必须提供客户端证书；OpenWrt 版暂未开放证书配置
+入口，因此实际可用的方式是 `EAPMD5` 与 `PEAP`。
 
 ---
 
@@ -358,7 +362,7 @@ ruijie-auth interfaces
 
 # 导入档案
 ruijie-auth profile list
-ruijie-auth profile import --file /tmp/hxxy.json
+ruijie-auth profile import --file "/tmp/厦门华厦学院.json"
 
 # 锁定服务器
 ruijie-auth servers list
@@ -376,16 +380,16 @@ ruijie-auth selftest
 `selftest` 期望输出：
 
 ```text
-rc4-vector                   ok bbf316e8d940af0ad3
-md4-vector                   ok a448017aaf21d8525fc10ae87aa6729d
-mschapv2-nt-response         ok 82309ecd8d708b5ea08faa3981cd83544233114a3d85d6df
-private-tail                 ok len=569 err=<nil>
-obfuscate-involution         ok ffff3777afff
-private-properties           ok errors=[] props=1
-selftest ok
+rc4-vector                   通过 bbf316e8d940af0ad3
+md4-vector                   通过 a448017aaf21d8525fc10ae87aa6729d
+mschapv2-nt-response         通过 82309ecd8d708b5ea08faa3981cd83544233114a3d85d6df
+private-tail                 通过 长度=569 错误=<nil>
+obfuscate-involution         通过 ffff3777afff
+private-properties           通过 错误=[] 属性=1
+自检通过
 ```
 
-任一 `FAIL` 说明二进制损坏或架构不符（比如把 mips 包装到 arm 上）。
+任一 `失败` 说明二进制损坏或架构不符（比如把 mips 包装到 arm 上）。
 
 ---
 
@@ -578,8 +582,8 @@ PROFILE=xiaomi_mi-router-3g \
   sh scripts/build-image.sh
 ```
 
-默认包集合只有 `luci-ssl luci-i18n-base-zh-cn` + 本插件，不含任何 kmod。
-需要额外软件包时：
+默认包集合只有 `luci-ssl luci-i18n-base-zh-cn` + 本插件；认证器自身不引入
+kmod，镜像中的 nftables kmod 随 firewall4 基础系统安装。需要额外软件包时：
 
 ```bash
 PACKAGES="luci-ssl luci-i18n-base-zh-cn tcpdump" sh scripts/build-image.sh

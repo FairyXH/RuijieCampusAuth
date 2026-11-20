@@ -38,15 +38,15 @@ type MschapResponse struct {
 // carries the same reason string the C# implementation returns.
 func TryParseChallenge(eapPacket []byte) (*MschapChallenge, error) {
 	if len(eapPacket) < 5+21 || eapPacket[0] != 1 || eapPacket[4] != EapMSCHAPv2 {
-		return nil, errors.New("not an EAP-MSCHAPv2 packet")
+		return nil, errors.New("不是 EAP-MSCHAPv2 报文")
 	}
 	data := eapPacket[5:]
 	if data[0] != MschapChallengeOpcode || data[4] != 16 {
-		return nil, errors.New("not an MSCHAPv2 challenge")
+		return nil, errors.New("不是 MSCHAPv2 Challenge")
 	}
 	nameLength := len(data) - 21
 	if nameLength < 0 {
-		return nil, errors.New("challenge too short")
+		return nil, errors.New("Challenge 长度不足")
 	}
 	return &MschapChallenge{
 		Identifier:       eapPacket[1],
@@ -63,7 +63,7 @@ func BuildResponse(
 	peerChallenge []byte,
 ) ([]byte, error) {
 	if len(peerChallenge) != 16 {
-		return nil, errors.New("peer challenge must be 16 bytes")
+		return nil, errors.New("Peer Challenge 必须为 16 字节")
 	}
 	ntResponse := GenerateNTResponse(
 		challenge.Challenge, peerChallenge, userName, password)

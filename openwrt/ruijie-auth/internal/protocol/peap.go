@@ -113,7 +113,7 @@ func RunPeap(transport PeapTransport, options PeapOptions) PeapResult {
 		return failure(err.Error())
 	}
 	if !isTunnelRequest(first, options.Mode) {
-		return failure("first server packet is not a PEAP/EAP-TLS request")
+		return failure("服务器首个报文不是 PEAP/EAP-TLS 请求")
 	}
 
 	pumpCtx, cancel := context.WithCancel(context.Background())
@@ -131,16 +131,35 @@ func RunPeap(transport PeapTransport, options PeapOptions) PeapResult {
 			return nil
 		}
 		if len(rawCerts) == 0 {
-			return errors.New("server presented no certificate")
+			return errors.New("服务器未提供证书")
 		}
 		certificate, err := x509.ParseCertificate(rawCerts[0])
 		if err != nil {
 			return err
 		}
+		// C# lets SslStream validate the chain against the system store and
+		// then keeps the Subject.Contains host check. Reproduce both here.
+		roots, err := x509.SystemCertPool()
+		if err != nil {
+			roots = x509.NewCertPool()
+		}
+		intermediates := x509.NewCertPool()
+		for _, raw := range rawCerts[1:] {
+			if intermediate, err := x509.ParseCertificate(raw); err == nil {
+				intermediates.AddCert(intermediate)
+			}
+		}
+		if _, err := certificate.Verify(x509.VerifyOptions{
+			Roots:         roots,
+			Intermediates: intermediates,
+			KeyUsages:     []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		}); err != nil {
+			return fmt.Errorf("证书链校验失败: %w", err)
+		}
 		if options.TargetHost != "" &&
 			!strings.Contains(strings.ToLower(certificate.Subject.String()),
 				strings.ToLower(options.TargetHost)) {
-			return fmt.Errorf("certificate subject %q does not match %q",
+			return fmt.Errorf("证书主题 %q 与 %q 不匹配",
 				certificate.Subject.String(), options.TargetHost)
 		}
 		return nil
@@ -149,11 +168,16 @@ func RunPeap(transport PeapTransport, options PeapOptions) PeapResult {
 	if targetHost == "" {
 		targetHost = "localhost"
 	}
+	// The official client carries OpenSSL 0.9.8j, so the compatible window is
+	// TLS 1.0-1.2. Cap at 1.2: PEAP phase2 semantics are not defined for
+	// TLS 1.3, and letting a modern RADIUS server negotiate 1.3 would break
+	// the inner EAP exchange.
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify:    true,
 		ServerName:            targetHost,
 		VerifyPeerCertificate: verify,
 		MinVersion:            tls.VersionTLS10,
+		MaxVersion:            tls.VersionTLS12,
 	}
 	if options.ClientCertificate != nil {
 		tlsConfig.Certificates = []tls.Certificate{*options.ClientCertificate}
@@ -206,7 +230,7 @@ func handshakeWithTimeout(tlsConn *tls.Conn, conn *EapTLSConn, deadline time.Tim
 		return err
 	case <-ctx.Done():
 		_ = conn.Close()
-		return errors.New("TLS handshake timeout")
+		return errors.New("TLS 握手超时")
 	}
 }
 
@@ -217,10 +241,9 @@ func pump(ctx context.Context, transport PeapTransport, conn *EapTLSConn, option
 		select {
 		case <-ctx.Done():
 			return
-		case outgoing, ok := <-conn.outgoing:
-			if !ok {
-				return
-			}
+		case <-conn.closed:
+			return
+		case outgoing := <-conn.outgoing:
 			next, err := sendClientPayload(transport, outgoing, options)
 			if err != nil || next == nil {
 				return

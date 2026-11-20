@@ -112,7 +112,7 @@ type ImportResult struct {
 // backup is written first, like the C# ProfileStore.Import.
 func Import(p Profile, configPath, profilePath string) (ImportResult, error) {
 	if strings.TrimSpace(configPath) == "" {
-		return ImportResult{}, errors.New("configuration path is empty")
+		return ImportResult{}, errors.New("配置路径为空")
 	}
 	existing, err := os.ReadFile(configPath)
 	if err != nil && !os.IsNotExist(err) {

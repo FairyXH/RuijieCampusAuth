@@ -408,6 +408,12 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 		serverMAC = ""
 		startSent = 1
 		reauthC = nil
+		// A resident session outlives one Authenticate() call, so the
+		// duplicate-response filter must not carry identifiers into the next
+		// attempt. The server is free to reuse an Identity identifier, and a
+		// stale entry would silently swallow that request.
+		handled = make(map[string]bool)
+		lastProperties = nil
 		if err := sendLogoff(); err != nil {
 			return err
 		}
@@ -459,14 +465,14 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 			}
 
 		case <-startTimer.C:
-			if !authenticated {
+			// Only hunt for an authenticator while none has answered. Once a
+			// server replies, C# suppresses further EAPOL-Start frames and the
+			// real capture shows the same behaviour; sending them mid-handshake
+			// can make the server restart authentication.
+			if !authenticated && serverMAC == "" {
 				if startSent >= opts.Retries {
-					if serverMAC == "" {
-						s.status("retrying", "未找到认证服务器", "")
-						return result(KindNoServer, "", false, false, nil, lastProperties, nil)
-					}
-					s.status("retrying", "认证超时，服务器未返回最终结果", serverMAC)
-					return result(KindTimeout, serverMAC, true, false, nil, lastProperties, nil)
+					s.status("retrying", "未找到认证服务器", "")
+					return result(KindNoServer, "", false, false, nil, lastProperties, nil)
 				}
 				if err := sendStart(); err != nil {
 					return result(KindTransport, serverMAC, connected, authenticated, nil, lastProperties, err)
@@ -521,6 +527,10 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 					s.logf("服务器消息: %s", message)
 				}
 				authenticated = true
+				// Stay resident and accept a server-initiated re-auth. The
+				// server may reuse an Identity identifier, so the duplicate
+				// filter starts fresh once the previous attempt completed.
+				handled = make(map[string]bool)
 				stopTimer(authTimer)
 				stopTimer(startTimer)
 				startReauthTimer()
@@ -549,6 +559,16 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 				if handled[key] {
 					continue
 				}
+				if authenticated {
+					// The server may start a re-authentication by itself while
+					// the session sits in the authenticated hold state. Bound
+					// that exchange with the normal auth timeout; otherwise a
+					// lost final result would leave the resident session
+					// waiting forever.
+					authenticated = false
+					resetTimer(authTimer, opts.Timeout)
+					s.status("authenticating", "服务器发起重认证...", from)
+				}
 				var response []byte
 				switch eapType {
 				case protocol.EapIdentity:
@@ -562,7 +582,7 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 					if len(eap) < 6 || eap[5] != 16 || len(eap) < 6+16 {
 						s.status("error", "服务器 MD5 Challenge 格式不完整", from)
 						return result(KindFailure, from, true, authenticated, nil, lastProperties,
-							fmt.Errorf("invalid MD5 challenge"))
+							fmt.Errorf("服务器 MD5 Challenge 格式不完整"))
 					}
 					challenge := eap[6 : 6+16]
 					tail, err := s.tail(st, challenge, nil, nil)
@@ -574,7 +594,7 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 				default:
 					s.status("error", fmt.Sprintf("服务器请求了未实现的 EAP 类型: %d", eapType), from)
 					return result(KindFailure, from, true, authenticated, nil, lastProperties,
-						fmt.Errorf("unsupported EAP type %d", eapType))
+						fmt.Errorf("服务器请求了未实现的 EAP 类型: %d", eapType))
 				}
 				handled[key] = true
 				time.Sleep(opts.ResponseDelay)
@@ -751,6 +771,10 @@ func (s *Session) attemptTunnel(
 		}
 	}()
 
+	// EAPOL-Start/Logoff always carry the control tail (session nonce plus a
+	// zeroed fingerprint), which is what the official live capture shows.
+	// C# PcapEapTransport reuses the identity tail only because its interface
+	// takes a single tail parameter.
 	tt := &tunnelTransport{
 		raw:         st.raw,
 		source:      st.source,
@@ -762,13 +786,19 @@ func (s *Session) attemptTunnel(
 		ctx:         runCtx,
 		status:      s.status,
 	}
+	// C# uses Math.Max(5, timeout * 2) for the tunnel deadline; keep the same
+	// floor so a very small auth timeout does not cut the TLS handshake short.
+	tunnelTimeout := 2 * opts.Timeout
+	if tunnelTimeout < 5*time.Second {
+		tunnelTimeout = 5 * time.Second
+	}
 	session := protocol.RunPeap(tt, protocol.PeapOptions{
 		Mode:                    kind.TunnelMode(),
 		UserName:                opts.Username,
 		Password:                opts.Password,
 		VerifyServerCertificate: false,
 		MaxFragmentBytes:        1200,
-		Timeout:                 2 * opts.Timeout,
+		Timeout:                 tunnelTimeout,
 		IdentityTail:            identityTail,
 	})
 	cancel()
@@ -880,7 +910,7 @@ func (t *tunnelTransport) sendControl(typ byte) error {
 func (t *tunnelTransport) sendEap(eap, tail []byte) error {
 	server := t.ServerMAC()
 	if server == "" {
-		return fmt.Errorf("transport is not started")
+		return fmt.Errorf("传输通道尚未启动")
 	}
 	frame, err := protocol.BuildFrame(t.source, server, eap, tail)
 	if err != nil {
@@ -919,15 +949,15 @@ func (t *tunnelTransport) Start(identity string, identityTail []byte) ([]byte, e
 			return nil, err
 		}
 		if packet == nil {
-			return nil, fmt.Errorf("no EAP identity request")
+			return nil, fmt.Errorf("未收到 EAP Identity 请求")
 		}
 		switch packet[0] {
 		case protocol.EapSuccess:
 			t.recordOuter(packet)
-			return nil, fmt.Errorf("server sent EAP-Success before PEAP start")
+			return nil, fmt.Errorf("服务器在 PEAP 开始前返回 EAP-Success")
 		case protocol.EapFailure:
 			t.recordOuter(packet)
-			return nil, fmt.Errorf("EAP-Failure before PEAP start")
+			return nil, fmt.Errorf("服务器在 PEAP 开始前返回 EAP-Failure")
 		case protocol.EapRequest:
 			if len(packet) >= 5 && packet[4] == protocol.EapIdentity {
 				t.status("authenticating", "收到 Identity 请求，提交用户身份", t.ServerMAC())
@@ -947,7 +977,7 @@ tunnel:
 			return nil, err
 		}
 		if packet == nil {
-			return nil, fmt.Errorf("no PEAP/EAP-TLS request")
+			return nil, fmt.Errorf("未收到 PEAP/EAP-TLS 请求")
 		}
 		switch packet[0] {
 		case protocol.EapSuccess, protocol.EapFailure:
@@ -977,7 +1007,7 @@ func (t *tunnelTransport) Exchange(eapPacket, tail []byte) ([]byte, error) {
 			return nil, err
 		}
 		if packet == nil {
-			return nil, fmt.Errorf("no server EAP response")
+			return nil, fmt.Errorf("未收到服务器 EAP 响应")
 		}
 		switch packet[0] {
 		case protocol.EapSuccess, protocol.EapFailure:
