@@ -229,7 +229,9 @@ Deep Freeze：
   测试必须先在旧客户端执行 Logoff，或等待会话释放。
 - **发布**：`v0.9.0` 已发布；因 Linux 包早于上述修复，补发
   `v0.9.1`（Windows/Linux 重新构建，OpenWrt ipk 代码未变，继续使用
-  0.9.0 包）。
+  0.9.0 包）。`v0.9.1` 已设为 Latest，5 个资产全部上传，GitHub 记录的
+  SHA256 与本地 `SHA256SUMS.txt` 一致；Ubuntu 应用菜单中的已安装版本
+  已同步为 0.9.1。
 - 仍未验证：真实 RADIUS 上的 PEAP/EAP-TLS。
 
 ## 8. 已知问题 / 限制
@@ -311,8 +313,6 @@ Deep Freeze：
    桥接真实校园网已完成认证与 LuCI 验证，PEAP 学校补一次隧道抓包。
 7. Python 服务宿主打包（`python/build.ps1` + PyInstaller）与 Linux systemd
    包装待实机验证。
-8. 发布 `v0.9.1` 修复包（Windows/Linux 重建；OpenWrt ipk 复用 0.9.0），
-   核对 release 资产 SHA256 与安装说明。
 
 差分校对工具链：`tools/re_diff/full_diff.py`（Unicorn 直调原版）+
 `tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
