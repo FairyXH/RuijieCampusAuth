@@ -62,7 +62,7 @@ PDB 路径泄漏：
 
 - `rjixsu.xml`：`ProductCustomName`、`ProductUninstallName`、安装文件清单。
 - `SuConfig.txt`：客户名称、用户名、超时、DHCP、自助 URL、网卡名。
-- `SuConfig.dat`：XOR/替换混淆的键值（SchoolCode、Service、AuthMode、AutoRun、WiFi、UI 等）。
+- `SuConfig.dat`：SchoolCode、Service（ProductName）、AuthMode、AutoRun、WiFi、UI、DHCP 等（解码见 3.1）。
 - `newskin.zip`：logo、背景、DuiLib 布局。
 - 运行期服务端可下发学校字段（服务名、静态 ID、升级 URL、学校代码等）。
 
@@ -79,6 +79,28 @@ PDB 路径泄漏：
 | 升级 | `http://update.rghall.com.cn/das/update` |
 | 引擎 | 5.0.2014.108 |
 | 认证模式 | EAPMD5 |
+
+### 3.1 SuConfig.dat 解码（2026-11-20，三校安装包实测）
+
+密文 → 明文：按 9 字节分组，组内循环左移 1 字节后逐字节 XOR 0xFF。
+每组 = 8 字节内容 + 1 字节分隔符（全 ASCII 组分隔符为 0x00，故密文中
+raw 0xFF 以 9 为周期出现）。内容为 GBK 编码的 INI 文本，中文字节原样保留。
+
+已验证的锚点（厦门工学院包）：`[DOMAIN]`、`SupportOsloginAuth=1`、
+`Auth=1\r\n`、`AuthenticationMode=EAPMD5`、`SelfSvrURL=http://210.34.213.99/zizhu/`
+（XMUT）、`SchoolCode=xmgxy/xmlgxy/hnny`、`ProductName=校园网`、
+`DhcpWayName=不使用`、`SharePassword=!@#%^&*)`。
+
+未完全还原：组分隔符之外的散布控制字节（如 `\x7f`、`\x02`、`\x03`、`\x80`，
+位置随内容长度漂移，疑为组标志/压缩标记）。它们会使个别 ASCII 字符缺失或
+大小写翻转（`AutoRun`→`A\x02uoRun`、`Path`→`?Ah`），因此字段值以"伪影之间
+的连续可读段"为准；读不全的字段按证据规则留空并标注，不得猜测补齐。
+
+安装包分层：iExpress（WEXTRACT.EXE）→ CAB（.rsrc RCDATA）→
+`Setup_x86.zip` → 客户端文件树（`rjixsu.xml`/`SuConfig.dat`/`SetupConfig.ini`/
+`8021x.exe` 等）。产品分支与 OEM 名取 `SetupConfig.ini`（ReleaseVer/CustomName），
+`engine_version` 取 `8021x.exe` 版本资源。三校（6.82/6.85/6.86 分支）引擎均为
+`5.0.2014.108`，与本机华厦安装一致。
 
 ## 4. 进程/模块架构
 

@@ -1,0 +1,19 @@
+{
+  "name": "厦门工学院",
+  "school_code": "xmgxy",
+  "auth_mode": "EAPMD5",
+  "service_name": "校园网",
+  "static_id": "",
+  "self_service_url": "",
+  "update_url": "http://update.rghall.com.cn/das/update",
+  "portal_url": "",
+  "sam_host": "",
+  "sam_port": 0,
+  "dhcp_mode": "none",
+  "dhcp_timeout": 30,
+  "dhcp_option82": false,
+  "ad_domain": "",
+  "ad_timeout": 120,
+  "engine_version": "5.0.2014.108",
+  "notes": "来源：RG_SU_For_Windows 6.82 分支安装包（SetupConfig.ini CustomName=厦门工学院认证客户端）。school_code 取自 SuConfig.dat（rotate+XOR 0xFF 解码）；DHCP 配置为 不使用；self_service_url 在 SuConfig 中为空。service_name 取 SuConfig ProductName=校园网，static_id 需实网 0x54 属性确认。"
+}

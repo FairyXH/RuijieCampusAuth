@@ -119,6 +119,11 @@ Deep Freeze：
 - 导入只覆盖档案声明字段；账号、网卡、接管、Guardian 不变；自动备份
   `settings.json.bak-<时间戳>`。
 - `profiles/` 可放多份 `<学校>.json`，导入只覆盖档案声明字段。
+- 已入库档案：`厦门华厦学院.json`（实网核对）+ `厦门工学院.json` /
+  `厦门理工学院.json` / `华南农业大学.json`（2026-11-20 从安装包逆向生成，
+  method 与未还原项见 `docs/REVERSE_ENGINEERING.md` §3.1；三校 static_id、
+  service_name 均需实网 0x54/0x39 属性确认）。注意：SCAU 安装包原文件名
+  误标"闽南农业大学"，档案以客户端 OEM 标识华南农业大学（hnny）为准。
 - OpenWrt 端用同一份档案：`ruijie-auth profile import --file "<学校>.json"`
   写入 `/etc/config/ruijie-auth`，或 LuCI「学校档案」页上传/粘贴。
 

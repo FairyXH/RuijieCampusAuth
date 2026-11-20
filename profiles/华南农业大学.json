@@ -1,0 +1,19 @@
+{
+  "name": "华南农业大学",
+  "school_code": "hnny",
+  "auth_mode": "EAPMD5",
+  "service_name": "校园网",
+  "static_id": "",
+  "self_service_url": "",
+  "update_url": "http://update.rghall.com.cn/das/update",
+  "portal_url": "",
+  "sam_host": "",
+  "sam_port": 0,
+  "dhcp_mode": "none",
+  "dhcp_timeout": 30,
+  "dhcp_option82": false,
+  "ad_domain": "",
+  "ad_timeout": 120,
+  "engine_version": "5.0.2014.108",
+  "notes": "来源：SCAU_Ruijie_Supplicant_For_Windows_V6.86 安装包（RG_SU_For_Windows 6.86 分支，CustomName=SCAU锐捷认证客户端）。注意：安装包文件名标注为“闽南农业大学”，但客户端内 OEM 标识为 SCAU/华南农业大学，school_code=hnny（华南农业大学拼音首字母），以此为准。SuConfig 中 SelfSvrURL 仅剩 http://1.1 残段（解码受损，疑似占位符 http://1.1.1.1），按证据规则留空待实网确认。DHCP 配置为 不使用。service_name 取 SuConfig ProductName=校园网，static_id 需实网 0x54 属性确认。"
+}

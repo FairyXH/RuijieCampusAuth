@@ -1,0 +1,19 @@
+{
+  "name": "厦门理工学院",
+  "school_code": "xmlgxy",
+  "auth_mode": "EAPMD5",
+  "service_name": "校园网",
+  "static_id": "",
+  "self_service_url": "http://210.34.213.99/zizhu/",
+  "update_url": "http://update.rghall.com.cn/das/update",
+  "portal_url": "",
+  "sam_host": "",
+  "sam_port": 0,
+  "dhcp_mode": "none",
+  "dhcp_timeout": 30,
+  "dhcp_option82": false,
+  "ad_domain": "",
+  "ad_timeout": 120,
+  "engine_version": "5.0.2014.108",
+  "notes": "来源：RG_SU_For_Windows 6.85 分支安装包（XMUT_Authentication_Client_For_Windows_V6.85）。school_code 取自 SuConfig.dat（rotate+XOR 0xFF 解码）；self_service_url=SelfSvrURL 明文可读；安装器 SetupConfig.ini 标记 IsSupportWireless=1（支持无线认证入口）。DHCP 配置为 不使用。service_name 取 SuConfig ProductName=校园网，static_id 需实网 0x54 属性确认。"
+}
