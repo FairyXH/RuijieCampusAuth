@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Sockets;
 using RuijieCampusAuth.Core;
 using RuijieCampusAuth.Core.Protocols;
@@ -13,6 +14,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
     private int _guardianFailures;
     private DateTimeOffset _nextGuardianCheck = DateTimeOffset.MinValue;
     private bool? _lastGuardianDecision;
+    private bool _guardianTcpFallback;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -145,6 +147,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         _guardianFailures = 0;
         _nextGuardianCheck = DateTimeOffset.MinValue;
         _lastGuardianDecision = null;
+        _guardianTcpFallback = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(PausedProbeInterval, stoppingToken);
@@ -384,6 +387,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         _guardianFailures = 0;
         _nextGuardianCheck = DateTimeOffset.MinValue;
         _lastGuardianDecision = null;
+        _guardianTcpFallback = false;
         var reauthAt = reauthIntervalSeconds is > 0
             ? DateTimeOffset.UtcNow.AddSeconds(reauthIntervalSeconds.Value)
             : (DateTimeOffset?)null;
@@ -432,18 +436,48 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                         {
                             _guardianFailures = 0;
                             _lastGuardianDecision = true;
+                            _guardianTcpFallback = false;
                             logger.LogInformation("网络管家: {Status}", probe.Short());
                             return true;
                         }
                         _guardianFailures++;
-                        logger.LogWarning(
-                            "网络管家: {Status} | 连续异常 {Count}/{Threshold}",
-                            probe.Short(),
-                            _guardianFailures,
-                            Math.Max(1, settings.GuardianFailures));
-                        if (_guardianFailures >= Math.Max(1, settings.GuardianFailures))
+                        if (!_guardianTcpFallback)
                         {
+                            logger.LogWarning(
+                                "网络管家: {Status} | 连续异常 {Count}/{Threshold}",
+                                probe.Short(),
+                                _guardianFailures,
+                                Math.Max(1, settings.GuardianFailures));
+                        }
+                        else
+                        {
+                            logger.LogDebug(
+                                "网络管家: {Status} | 继续使用认证网卡 TCP 复核",
+                                probe.Short());
+                        }
+                        if (_guardianTcpFallback ||
+                            _guardianFailures >= Math.Max(1, settings.GuardianFailures))
+                        {
+                            if (!probe.CaptivePortal &&
+                                await TcpOnlineAsync(
+                                    settings.ConnectivityUrl,
+                                    settings.Interface,
+                                    stoppingToken))
+                            {
+                                _guardianFailures = 0;
+                                _lastGuardianDecision = true;
+                                if (!_guardianTcpFallback)
+                                {
+                                    _guardianTcpFallback = true;
+                                    logger.LogInformation(
+                                        "网络管家原始探测离线，认证网卡 TCP 复核在线；保持认证会话");
+                                }
+                                return true;
+                            }
+                            _guardianTcpFallback = false;
                             _lastGuardianDecision = false;
+                            logger.LogWarning(
+                                "网络管家离线且认证网卡 TCP 复核失败，恢复重认证");
                             return false;
                         }
                         _lastGuardianDecision = true;
@@ -460,11 +494,15 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 return cached;
             }
         }
-        return await TcpOnlineAsync(settings.ConnectivityUrl, stoppingToken);
+        return await TcpOnlineAsync(
+            settings.ConnectivityUrl,
+            settings.Interface,
+            stoppingToken);
     }
 
     private static async Task<bool> TcpOnlineAsync(
         string connectivityUrl,
+        string? interfaceName,
         CancellationToken stoppingToken)
     {
         var url = connectivityUrl.Trim();
@@ -483,13 +521,38 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
         var port = uri.Port > 0
             ? uri.Port
             : uri.Scheme == "https" ? 443 : 80;
-        using var client = new TcpClient();
+        var localText = PrivateTail.CollectNetworkInfo(interfaceName).Ip;
+        var local = IPAddress.TryParse(localText, out var parsed) &&
+                    parsed.AddressFamily == AddressFamily.InterNetwork
+            ? parsed
+            : null;
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
         try
         {
-            await client.ConnectAsync(uri.Host, port, timeout.Token);
-            return true;
+            if (local is null)
+            {
+                using var client = new TcpClient();
+                await client.ConnectAsync(uri.Host, port, timeout.Token);
+                return true;
+            }
+            var addresses = await Dns.GetHostAddressesAsync(uri.Host);
+            foreach (var address in addresses.Where(item =>
+                         item.AddressFamily == AddressFamily.InterNetwork))
+            {
+                using var client = new TcpClient(AddressFamily.InterNetwork);
+                client.Client.Bind(new IPEndPoint(local, 0));
+                try
+                {
+                    await client.ConnectAsync(address, port, timeout.Token);
+                    return true;
+                }
+                catch (Exception) when (!stoppingToken.IsCancellationRequested)
+                {
+                    // Try the next resolved address.
+                }
+            }
+            return false;
         }
         catch (Exception) when (!stoppingToken.IsCancellationRequested)
         {
