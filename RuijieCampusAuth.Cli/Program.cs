@@ -483,7 +483,7 @@ internal static class ConfigStore
         var staticId = staticIdOverride
             ?? (settingsRoot is null ? "" : GetString(settings, "static_id"));
         var locked = lockedServerOverride;
-        if (locked is null && GetBool(settings, "server_lock"))
+        if (locked is null && settingsRoot is not null && GetBool(settings, "server_lock"))
         {
             locked = GetString(settings, "locked_server");
         }
@@ -576,7 +576,8 @@ internal static class ConfigStore
 
     private static string? GetString(JsonElement element, string name)
     {
-        return element.TryGetProperty(name, out var value) &&
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(name, out var value) &&
                value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
@@ -584,14 +585,16 @@ internal static class ConfigStore
 
     private static bool GetBool(JsonElement element, string name)
     {
-        return element.TryGetProperty(name, out var value) &&
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(name, out var value) &&
                value.ValueKind is JsonValueKind.True or JsonValueKind.False &&
                value.GetBoolean();
     }
 
     private static double? GetDouble(JsonElement element, string name)
     {
-        return element.TryGetProperty(name, out var value) &&
+        return element.ValueKind == JsonValueKind.Object &&
+               element.TryGetProperty(name, out var value) &&
                value.ValueKind == JsonValueKind.Number
             ? value.GetDouble()
             : null;
