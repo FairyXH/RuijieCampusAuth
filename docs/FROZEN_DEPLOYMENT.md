@@ -8,7 +8,7 @@
 - Windows 系统盘 `C:` 由 DiskGuard/Laneye 长期冻结。
 - 部署盘 `D:` 可写，程序固定放在
   `D:\Storageredirect\Program\RuijieCampusAuth`。
-- Windows 服务 `RuijieCampusAuth`、登录任务 `RunRuijieNet` 和
+- Windows 服务 `RuijieCampusAuth`、登录任务 `RunHXXYNet` 和
   `C:\Program Files\restart_ruijie.vbs` 已写入 C: 冻结基线。
 - GUI 固定启动命令：
   `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`
@@ -20,7 +20,7 @@
 | 内容 | 位置 | 冻结后的处理 |
 | --- | --- | --- |
 | 原版启动/接管判断脚本 | `C:\Program Files\restart_ruijie.vbs` | 只能解冻更新 |
-| 登录任务 | `C:\Windows\System32\Tasks\RunRuijieNet` | 只能解冻重建/修改 |
+| 登录任务 | `C:\Windows\System32\Tasks\RunHXXYNet` | 只能解冻重建/修改 |
 | 服务注册、依赖、恢复策略 | `HKLM\SYSTEM\CurrentControlSet\Services\RuijieCampusAuth` | 不要卸载重装 |
 | .NET 10 运行时 | `C:\Program Files\dotnet` | 当前程序依赖它 |
 | Npcap | `C:\Windows\System32\Npcap`、驱动 `npcap` | 当前程序依赖它 |
@@ -60,10 +60,10 @@
    Get-FileHash "C:\Program Files\restart_ruijie.vbs" -Algorithm SHA256
    ```
    当前冻结基线 SHA256：
-   `7E8258FA0CDAED2D0BF648D30F64745F0AFFE5E299DE92BBFB40C90FDBF3E7C6`
+   `D1833A456CAB97FA5EE2F652A92852AC8E5E392ED668B8A93AD6BFAEE77623EB`
 5. 检查任务：
    ```powershell
-   Export-ScheduledTask -TaskName RunRuijieNet
+   Export-ScheduledTask -TaskName RunHXXYNet
    ```
    期望：`wscript.exe "C:\Program Files\restart_ruijie.vbs"`，
    `HighestAvailable`，登录触发，无超时。
@@ -87,7 +87,7 @@ Get-Process RuijieCampusAuth,RuijieCampusAuth.Service
 sc.exe qc RuijieCampusAuth
 sc.exe qfailure RuijieCampusAuth
 Get-FileHash "C:\Program Files\restart_ruijie.vbs" -Algorithm SHA256
-Get-ScheduledTaskInfo -TaskName RunRuijieNet
+Get-ScheduledTaskInfo -TaskName RunHXXYNet
 ```
 
 再检查运行数据：
@@ -107,14 +107,28 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 - 7 个 IFEO 标记存在。
 - 浏览器或 `Invoke-WebRequest http://www.baidu.com/` 返回 HTTP 200。
 
-### 2026-11-18 21:04 实测快照
+### 2026-11-18 21:04 实测快照（历史）
 
 - 开机时间：`2026-11-18 20:54:42`
 - 服务 PID 8580，GUI PID 21820，服务 Running，`npcap` Running。
-- VBS 哈希仍为 `7E8258...E7C6`，任务结果最终 0。
+- 当时 VBS 哈希为 `7E8258...E7C6`，任务结果最终 0；2026-11-20 已升级为
+  `D1833A...23EB`（兼容 `RuijieTakeover` 与旧 `HXXYTakeover`）。
 - 服务启动 `20:55:07`，认证成功 `20:57:09`。
 - `RJSuService` Stopped / Disabled，7 个 IFEO 标记完整。
 - `baidu HTTP 200`。
+
+### 2026-11-20 17:00 冻结前复核
+
+- VBS 已更新为双标记兼容版，C: 与仓库源文件 SHA256 均为
+  `D1833A456CAB97FA5EE2F652A92852AC8E5E392ED668B8A93AD6BFAEE77623EB`。
+- 7 个官方 exe 的 `RuijieTakeover=RuijieCampusAuth` 在 64/32 位视图均存在。
+- 服务 PID 93512，GUI PID 92384；服务 Running/Automatic，`npcap` Running，
+  `RJSuService` Stopped/Disabled。
+- 手动触发 `RunHXXYNet`：LastTaskResult 0，`launcher.log` 新增
+  `healthy takeover; skip original`，服务/GUI PID 未变化，官方客户端未启动。
+- `takeover.ini` 持续心跳，`enabled=1`，`pid=93512`，指向服务镜像。
+- 本机认证在线；`sc qc` 仍为 `AUTO_START`、`LocalSystem`、`DEPENDENCIES: npcap`，
+  恢复策略仍为 5s/10s/30s。
 
 ## 4. 冻结期间的日常更新（只改 D:）
 
@@ -144,6 +158,29 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
    Start-Process "D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" -ArgumentList '--tray','--auto'
    ```
 7. 重复第 3 节的验收检查。
+
+### 4.1 冻结基线兼容契约（后续版本必须保持不变）
+
+| 项目 | 固定值 |
+| --- | --- |
+| 服务名 | `RuijieCampusAuth` |
+| 显示名 | `Ruijie Auth` |
+| 服务镜像 | `"d:\storageredirect\program\ruijiecampusauth\RuijieCampusAuth.Service.exe"` |
+| 服务类型/启动 | `WIN32_OWN_PROCESS`、`AUTO_START`、`LocalSystem` |
+| 依赖 | `npcap` |
+| 失败恢复 | 5s / 10s / 30s，重置周期 86400s |
+| GUI | `D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe --tray --auto` |
+| 接管恢复入口 | `D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe --restore-client` |
+| 登录任务 | `RunHXXYNet`（`C:\Windows\System32\Tasks\RunHXXYNet`） |
+| 任务动作 | `C:\Windows\System32\wscript.exe "C:\Program Files\restart_ruijie.vbs"` |
+| VBS | `C:\Program Files\restart_ruijie.vbs` |
+| VBS SHA256 | `D1833A456CAB97FA5EE2F652A92852AC8E5E392ED668B8A93AD6BFAEE77623EB` |
+| IFEO 标记 | `RuijieTakeover=RuijieCampusAuth`（VBS 同时兼容旧 `HXXYTakeover`） |
+
+更新时只替换 D: 下的程序文件；C: 上的服务注册、VBS、计划任务和运行时
+一律不动。不得改服务名、服务 exe 名、GUI exe 名、部署路径或 GUI 启动参数。
+冻结后不要执行 `service uninstall` / `service install`，否则可能丢失
+`depend=npcap` 和恢复策略。
 
 更新约束：
 

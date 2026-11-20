@@ -101,6 +101,15 @@ Deep Freeze：
 
 - 程序与数据放 D:；环境变量放用户级。
 - 不要在冻结的 C: 上部署二进制/配置；C: 只保留冻结基线内容。
+- C: 冻结基线：`C:\Program Files\restart_ruijie.vbs`（SHA256
+  `D1833A456CAB97FA5EE2F652A92852AC8E5E392ED668B8A93AD6BFAEE77623EB`）、
+  登录任务 `RunHXXYNet`、服务注册 `RuijieCampusAuth`。
+- 服务镜像固定为
+  `"d:\storageredirect\program\ruijiecampusauth\RuijieCampusAuth.Service.exe"`，
+  `AUTO_START`/`LocalSystem`/`depend=npcap`，恢复 5s/10s/30s。
+- 后续版本只能替换 D: 程序文件；不得改服务名、服务 exe 名、GUI exe 名、
+  部署路径、`--tray --auto` 或 `--restore-client` 入口。VBS 同时识别
+  `RuijieTakeover` 与旧 `HXXYTakeover`。
 
 ## 5. 配置档案（多学校）
 
