@@ -1,11 +1,14 @@
 # 冻结系统盘部署与更新手册
 
+> 本文按当前服务名/任务名描述；若机器上仍保留迁移前的旧名称，执行命令时
+> 替换为实际名称。
+
 本文档适用于当前机器形态：
 
 - Windows 系统盘 `C:` 由 DiskGuard/Laneye 长期冻结。
 - 部署盘 `D:` 可写，程序固定放在
   `D:\Storageredirect\Program\RuijieCampusAuth`。
-- Windows 服务 `HXXY-CampusAuth`、登录任务 `RunHXXYNet` 和
+- Windows 服务 `RuijieCampusAuth`、登录任务 `RunRuijieNet` 和
   `C:\Program Files\restart_ruijie.vbs` 已写入 C: 冻结基线。
 - GUI 固定启动命令：
   `"D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAuth.exe" --tray --auto`
@@ -17,8 +20,8 @@
 | 内容 | 位置 | 冻结后的处理 |
 | --- | --- | --- |
 | 原版启动/接管判断脚本 | `C:\Program Files\restart_ruijie.vbs` | 只能解冻更新 |
-| 登录任务 | `C:\Windows\System32\Tasks\RunHXXYNet` | 只能解冻重建/修改 |
-| 服务注册、依赖、恢复策略 | `HKLM\SYSTEM\CurrentControlSet\Services\HXXY-CampusAuth` | 不要卸载重装 |
+| 登录任务 | `C:\Windows\System32\Tasks\RunRuijieNet` | 只能解冻重建/修改 |
+| 服务注册、依赖、恢复策略 | `HKLM\SYSTEM\CurrentControlSet\Services\RuijieCampusAuth` | 不要卸载重装 |
 | .NET 10 运行时 | `C:\Program Files\dotnet` | 当前程序依赖它 |
 | Npcap | `C:\Windows\System32\Npcap`、驱动 `npcap` | 当前程序依赖它 |
 | 冻结软件 | `C:\Program Files (x86)\Laneye\DiskGuard` | 不要改 |
@@ -47,8 +50,8 @@
 2. 确认 `D:` 是固定盘，且不会在 Windows 服务启动后才解锁（BitLocker 自动解锁要确认）。
 3. 检查服务注册：
    ```powershell
-   sc.exe qc HXXY-CampusAuth
-   sc.exe qfailure HXXY-CampusAuth
+   sc.exe qc RuijieCampusAuth
+   sc.exe qfailure RuijieCampusAuth
    ```
    期望：`AUTO_START`、`LocalSystem`、`DEPENDENCIES: npcap`，
    `RESTART 5s/10s/30s`。
@@ -60,7 +63,7 @@
    `7E8258FA0CDAED2D0BF648D30F64745F0AFFE5E299DE92BBFB40C90FDBF3E7C6`
 5. 检查任务：
    ```powershell
-   Export-ScheduledTask -TaskName RunHXXYNet
+   Export-ScheduledTask -TaskName RunRuijieNet
    ```
    期望：`wscript.exe "C:\Program Files\restart_ruijie.vbs"`，
    `HighestAvailable`，登录触发，无超时。
@@ -79,12 +82,12 @@
 按以下项逐条确认：
 
 ```powershell
-Get-Service HXXY-CampusAuth,RJSuService,npcap
+Get-Service RuijieCampusAuth,RJSuService,npcap
 Get-Process RuijieCampusAuth,RuijieCampusAuth.Service
-sc.exe qc HXXY-CampusAuth
-sc.exe qfailure HXXY-CampusAuth
+sc.exe qc RuijieCampusAuth
+sc.exe qfailure RuijieCampusAuth
 Get-FileHash "C:\Program Files\restart_ruijie.vbs" -Algorithm SHA256
-Get-ScheduledTaskInfo -TaskName RunHXXYNet
+Get-ScheduledTaskInfo -TaskName RunRuijieNet
 ```
 
 再检查运行数据：
@@ -97,7 +100,7 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 
 预期：
 
-- `HXXY-CampusAuth` Running / Automatic，`npcap` Running。
+- `RuijieCampusAuth` Running / Automatic，`npcap` Running。
 - `RJSuService` Stopped / Disabled（长期接管模式）。
 - `service_status.json` 为 `authenticated`，服务器为 `00:1a:a9:17:ff:ff`。
 - `launcher.log` 出现 `healthy takeover; skip original`。
@@ -121,7 +124,7 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 1. 停止进程守护，避免它拉起 GUI。
 2. 停止 GUI 和服务：
    ```powershell
-   Stop-Service HXXY-CampusAuth
+   Stop-Service RuijieCampusAuth
    Stop-Process -Name RuijieCampusAuth -Force
    ```
 3. 备份 D: 配置（至少 `service.json`、`accounts.json`、`settings.json`）：
@@ -134,7 +137,7 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 4. 将新 `publish\win-x64\*` 复制到 D:，不要覆盖或删除上述 JSON。
 5. 启动服务：
    ```powershell
-   Start-Service HXXY-CampusAuth
+   Start-Service RuijieCampusAuth
    ```
 6. 按固定命令启动 GUI：
    ```powershell
@@ -158,8 +161,8 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 1. 检查 `npcap` 是否为 Running；服务依赖它。
 2. 检查 D: 是否可访问。
 3. 查看 `logs\service.log` 和 `service_status.json`。
-4. `sc.exe qc HXXY-CampusAuth` 确认 ImagePath 指向 D:。
-5. 必要时手动 `Start-Service HXXY-CampusAuth`。
+4. `sc.exe qc RuijieCampusAuth` 确认 ImagePath 指向 D:。
+5. 必要时手动 `Start-Service RuijieCampusAuth`。
 
 ### VBS 没有跳过原版
 

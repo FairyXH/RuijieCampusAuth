@@ -510,7 +510,7 @@ class Supplicant:
         """Send a private-tail EAPOL-Logoff for the current account.
 
         Logoff always goes to the standard PAE group. A unicast Logoff to the
-        authenticator does not clear the switch session on HXXY, which makes the
+        authenticator does not clear the switch session on some campus switches, which makes the
         next Start fail with EAP-Failure.
         """
         frame = (

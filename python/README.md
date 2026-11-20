@@ -147,9 +147,9 @@ ruijie-auth -u ID -i eth0 -v           # 详细协议日志
 ## Python API
 
 ```python
-import ruijie_hxxy   # 兼容别名，也可 from ruijie_auth import RuijieClient
+import ruijie_auth   # 包入口
 
-client = ruijie_hxxy.login("YOUR_ID", "YOUR_PASSWORD")
+client = ruijie_auth.login("YOUR_ID", "YOUR_PASSWORD")
 print(client.status()["authenticated"])
 print(client.status()["message"])
 
@@ -222,7 +222,7 @@ Linux 源码运行时是 `~/.config/RuijieCampusAuth/`（遵循 `XDG_CONFIG_HOME
 
 ## 系统服务
 
-Windows 服务名：`HXXY-CampusAuth`（历史名，已部署环境沿用，避免迁移时丢配置）。
+Windows 服务名：`RuijieCampusAuth`。
 它以 LocalSystem 在登录前认证，读取 `service.json`，按设置做抢占保活。
 
 安装前需要先构建服务宿主（PyInstaller onedir）：

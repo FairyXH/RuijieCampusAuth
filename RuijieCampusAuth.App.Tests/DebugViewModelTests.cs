@@ -57,7 +57,7 @@ public sealed class DebugViewModelTests
     {
         var store = new RuijieCampusAuth.Core.UserStore();
         var settings = store.LoadSettings();
-        settings.SelfServiceUrl = "http://netss.hxxy.edu.cn/selfservice/";
+        settings.SelfServiceUrl = "http://portal.example.edu.cn/selfservice/";
         store.SaveSettings(settings);
 
         var vm = new DebugViewModel(store);
@@ -70,7 +70,7 @@ public sealed class DebugViewModelTests
         var parsed = System.Text.Json.JsonDocument.Parse(vm.ArgumentsJson);
         Assert.True(
             parsed.RootElement.TryGetProperty("url", out var url) &&
-            url.GetString() == "http://netss.hxxy.edu.cn/selfservice/",
+            url.GetString() == "http://portal.example.edu.cn/selfservice/",
             $"args = {vm.ArgumentsJson}");
     }
 

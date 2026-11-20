@@ -183,7 +183,7 @@ def test_profile_import_switches_auth_mode_and_propagates(tmp_path):
 
 def test_debug_defaults_prefill_school_config():
     settings = AppSettings()
-    settings.self_service_url = "http://netss.hxxy.edu.cn/selfservice/"
+    settings.self_service_url = "http://portal.example.edu.cn/selfservice/"
     settings.school_code = "HPVTC"
     settings.sam_host = "172.22.11.1"
     settings.sam_port = 53
@@ -191,7 +191,7 @@ def test_debug_defaults_prefill_school_config():
 
     args = build_defaults("self-service", settings, account)
     parsed = json.loads(args)
-    assert parsed["url"] == "http://netss.hxxy.edu.cn/selfservice/"
+    assert parsed["url"] == "http://portal.example.edu.cn/selfservice/"
 
     args = build_defaults("sam-direct", settings, account)
     parsed = json.loads(args)

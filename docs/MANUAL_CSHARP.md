@@ -231,7 +231,7 @@ powershell -ExecutionPolicy Bypass -File build-csharp.ps1 -Runtime win-x64 -Depl
 **方式一（GUI）**：
 1. 账户页确认账号和“当前”标记。
 2. 服务页点 **安装并启动**。
-3. 首次安装会删除旧的 `HXXY-CampusAuth` 服务并迁移到新服务名
+3. 首次安装会删除迁移前注册的旧服务，并注册当前服务名
    `RuijieCampusAuth`。
 
 **方式二（CLI）**：
@@ -282,7 +282,7 @@ GUI 服务页的 **应用服务配置** 会把当前账号 + 设置写入 `servi
 - 打开：服务页 → 高级功能 → **接管模式** → **应用服务配置**。
 - 关闭：取消勾选 → **应用服务配置**。
 - 实现：IFEO `Debugger` + `RuijieTakeover` 标记（64/32 位视图），
-  兼容旧 `HXXYTakeover` 标记。
+  兼容旧版本标记。
 
 注意：
 
@@ -347,9 +347,9 @@ RuijieCampusAuth.Cli.exe status
 ```powershell
 RuijieCampusAuth.Cli.exe profile list
 RuijieCampusAuth.Cli.exe profile list --dir "<档案目录>"
-RuijieCampusAuth.Cli.exe profile show "profiles\厦门华厦学院.json"
-RuijieCampusAuth.Cli.exe profile import "profiles\厦门华厦学院.json"
-RuijieCampusAuth.Cli.exe profile import "profiles\厦门华厦学院.json" --root "<安装目录>"
+RuijieCampusAuth.Cli.exe profile show "profiles\<学校>.json"
+RuijieCampusAuth.Cli.exe profile import "profiles\<学校>.json"
+RuijieCampusAuth.Cli.exe profile import "profiles\<学校>.json" --root "<安装目录>"
 ```
 
 `import` 会打印档案名、settings 路径、备份路径、实际应用的字段列表。
@@ -541,8 +541,8 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 - `service.json` 不存在 → 先 `config init`；
 - `service.json` 的账号/网卡为空；
 - 服务账户读不到 Npcap 驱动 → 重装 Npcap；
-- 旧服务 `HXXY-CampusAuth` 还在运行 → `service install` 会自动删旧服务，
-  也可以手动 `sc delete HXXY-CampusAuth`。
+- 迁移前的旧服务仍在运行 → `service install` 会自动删除旧服务，
+  也可以按旧服务名手动 `sc delete`。
 
 ### 13.5 服务在跑，但 GUI 说没有认证
 

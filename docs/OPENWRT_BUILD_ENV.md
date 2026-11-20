@@ -2,11 +2,11 @@
 
 日期：2026-11-18
 
-> **状态说明（2026-11-20）**：本文保留 2026-11-18/19 的早期
-> `hxxy-auth` 原型构建环境与踩坑记录。当前实现已改名为 `ruijie-auth`，
-> 构建脚本、包名、产物与 LuCI 路径以 `openwrt/README.md`、
-> `docs/MANUAL_OPENWRT.md`、`docs/OPENWRT_PORT.md` 为准；下文出现旧包名
-> 的位置属于历史记录，不是当前命令。
+> **状态说明（2026-11-20）**：本文保留 2026-11-18/19 的早期原型构建
+> 环境与踩坑记录。文中的包名与路径已按当前命名统一为 `ruijie-auth`；
+> 构建脚本、产物与 LuCI 路径以 `openwrt/README.md`、
+> `docs/MANUAL_OPENWRT.md`、`docs/OPENWRT_PORT.md` 为准。数值与大小
+> 来自当时构建，不代表当前版本。
 
 主机：Ubuntu 26.04.1 LTS（VMware），8 vCPU，7.2GB RAM，约 30GB 可用。
 本文只记录环境与命令，不保存任何登录凭据。
@@ -94,9 +94,9 @@ bin/targets/ramips/mt7621/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squa
 - `sha256sum -c sha256sums` 全部 OK
 - manifest 包含 `luci-ssl`、`luci-base`、`luci-mod-*`、`luci-theme-bootstrap`
 
-`FILES=files/` 覆盖已验证：放一个 `/etc/hxxy-smoke` 进
+`FILES=files/` 覆盖已验证：放一个 `/etc/ruijie-smoke` 进
 `files/etc/`，重新构建后 `unsquashfs -l root.squashfs` 能看到
-`squashfs-root/etc/hxxy-smoke`，LuCI 静态资源也正常。测试 marker 已删除。
+`squashfs-root/etc/ruijie-smoke`，LuCI 静态资源也正常。测试 marker 已删除。
 
 ### 自定义 R3G 镜像（2026-11-19）
 
@@ -116,35 +116,35 @@ sh scripts/build-image.sh
   `f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a`
 - `rootfs0.bin` 12MB，SHA256
   `4aa9a27d571e71f11fba704b1d81fbc71aeda43d3f26986bdba84a76d99f1255`
-- 插件 ipk：`openwrt/build/ipk/hxxy-auth_0.1.0_mipsel_24kc.ipk`
+- 插件 ipk：`openwrt/build/ipk/ruijie-auth_0.1.0_mipsel_24kc.ipk`
   （1.4MB，外层 tar.gz 格式）
 - rootfs squashfs 约 10MB（UA3F 17MB 压缩后 + 其他包）
 - `root.squashfs` 已确认包含：
-  - `/usr/sbin/hxxy-auth`（3.9MB，mipsle 静态，opkg 所有）
+  - `/usr/sbin/ruijie-auth`（3.9MB，mipsle 静态，opkg 所有）
   - `/usr/bin/ua3f`（17MB，mipsle musl 动态，UA3F 3.7.0）
   - `/etc/config/ua3f`（NFQUEUE，L3 开，UA 改写关）
   - `/etc/init.d/ua3f`（来自 UA3F ipk）
   - `/etc/config/https-dns-proxy`（AliDNS + Tencent DoH，IPv4）
   - `/etc/init.d/https-dns-proxy`
-  - `/etc/config/hxxy-auth`（`device=wan`、`disguise=full`，0600）
-  - `/etc/init.d/hxxy-auth`
-  - `/etc/init.d/hxxy-disguise`（nft TTL 128 + MSS 1460）
-  - `/etc/sysctl.d/90-hxxy.conf`
-  - `/etc/hotplug.d/iface/90-hxxy-auth`
-  - `/etc/hotplug.d/net/90-hxxy-usbwan`（USB 共享自动接管）
-  - `/etc/uci-defaults/90-hxxy-auth`（usbwan + firewall zone）
-  - `/etc/rc.d/S20https-dns-proxy`、`S95hxxy-auth`、`S99hxxy-disguise`
-  - `/usr/share/luci/menu.d/luci-app-hxxy-auth.json`
-  - `/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json`
-  - `/www/luci-static/resources/view/hxxy-auth/{overview,accounts,servers,mac,settings,logs}.js`
-  - `/usr/lib/opkg/info/hxxy-auth.{control,list,conffiles}`
-  - `/usr/lib/opkg/status` 中有 `Package: hxxy-auth` +
+  - `/etc/config/ruijie-auth`（`device=wan`、`disguise=full`，0600）
+  - `/etc/init.d/ruijie-auth`
+  - `/etc/init.d/ruijie-disguise`（nft TTL 128 + MSS 1460）
+  - `/etc/sysctl.d/90-ruijie.conf`
+  - `/etc/hotplug.d/iface/90-ruijie-auth`
+  - `/etc/hotplug.d/net/90-ruijie-usbwan`（USB 共享自动接管）
+  - `/etc/uci-defaults/90-ruijie-auth`（usbwan + firewall zone）
+  - `/etc/rc.d/S20https-dns-proxy`、`S95ruijie-auth`、`S99ruijie-disguise`
+  - `/usr/share/luci/menu.d/luci-app-ruijie-auth.json`
+  - `/usr/share/rpcd/acl.d/luci-app-ruijie-auth.json`
+  - `/www/luci-static/resources/view/ruijie-auth/{overview,accounts,servers,mac,settings,logs}.js`
+  - `/usr/lib/opkg/info/ruijie-auth.{control,list,conffiles}`
+  - `/usr/lib/opkg/status` 中有 `Package: ruijie-auth` +
     `Status: install ok installed`
 
 包清单（manifest）确认包含：
 
 ```text
-hxxy-auth, https-dns-proxy, luci-app-https-dns-proxy,
+ruijie-auth, https-dns-proxy, luci-app-https-dns-proxy,
 luci-i18n-https-dns-proxy-zh-cn, luci-i18n-base-zh-cn,
 kmod-nft-queue, kmod-nft-tproxy, kmod-nfnetlink-queue,
 kmod-nf-conntrack-netlink, iptables-nft, iptables-mod-tproxy,
@@ -157,16 +157,16 @@ kmod-usb-net-ipheth
 
 ### 插件 ipk 与免刷更新
 
-`build-image.sh` 先调用 `build-ipk.sh` 生成 `hxxy-auth` 包，再把本地 ipk
+`build-image.sh` 先调用 `build-ipk.sh` 生成 `ruijie-auth` 包，再把本地 ipk
 路径放进 `PACKAGES`，Image Builder 用 opkg 安装，所以固件里的应用文件
 由 opkg 拥有。后续更新只需：
 
 ```sh
-opkg install --force-reinstall /tmp/hxxy-auth_0.1.0_mipsel_24kc.ipk
+opkg install --force-reinstall /tmp/ruijie-auth_0.1.0_mipsel_24kc.ipk
 ```
 
-`/etc/config/hxxy-auth` 是 conffile，账号和设置保留；`postinst` 重启
-`hxxy-auth` 与 `hxxy-disguise`。
+`/etc/config/ruijie-auth` 是 conffile，账号和设置保留；`postinst` 重启
+`ruijie-auth` 与 `ruijie-disguise`。
 
 构建 ipk 时踩到一个坑：Image Builder 自带的 host opkg
 （`38eccbb1`, 2024-10-16）读取 GNU `ar` 格式的 ipk 会段错误，
@@ -198,7 +198,7 @@ CRLF，Ubuntu 上先 `sed -i 's/\r$//'`。该镜像尚未在真机验证。
 
 默认配置：
 
-- `disguise=full`：`hxxy-disguise` 应用 nft TTL/MSS，并启动 UA3F L3
+- `disguise=full`：`ruijie-disguise` 应用 nft TTL/MSS，并启动 UA3F L3
   （TTL 128、IPID 0、删除 TCP timestamp、SYN window 65535）。
 - UA 改写关闭（`rewrite_mode DIRECT`），不强制改微信/企业微信 UA。
 - sysctl：`ip_default_ttl=128`、`tcp_timestamps=0`、`tcp_ecn=0`、IPv6 关闭。
@@ -216,20 +216,20 @@ build/files/usr/bin/ua3f                  # 构建时从 UA3F ipk 抽取
 build/files/etc/init.d/ua3f               # 构建时从 UA3F ipk 抽取
 ```
 
-`hxxy-auth` 的二进制、init/hotplug 脚本、UCI 默认配置和 LuCI 文件都在
-`hxxy-auth_<version>_mipsel_24kc.ipk` 里，由 opkg 安装并拥有。源码树对应：
+`ruijie-auth` 的二进制、init/hotplug 脚本、UCI 默认配置和 LuCI 文件都在
+`ruijie-auth_<version>_mipsel_24kc.ipk` 里，由 opkg 安装并拥有。源码树对应：
 
 ```text
-files/etc/config/hxxy-auth
-files/etc/init.d/hxxy-auth
-files/etc/init.d/hxxy-disguise
-files/etc/sysctl.d/90-hxxy.conf
-files/etc/hotplug.d/iface/90-hxxy-auth
-files/etc/hotplug.d/net/90-hxxy-usbwan
-luci-app-hxxy-auth/root/etc/uci-defaults/90-hxxy-auth
-luci-app-hxxy-auth/root/usr/share/luci/menu.d/luci-app-hxxy-auth.json
-luci-app-hxxy-auth/root/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
-luci-app-hxxy-auth/htdocs/luci-static/resources/view/hxxy-auth/*.js
+files/etc/config/ruijie-auth
+files/etc/init.d/ruijie-auth
+files/etc/init.d/ruijie-disguise
+files/etc/sysctl.d/90-ruijie.conf
+files/etc/hotplug.d/iface/90-ruijie-auth
+files/etc/hotplug.d/net/90-ruijie-usbwan
+luci-app-ruijie-auth/root/etc/uci-defaults/90-ruijie-auth
+luci-app-ruijie-auth/root/usr/share/luci/menu.d/luci-app-ruijie-auth.json
+luci-app-ruijie-auth/root/usr/share/rpcd/acl.d/luci-app-ruijie-auth.json
+luci-app-ruijie-auth/htdocs/luci-static/resources/view/ruijie-auth/*.js
 ```
 
 ### `ucode` 下载失败的恢复
@@ -270,10 +270,10 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
   `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`），
   含 UA3F 3.7.0 mipsel、https-dns-proxy + LuCI 中文、MAC 页、disguise、
   DoH 配置、iptables/nft kmods、USB tethering kmods；`rc.d` 有
-  S20https-dns-proxy、S95hxxy-auth、S99hxxy-disguise。
-- `hxxy-auth` 已改为 opkg 包：manifest 有 `hxxy-auth - 0.1.0`，
-  squashfs 里有 `/usr/lib/opkg/info/hxxy-auth.*`，status 为 installed。
-- host opkg 安装/强制重装 ipk 通过；升级前写入 `/etc/config/hxxy-auth`
+  S20https-dns-proxy、S95ruijie-auth、S99ruijie-disguise。
+- `ruijie-auth` 已改为 opkg 包：manifest 有 `ruijie-auth - 0.1.0`，
+  squashfs 里有 `/usr/lib/opkg/info/ruijie-auth.*`，status 为 installed。
+- host opkg 安装/强制重装 ipk 通过；升级前写入 `/etc/config/ruijie-auth`
   的 marker 在重装后仍存在，文件权限 0600 保持。
 - 用 qemu-mipsel 跑 Image Builder root 里的真实 MIPS `uci`，执行
   `uci-defaults`：生成 `network.usbwan`（dhcp/usb0/metric 100），
@@ -282,7 +282,7 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
   `eb4e152b8412d9af8581ffc3a0bfb17f0ca689140b8ca32e0924514b57249a65`；
   kernel1 在 0/4M、rootfs0 在 8M 的布局已逐段校验。
 - 二进制核对：UA3F 为 mipsle musl 动态（`ld-musl-mipsel-sf.so.1`），
-  hxxy-auth 为 mipsle 静态；nft `ttl set 128` + `maxseg size set 1460`
+  ruijie-auth 为 mipsle 静态；nft `ttl set 128` + `maxseg size set 1460`
   语法在宿主 nft 上验证通过。
 - Go 功能测试：UCI/账号池上限、服务器/探测缓存、控制 socket、
   supplicant 假认证器全链路、网关解析、`go vet` 全通过。
@@ -290,7 +290,7 @@ zcat dl/openwrt_base | awk '/^Package: ucode$/{f=1} f{print} f&&/^$/{exit}'
   localhost 探测在线时进入 `paused`，概览页显示账号/接口；Resume 按钮
   能拉回认证流程并再次暂停；账号页、服务器/缓存页、设置页均正常渲染。
 - Go mipsle smoke：1.7MB 静态 ELF，`qemu-mipsel` 输出 `mipsle ok`。
-- Go GB18030：`x/text` 编码 `电信宽带服务` 输出
+- Go GB18030：`x/text` 编码 `校园宽带服务` 输出
   `b5e7d0c5bfedb4f8b7fecef1`，与 Python `gb18030` 一致；解码回原文正常。
 - Go 1.25.5 在 `go get golang.org/x/text@latest` 时自动下载了
   go1.26.11 toolchain；这是 Go 的 toolchain 机制，不影响目标二进制。

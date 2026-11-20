@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// The two vectors below are the private tails of a real HXXY authentication
+// The two vectors below are the private tails of a real campus authentication
 // captured in build/capture/live-auth.pcap and accepted by the campus server.
 // C# PrivateTail.BuildTail rebuilt both byte-for-byte; this test locks the Go
 // port to the same on-wire bytes.

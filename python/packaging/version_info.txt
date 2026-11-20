@@ -15,12 +15,12 @@ VSVersionInfo(
         StringTable(
           '080404B0',
           [
-            StringStruct('CompanyName', 'HXXY'),
-            StringStruct('FileDescription', 'HXXY Ruijie Campus Auth'),
+            StringStruct('CompanyName', 'Ruijie'),
+            StringStruct('FileDescription', 'Ruijie Campus Auth'),
             StringStruct('FileVersion', '0.9.0'),
             StringStruct('InternalName', 'RuijieCampusAuth'),
             StringStruct('OriginalFilename', 'RuijieCampusAuth.exe'),
-            StringStruct('ProductName', 'HXXY Ruijie Campus Auth'),
+            StringStruct('ProductName', 'Ruijie Campus Auth'),
             StringStruct('ProductVersion', '0.9.0'),
             StringStruct('LegalCopyright', 'For campus network debugging')
           ]

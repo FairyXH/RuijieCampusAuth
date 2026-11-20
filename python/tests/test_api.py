@@ -1,4 +1,4 @@
-from ruijie_hxxy import RuijieClient
+from ruijie_auth import RuijieClient
 
 
 def test_initial_status_is_json_friendly() -> None:

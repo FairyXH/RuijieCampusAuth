@@ -82,12 +82,12 @@ ruijie-auth
 
 ```text
 --- 学校配置档案 ---
- 1) 厦门华厦学院 (EAPMD5)
+ 1) <学校档案名> (EAPMD5)
  当前档案: 未导入
  1) 导入/切换  2) 刷新  0) 返回
 选择: 1
 档案编号: 1
-已切换到 厦门华厦学院；应用字段: profile_name, school_code, auth_mode, ...
+已切换到 <学校档案名>；应用字段: profile_name, school_code, auth_mode, ...
 ```
 
 档案从这些目录扫描（去重）：仓库根 `profiles/`、当前目录 `profiles/`。
@@ -292,16 +292,16 @@ sudo ruijie-auth -u S12016004 --no-private
 ### 6.1 一步登录
 
 ```python
-import ruijie_hxxy
+import ruijie_auth
 
-client = ruijie_hxxy.login("YOUR_ID", "YOUR_PASSWORD")
+client = ruijie_auth.login("YOUR_ID", "YOUR_PASSWORD")
 status = client.status()
 print(status["authenticated"], status["message"])
 print("\n".join(status["logs"]))
 client.logout()
 ```
 
-`ruijie_hxxy` 是兼容别名；新代码可以直接
+`ruijie_auth` 是包入口，也可以直接
 `from ruijie_auth import RuijieClient, login`。
 
 ### 6.2 可配置客户端
@@ -372,11 +372,12 @@ cd python
 1. 先在菜单 2 添加账号并设为当前；
 2. `1) 安装并启动`：
    - 写 `service.json`（LocalMachine DPAPI，ACL 只给 SYSTEM/Administrators）；
-   - `CreateService` 注册 `HXXY-CampusAuth`，自动启动；
+   - `CreateService` 注册 `RuijieCampusAuth`，自动启动；
    - 设置失败恢复 5s/10s/30s；
 3. `2/3/4` 分别是启动、停止、卸载；`5` 刷新服务配置。
 
-服务名 `HXXY-CampusAuth` 是历史名，已部署环境沿用，避免升级时丢配置。
+服务名由 `system_service.py` 的 `SERVICE_NAME` 定义，默认为
+`RuijieCampusAuth`。
 
 ### 7.3 服务文件在哪
 
@@ -389,7 +390,7 @@ python\RuijieCampusAuth\
   logs\service.log
 ```
 
-也可以用环境变量 `HXXY_SERVICE_DIR` 覆盖服务目录。
+也可以用环境变量 `RUIJIE_SERVICE_DIR` 覆盖服务目录。
 打包/部署后，服务目录默认是 exe 所在目录。
 
 Linux 没有内置 systemd 单元；需要开机自启时自行写 unit 调用 CLI，
@@ -522,7 +523,7 @@ PYTHONPATH=src python -m pytest -q tests/test_protocols.py
 ## 12. 卸载
 
 ```bash
-pip uninstall ruijie-campus-auth-hxxy
+pip uninstall ruijie-campus-auth
 ```
 
 再按需删除：
@@ -531,5 +532,5 @@ pip uninstall ruijie-campus-auth-hxxy
 - `python\RuijieCampusAuth`（源码模式的服务配置与日志）；
 - `dist\`、`build\`（PyInstaller 产物）。
 
-如果装过 Windows 服务，先 `sc stop HXXY-CampusAuth` 和
-`sc delete HXXY-CampusAuth`，或运行菜单 7 → 4。
+如果装过 Windows 服务，先 `sc stop RuijieCampusAuth` 和
+`sc delete RuijieCampusAuth`，或运行菜单 7 → 4。

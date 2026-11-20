@@ -138,7 +138,7 @@
 ```
 
 - 新增 `Core/Debug/DebugFeatureRegistry.cs`：每个功能实现 `IDebugFeature`（`Name/IsEnabled/StatusAsync/RunAsync/StopAsync`），统一注册、统一审计日志。
-- 服务新增 `DebugPipeServer`：命名管道 `\\.\pipe\HXXY-CampusAuth-Debug`，仅本机、ACL 限制 SYSTEM + 当前用户；JSON 行协议 `{id,feature,action,args}` → `{id,ok,data,error}`。
+- 服务新增 `DebugPipeServer`：命名管道 `\\.\pipe\RuijieCampusAuth-Debug`，仅本机、ACL 限制 SYSTEM + 当前用户；JSON 行协议 `{id,feature,action,args}` → `{id,ok,data,error}`。
 - 后台类功能（ARP、代理、DHCP 监听、WLAN 监控）只有显式 `start` 后才运行，`stop`/服务停止即释放；不做常驻。
 - GUI 在服务运行时优先走管道；服务未运行时可在 GUI 进程内直接调用（便于调试），但 DHCP/ARP/WLAN 等需要 SYSTEM 权限的功能提示“需服务模式”。
 

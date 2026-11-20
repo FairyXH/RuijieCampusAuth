@@ -6,8 +6,7 @@
 ## 0. 仓库位置
 
 - 源码仓库：`D:\Files\Develop\Cross-Platform\RuijieCampusAuth`
-- 旧路径 `D:\Files\Develop\HXXY\ruijie-campus-auth-hxxy` 已废弃，文档与工具中的
-  旧路径引用已同步更新。
+- 迁移前的旧仓库路径已废弃，文档与工具中的旧路径引用已同步更新。
 - 部署目录仍为 `D:\Storageredirect\Program\RuijieCampusAuth`；源码迁移不影响
   已安装的 Windows 服务。
 
@@ -15,7 +14,7 @@
 
 通用的锐捷校园网第三方认证客户端（“锐捷认证器 / 锐捷校园网开放认证器”）。
 使用官方协议做兼容认证，不依赖官方进程；学校差异通过 `profiles/*.json` 导入。
-软件本体不写死学校参数；仓库附带 `profiles/厦门华厦学院.json` 正式档案。
+软件本体不写死学校参数；仓库附带一份已核对的正式档案。
 
 三套实现：
 
@@ -54,7 +53,7 @@ RuijieCampusAuth.Cli/        auth/config/service/debug/profile
 RuijieCampusAuth.Core.Tests/ 65 tests
 RuijieCampusAuth.App.Tests/  34 tests
 RuijieCampusAuth.Service.Tests/ 管道集成测试（需先停止运行中的服务）
-profiles/                    学校档案（厦门华厦学院.json 为正式档案）
+profiles/                    学校档案（每校一份 JSON）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
 openwrt/                     锐捷认证器 OpenWrt 版：ruijie-auth（Go）+ luci-app-ruijie-auth
@@ -110,9 +109,8 @@ Deep Freeze：
 - GUI：`档案` 页选择后“导入/切换”。
 - 导入只覆盖档案声明字段；账号、网卡、接管、Guardian 不变；自动备份
   `settings.json.bak-<时间戳>`。
-- 正式档案为 `profiles/厦门华厦学院.json`：`profile_name=厦门华厦学院`、
-  `service_name=电信宽带服务`、`static_id=Static:AB45A862`、`school_code=HPVTC`。
-- OpenWrt 端用同一份档案：`ruijie-auth profile import --file "厦门华厦学院.json"`
+- `profiles/` 可放多份 `<学校>.json`，导入只覆盖档案声明字段。
+- OpenWrt 端用同一份档案：`ruijie-auth profile import --file "<学校>.json"`
   写入 `/etc/config/ruijie-auth`，或 LuCI「学校档案」页上传/粘贴。
 
 档案字段与适配流程见 `profiles/README.md`、`docs/ADAPTATION.md`。
@@ -161,7 +159,7 @@ Deep Freeze：
   `build/capture/original-parse-truth.json`。
 - **实测互证**：ENCRYPT_KEY=7C73533126403871 / ENCRYPT_IV=4163332331215164
   与 dircomm.log 的 SAM DES key/IV 一致（SAM 复用认证下发的 key/IV）；
-  MSG_CLIENT_PORT=138、INDICATE_SERV_IP=172.22.11.1 与 dircomm 一致。
+  MSG_CLIENT_PORT=138、INDICATE_SERV_IP=<server-ip> 与 dircomm 一致。
 - **GetDHCPAuthPhase 差分**：phase=3+首次+DHCP 激活 → `63 01 03`
   len 3，与 C# `DhcpPhase(3)` 一致；非首次 → len 0。
 - **GetServiceName 差分**：空配置 → len 0（无段），与原版一致。
@@ -194,7 +192,7 @@ Deep Freeze：
   镜像、kernel1/rootfs0、manifest、mipsle/amd64 daemon、zh-cn lmo、
   `SHA256SUMS.txt`、`BUILD_INFO.txt`。刷机包
   `D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt` 已同步新镜像/新 ipk，
-  删除旧 `hxxy-auth` ipk，并更新 checksums、README、刷写教程、自启示例
+  删除旧 `ruijie-auth` ipk，并更新 checksums、README、刷写教程、自启示例
   和智能检测脚本（移除 DoH 守护）。
 - `scripts/po2lmo.py` 生成的 `.lmo` 与 24.10 官方
   `https-dns-proxy.zh-cn.lmo` 逐键值一致（154/154）。
@@ -207,8 +205,8 @@ Deep Freeze：
   WAN；daemon 在 br-lan 上完成 Logoff→4×Start→paused；QEMU 演示档案
   `profile import` 写入 8 字段并生成 backup，reload 后状态显示 profile；
   LuCI 页面 200、`lang_zh-cn`、translations 端点全量中文命中。
-- 正式档案 `profiles/厦门华厦学院.json` 已用 C# CLI 与 OpenWrt Go CLI
-  分别 `profile show` 验证，并用 Go CLI 导入临时 UCI 配置，应用 13 个字段。
+- 仓库附带的正式档案已用 C# CLI 与 OpenWrt Go CLI 分别 `profile show`
+  验证，并用 Go CLI 导入临时 UCI 配置，应用 13 个字段。
 - 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
 
 ## 8. 已知问题 / 限制
@@ -234,7 +232,7 @@ Deep Freeze：
 ## 9. 安全/运维注意
 
 - 凭据：账号密码 DPAPI；调试日志对 password/token/key/iv 脱敏。
-- 接管：IFEO `RuijieTakeover`（兼容旧 `HXXYTakeover`）；服务名迁移会删除旧服务。
+- 接管：IFEO `RuijieTakeover`（兼容旧版本标记）；服务名迁移会删除旧服务。
 - 协议实验默认关闭，手动触发；DHCP release/无线变更需要确认。
 - 账号重试有限制，避免触发服务器锁定。
 - 日志轮转：服务 10MB、GUI 5MB、debug 10MB。
@@ -274,7 +272,7 @@ aa32fdd Update
 99c911a fix: TakeoverGuard excludes own service; VBS uses in-process StdRegProv
 ```
 
-仓库从 `D:\Files\Develop\HXXY\ruijie-campus-auth-hxxy` 迁移到
+仓库已从旧路径迁移到
 `D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变；
 `feat/debug-protocols`、`feat/openwrt-r3g`、`feat/ruijie-private-tail`
 已并入 `main` 并删除。

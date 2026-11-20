@@ -3,7 +3,7 @@
 锐捷（Ruijie）校园网 802.1X 认证协议的第三方开源实现。项目以锐捷官方
 Windows 客户端 `8021x.exe` 的协议行为为参照，提供 C#/.NET 10 参考实现、
 Python 协议参考实现，以及 OpenWrt 上的 Go + LuCI 部署形态。学校差异通过
-外部 JSON 配置档案注入；仓库附带厦门华厦学院的正式档案，软件本体不写死
+外部 JSON 配置档案注入；仓库附带已核对的正式档案，软件本体不写死
 任何学校参数。
 
 **关键词**：IEEE 802.1X；EAP-MD5；PEAP；MSCHAPv2；EAPOL；锐捷私有协议；
@@ -73,11 +73,11 @@ AF_PACKET 原始套接字。三者都把私有尾放在 EAPOL 长度字段之外
 
 ### 2.3 配置模型
 
-学校差异统一放在 `profiles/*.json`，字段包括认证方式、服务名、静态 ID、
-Portal/自助/升级地址、DHCP 模式等。仓库附带
-[`profiles/厦门华厦学院.json`](profiles/厦门华厦学院.json) 作为正式档案；
-C# 与 OpenWrt 使用同一份 schema，导入时只覆盖档案声明的字段，并保留账号
-与未知配置项。
+学校差异统一放在 `profiles/*.json`，每校一个 `<学校>.json`，字段包括认证
+方式、服务名、静态 ID、Portal/自助/升级地址、DHCP 模式等。仓库附带一份
+已核对的正式档案；目录、字段与导入方法见
+[`profiles/README.md`](profiles/README.md)。C# 与 OpenWrt 使用同一份
+schema，导入时只覆盖档案声明的字段，并保留账号与未知配置项。
 
 ### 2.4 部署形态
 
@@ -183,7 +183,7 @@ RuijieCampusAuth.Service.Tests/
 skills/                       Agent 端到端适配作业手册
 tools/re_diff/                Unicorn 直调原版二进制的差分工具
 tools/csharp_diff/            C# 侧差分对照器
-profiles/                     学校配置档案（含厦门华厦学院正式档案）
+profiles/                     学校配置档案（每校一份 JSON）
 openwrt/                      OpenWrt 插件版源码（Go + LuCI）
 python/                       Python 参考实现
 docs/                         逆向、协议、适配、构建与操作文档
@@ -238,8 +238,8 @@ sh scripts/build-image.sh    # 生成整机固件（默认 R3G Image Builder）
 
 ### 7.4 配置与数据
 
-- 学校档案：`profiles/*.json`，C# 与 OpenWrt 共用同一 schema；
-  `profiles/厦门华厦学院.json` 为已核对的正式档案。
+- 学校档案：`profiles/*.json`，每校一个 `<学校>.json`；C# 与 OpenWrt
+  共用同一 schema，仓库附带一份已核对的正式档案。
 - C#：`settings.json`、`accounts.json`、`service.json`、`servers.json`、
   `discovery.json` 与日志目录位于安装目录。
 - OpenWrt：`/etc/config/ruijie-auth`、`/etc/ruijie-auth/profiles/`、

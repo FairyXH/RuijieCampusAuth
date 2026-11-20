@@ -37,9 +37,9 @@ from .storage import (
 
 LOG = logging.getLogger("ruijie-auth")
 
-SERVICE_NAME = "HXXY-CampusAuth"
-SERVICE_DISPLAY = "HXXY Campus Auth"
-SERVICE_DESCRIPTION = "HXXY Ruijie campus network supplicant"
+SERVICE_NAME = "RuijieCampusAuth"
+SERVICE_DISPLAY = "Ruijie Campus Auth"
+SERVICE_DESCRIPTION = "Ruijie-compatible campus network supplicant"
 CONFIG_FILE = "service.json"
 STATUS_FILE = "service_status.json"
 LOG_FILE = "service.log"
@@ -65,7 +65,7 @@ def _iso() -> str:
 
 
 def service_root() -> Path:
-    override = os.environ.get("HXXY_SERVICE_DIR", "").strip()
+    override = os.environ.get("RUIJIE_SERVICE_DIR", "").strip()
     if override:
         return Path(override)
     if getattr(sys, "frozen", False):
@@ -252,7 +252,7 @@ def _boot_log(message: str) -> None:
 
 def _setup_service_logging(path: Path) -> None:
     LOG.setLevel(logging.DEBUG)
-    if any(getattr(handler, "_hxxy_service", False) for handler in LOG.handlers):
+    if any(getattr(handler, "_ruijie_service", False) for handler in LOG.handlers):
         return
     ensure_service_dir()
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -264,7 +264,7 @@ def _setup_service_logging(path: Path) -> None:
             "%(asctime)s [%(levelname)s] %(message)s", "%Y-%m-%d %H:%M:%S"
         )
     )
-    handler._hxxy_service = True  # type: ignore[attr-defined]
+    handler._ruijie_service = True  # type: ignore[attr-defined]
     LOG.addHandler(handler)
 
 
@@ -708,7 +708,7 @@ def _service_main(_argc: int, _argv) -> None:
         SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN,
     )
     _boot_log("service running")
-    _agent_thread = threading.Thread(target=agent.run, name="hxxy-agent")
+    _agent_thread = threading.Thread(target=agent.run, name="ruijie-agent")
     _agent_thread.start()
     while not _stop_event.wait(0.5):
         if not _agent_thread.is_alive():

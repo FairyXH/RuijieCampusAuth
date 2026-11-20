@@ -37,7 +37,7 @@ from ruijie_auth.system_service import (
 _early("imports ok")
 
 
-class HXXYService(win32serviceutil.ServiceFramework):
+class RuijieService(win32serviceutil.ServiceFramework):
     _svc_name_ = SERVICE_NAME
     _svc_display_name_ = SERVICE_DISPLAY
     _svc_description_ = SERVICE_DESCRIPTION
@@ -58,11 +58,11 @@ class HXXYService(win32serviceutil.ServiceFramework):
             account, settings = load_service_config()
         except Exception as exc:
             _boot_log(f"config failed: {exc}")
-            servicemanager.LogErrorMsg(f"HXXY service config failed: {exc}")
+            servicemanager.LogErrorMsg(f"Ruijie service config failed: {exc}")
             return
         _setup_service_logging(service_log_path())
         agent = SystemAgent(account, settings, self.stop_event)
-        self.worker = threading.Thread(target=agent.run, name="hxxy-agent")
+        self.worker = threading.Thread(target=agent.run, name="ruijie-agent")
         self.worker.start()
         self.worker.join()
         _boot_log("SvcDoRun exit")
@@ -71,7 +71,7 @@ class HXXYService(win32serviceutil.ServiceFramework):
 def main() -> int:
     _early(f"hosting service {SERVICE_NAME}")
     servicemanager.Initialize()
-    servicemanager.PrepareToHostSingle(HXXYService)
+    servicemanager.PrepareToHostSingle(RuijieService)
     _early("dispatching")
     servicemanager.StartServiceCtrlDispatcher()
     _early("dispatcher returned")

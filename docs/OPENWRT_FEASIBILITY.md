@@ -2,7 +2,7 @@
 
 日期：2026-11-18
 
-> **历史文档**：本文是移植前的可行性评估，保留当时对 `hxxy-auth`、UA3F、
+> **历史文档**：本文是移植前的可行性评估，保留当时对早期原型、UA3F、
 > https-dns-proxy、full-buildroot 等方案的权衡记录。最终实现已改为
 > `ruijie-auth` 纯用户态方案，移除 UA3F/DoH 依赖；当前架构、包名与验证
 > 结果见 `docs/OPENWRT_PORT.md` 与 `openwrt/README.md`。
@@ -90,7 +90,7 @@ TTL 一致时应关闭 flow offload），NAT 吞吐会进一步下降。
 原版 R3G（128MB NAND）不需要 full buildroot：
 
 - 官方 24.10 sysupgrade + `opkg install ua3f kmod-nft-queue kmod-nft-tproxy`
-  + 交叉编译的 `hxxy-auth` + 配置/init/hotplug 即可。
+  + 交叉编译的 `ruijie-auth` + 配置/init/hotplug 即可。
 - 想要可复现/可恢复，用 **Image Builder** 把包和 `files/` 烤进镜像；
   不需要编译整个 OpenWrt。
 - 只有以下情况才需要 full buildroot：
@@ -111,9 +111,9 @@ make image PROFILE=xiaomi_mi-router-3g \
   FILES=files/
 ```
 
-`files/` 里放：`hxxy-auth` 二进制、`/etc/init.d/hxxy-auth`、
-`/etc/config/hxxy-auth`、`/etc/hotplug.d/iface/90-hxxy-auth`、
-`/etc/sysctl.d/90-hxxy.conf`、UA3F 配置。UA3F 若不在官方 feed，可以解包
+`files/` 里放：`ruijie-auth` 二进制、`/etc/init.d/ruijie-auth`、
+`/etc/config/ruijie-auth`、`/etc/hotplug.d/iface/90-ruijie-auth`、
+`/etc/sysctl.d/90-ruijie.conf`、UA3F 配置。UA3F 若不在官方 feed，可以解包
 ipk 把 `/usr/bin/ua3f` 放进 `files/`，或刷机后 `opkg install` 本地 ipk。
 
 ### 0.5 网络伪装栈（NAT 检测规避）
@@ -255,7 +255,7 @@ NFQUEUE 吞吐是主要风险。**
 | `Core/GuardianClient.cs` | 127.0.0.1 MCP | 低 | 路由器上无意义；改为 WAN 绑定探测 |
 | `Core/TakeoverPolicy.cs` | 注册表/服务 | 无 | 丢弃 |
 | `Core/ServiceInstaller.cs` | SCM/systemd | 低 | 改为 procd init + hotplug |
-| `Core/ServiceStatus.cs` | exe 目录 JSON | 中 | 改 `/var/run/hxxy-auth/status.json` |
+| `Core/ServiceStatus.cs` | exe 目录 JSON | 中 | 改 `/var/run/ruijie-auth/status.json` |
 | `Service/AuthWorker.cs` | Hosting + Guardian | 高 | 业务逻辑可移植；宿主改 Go 循环 |
 | `Service/Takeover*.cs` | Windows | 无 | 丢弃 |
 | `App/*` | Avalonia | 无 | 丢弃；用 LuCI/CLI |
@@ -278,13 +278,13 @@ NFQUEUE 吞吐是主要风险。**
    Start/Logoff/Identity 为全零，对 MD5 为 challenge；
    `cipher = plain XOR MD5(key || previous_cipher/IV)`。
 5. 0x39 服务名：GB18030，补到 32 字节。
-6. 0x54 静态 ID：ASCII，补到 64 字节；HXXY 观测值 `Static:AB45A862`。
+6. 0x54 静态 ID：ASCII，补到 64 字节；实网观测值用 `<static-id>` 占位。
 7. 0x4D 指纹：128 字节十六进制 ASCII；控制帧用全零 128 字节。
 8. 0x17 nonce：32 字节十六进制 ASCII；Start/Logoff/Identity 共用一个
    会话 nonce，MD5 响应使用新 nonce。
 9. EAPOL 头长度只覆盖标准 EAP 包；私有尾在 EAPOL length 之外。
-10. Identity/MD5 的 EAPOL length 按 EAP 长度计算（HXXY 验证账号为
-    14/31），尾巴不计入。
+10. Identity/MD5 的 EAPOL length 按 EAP 长度计算（示例账号为 14/31），
+    尾巴不计入。
 11. Start 可单播到锁定的认证服务器；Logoff 必须发
     `01:80:c2:00:00:03`。单播 Logoff 不会清除交换机会话，反而导致下一次
     Start 收到 EAP-Failure。
@@ -322,12 +322,12 @@ NFQUEUE 吞吐是主要风险。**
 不能再使用 exe 目录（`/usr/sbin` 在 squashfs 上只读）。建议：
 
 ```
-/etc/config/hxxy-auth              UCI 配置（含 config account，明文 0600）
-/etc/hxxy-auth/servers.json        学习到的服务器 + locked
-/etc/hxxy-auth/discovery.json      探测缓存
-/var/run/hxxy-auth/status.json     运行状态
-/var/run/hxxy-auth.sock            控制 socket（0600）
-/var/log/hxxy-auth.log             日志（1MB 轮转）
+/etc/config/ruijie-auth              UCI 配置（含 config account，明文 0600）
+/etc/ruijie-auth/servers.json        学习到的服务器 + locked
+/etc/ruijie-auth/discovery.json      探测缓存
+/var/run/ruijie-auth/status.json     运行状态
+/var/run/ruijie-auth.sock            控制 socket（0600）
+/var/log/ruijie-auth.log             日志（1MB 轮转）
 ```
 
 现有 `ServiceConfig.ServiceRoot`、`UserStore.BaseDirectory`、
@@ -335,7 +335,7 @@ NFQUEUE 吞吐是主要风险。**
 
 ### 5.4 服务与自启动
 
-- `procd` init 脚本 + `respawn`；`/etc/init.d/hxxy-auth enable`。
+- `procd` init 脚本 + `respawn`；`/etc/init.d/ruijie-auth enable`。
 - `/etc/hotplug.d/iface` 在 WAN up/down 时通知守护进程（SIGHUP 或 ubus）。
 - 不要用 systemd unit；`ServiceInstaller` 的 Linux 分支在 OpenWrt 上无效。
 
@@ -381,21 +381,21 @@ NFQUEUE 吞吐是主要风险。**
 
 | 页面 | 内容 | 后端 |
 | --- | --- | --- |
-| 概览 | 状态 badge、当前账号、服务器 MAC、WAN IP、最后成功、运行时长；认证/注销/暂停/恢复/重载按钮 | `hxxy-auth status --json`；按钮 `fs.exec` |
-| 账号 | 账号列表：用户名、备注、启用、当前；增删改、设当前 | `hxxy-auth accounts ... --json` |
-| 服务器 | 学习到的认证服务器：MAC、名称、成功次数、最后成功；锁定/解锁/删除 | `hxxy-auth servers ... --json` |
-| 设置 | device、服务名、静态 ID、timeout/retries/repeats/start_timeout、重认证间隔、家庭网络暂停、伪装等级、连接检测 URL、日志级别 | `L.uci` 的 `hxxy-auth` 配置 |
-| 日志 | 最近内容，自动刷新 | `fs.read('/var/log/hxxy-auth.log')` |
+| 概览 | 状态 badge、当前账号、服务器 MAC、WAN IP、最后成功、运行时长；认证/注销/暂停/恢复/重载按钮 | `ruijie-auth status --json`；按钮 `fs.exec` |
+| 账号 | 账号列表：用户名、备注、启用、当前；增删改、设当前 | `ruijie-auth accounts ... --json` |
+| 服务器 | 学习到的认证服务器：MAC、名称、成功次数、最后成功；锁定/解锁/删除 | `ruijie-auth servers ... --json` |
+| 设置 | device、服务名、静态 ID、timeout/retries/repeats/start_timeout、重认证间隔、家庭网络暂停、伪装等级、连接检测 URL、日志级别 | `L.uci` 的 `ruijie-auth` 配置 |
+| 日志 | 最近内容，自动刷新 | `fs.read('/var/log/ruijie-auth.log')` |
 
 **配置分层：**
 
-- `/etc/config/hxxy-auth`（UCI，0600）：认证参数、`config account` 账号池
+- `/etc/config/ruijie-auth`（UCI，0600）：认证参数、`config account` 账号池
   （明文）、伪装等级、日志级别。
-- `/etc/hxxy-auth/servers.json`（daemon/CLI 管理）：学习到的服务器 + locked。
-- `/etc/hxxy-auth/discovery.json`：探测缓存。
-- `/var/run/hxxy-auth/status.json`：运行状态。
-- `/var/run/hxxy-auth.sock`：控制 socket（0600）。
-- `/var/log/hxxy-auth.log`：日志（1MB 轮转）。
+- `/etc/ruijie-auth/servers.json`（daemon/CLI 管理）：学习到的服务器 + locked。
+- `/etc/ruijie-auth/discovery.json`：探测缓存。
+- `/var/run/ruijie-auth/status.json`：运行状态。
+- `/var/run/ruijie-auth.sock`：控制 socket（0600）。
+- `/var/log/ruijie-auth.log`：日志（1MB 轮转）。
 
 UCI：
 
@@ -403,8 +403,8 @@ UCI：
 config auth 'main'
     option enabled '1'
     option device 'wan'
-    option service_name '电信宽带服务'
-    option static_id 'Static:AB45A862'
+    option service_name '<service-name>'
+    option static_id '<static-id>'
     option timeout '20'
     option retries '4'
     option repeats '3'
@@ -448,51 +448,51 @@ config account 'a1'
 CLI JSON 契约：
 
 ```text
-hxxy-auth status --json
+ruijie-auth status --json
 {
   "state": "authenticated",
   "message": "认证成功",
   "account": "S12016004",
   "interface": "wan",
   "server": "00:1a:a9:17:ff:ff",
-  "ip": "172.18.28.6",
+  "ip": "<client-ip>",
   "last_success": "2026-11-18T20:57:09+08:00",
   "updated_at": "2026-11-18T21:00:00+08:00",
   "uptime": 12345
 }
 
-hxxy-auth servers list --json
+ruijie-auth servers list --json
 [{"mac":"00:1a:a9:17:ff:ff","name":"","description":"wan","success_count":1,"last_success":"...","locked":true}]
 
-hxxy-auth accounts list --json
+ruijie-auth accounts list --json
 [{"id":"a1","username":"S12016004","note":"主账号","enabled":true,"active":true}]
 
-# 日志页直接 fs.read('/var/log/hxxy-auth.log')
-hxxy-auth auth|logoff|pause|resume|reload
+# 日志页直接 fs.read('/var/log/ruijie-auth.log')
+ruijie-auth auth|logoff|pause|resume|reload
 ```
 
 LuCI 文件：
 
 ```text
-htdocs/luci-static/resources/view/hxxy-auth/overview.js
-htdocs/luci-static/resources/view/hxxy-auth/accounts.js
-htdocs/luci-static/resources/view/hxxy-auth/servers.js
-htdocs/luci-static/resources/view/hxxy-auth/settings.js
-htdocs/luci-static/resources/view/hxxy-auth/logs.js
-root/usr/share/luci/menu.d/luci-app-hxxy-auth.json
-root/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
-root/etc/uci-defaults/90-hxxy-auth
+htdocs/luci-static/resources/view/ruijie-auth/overview.js
+htdocs/luci-static/resources/view/ruijie-auth/accounts.js
+htdocs/luci-static/resources/view/ruijie-auth/servers.js
+htdocs/luci-static/resources/view/ruijie-auth/settings.js
+htdocs/luci-static/resources/view/ruijie-auth/logs.js
+root/usr/share/luci/menu.d/luci-app-ruijie-auth.json
+root/usr/share/rpcd/acl.d/luci-app-ruijie-auth.json
+root/etc/uci-defaults/90-ruijie-auth
 ```
 
 菜单：
 
 ```json
 {
-  "admin/services/hxxy-auth": {
-    "title": "HXXY Auth",
+  "admin/services/ruijie-auth": {
+    "title": "Ruijie Auth",
     "order": 90,
-    "action": { "type": "view", "path": "hxxy-auth/overview" },
-    "depends": { "acl": ["luci-app-hxxy-auth"] }
+    "action": { "type": "view", "path": "ruijie-auth/overview" },
+    "depends": { "acl": ["luci-app-ruijie-auth"] }
   }
 }
 ```
@@ -501,19 +501,19 @@ rpcd ACL：
 
 ```json
 {
-  "luci-app-hxxy-auth": {
-    "description": "HXXY Auth management",
+  "luci-app-ruijie-auth": {
+    "description": "Ruijie Auth management",
     "read": {
       "file": {
-        "/usr/bin/hxxy-auth": ["exec"],
-        "/var/run/hxxy-auth/status.json": ["read"],
-        "/var/log/hxxy-auth.log": ["read"]
+        "/usr/bin/ruijie-auth": ["exec"],
+        "/var/run/ruijie-auth/status.json": ["read"],
+        "/var/log/ruijie-auth.log": ["read"]
       },
-      "uci": ["hxxy-auth"]
+      "uci": ["ruijie-auth"]
     },
     "write": {
-      "file": { "/usr/bin/hxxy-auth": ["exec"] },
-      "uci": ["hxxy-auth"]
+      "file": { "/usr/bin/ruijie-auth": ["exec"] },
+      "uci": ["ruijie-auth"]
     }
   }
 }
@@ -525,8 +525,8 @@ rpcd ACL：
 - 账号页用 `fs.exec` 调 `accounts ...`；列表不返回密码，密码只在添加/修改
   时提交。
 - 服务器页 `servers list --json`；锁定/解锁调 CLI，写 `servers.json`。
-- 设置页用 `form.Map` + `L.uci`；保存后 `hxxy-auth reload`；伪装等级变化时
-  `/etc/init.d/hxxy-disguise restart`。
+- 设置页用 `form.Map` + `L.uci`；保存后 `ruijie-auth reload`；伪装等级变化时
+  `/etc/init.d/ruijie-disguise restart`。
 - 日志页 `log --lines 200`，3 秒刷新；避免整文件读取。
 - CLI 错误也返回 JSON（`{"error":"..."}`），LuCI 用 toast 显示。
 
@@ -539,10 +539,10 @@ rpcd ACL：
 伪装分层：
 
 - `off`：不做伪装。
-- `basic`：`hxxy-disguise` 应用 TTL 128、MSS clamp、关 IPv6、WAN drop、
+- `basic`：`ruijie-disguise` 应用 TTL 128、MSS clamp、关 IPv6、WAN drop、
   关 UPnP/NAT-PMP；MAC/DHCP 指纹在首次配置/镜像里写好。
 - `full`：在 basic 之上启动 UA3F L3（NFQUEUE），按需开 IPID/TS/window。
-- LuCI 设置页只写 UCI；`hxxy-disguise` 读取 UCI 并应用，避免认证 daemon
+- LuCI 设置页只写 UCI；`ruijie-disguise` 读取 UCI 并应用，避免认证 daemon
   耦合网络配置。
 
 ## 7. 必须实测的未知点（Go/No-Go）
@@ -573,7 +573,7 @@ rpcd ACL：
      客户端，避免同 MAC 冲突。
 
 4. **静态 ID 0x54 是否被服务器校验**
-   - 已知值 `Static:AB45A862`。先原样复用；再试随机值。
+   - 已知值 `<static-id>`。先原样复用；再试随机值。
    - 如果服务器校验，保留原值即可（配置项已存在）。
 
 5. **服务器是否周期性发起重认证**
@@ -593,27 +593,27 @@ rpcd ACL：
 ## 8. 推荐架构（原版 R3G）
 
 ```
-/usr/sbin/hxxy-auth                 Go 静态二进制（协议 + 守护进程）
-/etc/init.d/hxxy-auth               procd 脚本
-/etc/hotplug.d/iface/90-hxxy-auth   WAN up/down 通知
-/etc/config/hxxy-auth               UCI 配置（含 config account，明文 0600）
-/etc/hxxy-auth/servers.json         学习到的服务器（含 locked）
-/etc/hxxy-auth/discovery.json       探测缓存
-/var/run/hxxy-auth.sock             控制 socket（0600）
-/etc/init.d/hxxy-disguise           伪装层（TTL/MSS/IPv6/UA3F）
-/var/run/hxxy-auth/status.json      状态
-/var/log/hxxy-auth.log              日志（1MB 轮转）
+/usr/sbin/ruijie-auth                 Go 静态二进制（协议 + 守护进程）
+/etc/init.d/ruijie-auth               procd 脚本
+/etc/hotplug.d/iface/90-ruijie-auth   WAN up/down 通知
+/etc/config/ruijie-auth               UCI 配置（含 config account，明文 0600）
+/etc/ruijie-auth/servers.json         学习到的服务器（含 locked）
+/etc/ruijie-auth/discovery.json       探测缓存
+/var/run/ruijie-auth.sock             控制 socket（0600）
+/etc/init.d/ruijie-disguise           伪装层（TTL/MSS/IPv6/UA3F）
+/var/run/ruijie-auth/status.json      状态
+/var/log/ruijie-auth.log              日志（1MB 轮转）
 /usr/bin/ua3f                       UA3F（mipsel_24kc，NFQUEUE）
 /etc/ua3f/config.yaml               UA3F 配置
-/etc/sysctl.d/90-hxxy.conf          TTL/timestamp/IPv6 等
-/usr/share/luci/menu.d/luci-app-hxxy-auth.json
-/usr/share/rpcd/acl.d/luci-app-hxxy-auth.json
-/www/luci-static/resources/view/hxxy-auth/*.js
+/etc/sysctl.d/90-ruijie.conf          TTL/timestamp/IPv6 等
+/usr/share/luci/menu.d/luci-app-ruijie-auth.json
+/usr/share/rpcd/acl.d/luci-app-ruijie-auth.json
+/www/luci-static/resources/view/ruijie-auth/*.js
 ```
 
 进程模型：
 
-- `hxxy-auth`：单进程；收包 goroutine + 状态机。
+- `ruijie-auth`：单进程；收包 goroutine + 状态机。
 - 常驻监听 EAPOL；WAN up + DHCP 拿到 IPv4 后触发 Start；定时重认证；
   失败退避；账号轮换。
 - 状态机：`idle → discovering → identity → md5 → authenticated →
@@ -644,12 +644,12 @@ rpcd ACL：
 CLI：
 
 ```text
-hxxy-auth status [--json]
-hxxy-auth auth|logoff|pause|resume|reload
-hxxy-auth accounts list|add|update|remove|use [--json]
-hxxy-auth servers list|lock|unlock|remove [--json]
-hxxy-auth discovery show|clear
-hxxy-auth config show
+ruijie-auth status [--json]
+ruijie-auth auth|logoff|pause|resume|reload
+ruijie-auth accounts list|add|update|remove|use [--json]
+ruijie-auth servers list|lock|unlock|remove [--json]
+ruijie-auth discovery show|clear
+ruijie-auth config show
 ```
 
 LuCI（必需）：概览/账号/服务器/设置/日志五页；后端 `rpcd` + `fs.exec`
@@ -660,7 +660,7 @@ LuCI（必需）：概览/账号/服务器/设置/日志五页；后端 `rpcd` +
 ```sh
 # 认证 daemon（开发机交叉编译）
 GOOS=linux GOARCH=mipsle GOMIPS=softfloat CGO_ENABLED=0 \
-  go build -trimpath -ldflags "-s -w" -o hxxy-auth ./cmd/hxxy-auth
+  go build -trimpath -ldflags "-s -w" -o ruijie-auth ./cmd/ruijie-auth
 
 # 固件（Image Builder，不是 full buildroot）
 make image PROFILE=xiaomi_mi-router-3g \
@@ -709,7 +709,7 @@ OpenWrt x86/QEMU 验证 LuCI。网络伪装调优是开放式的，取决于校�
 | DHCP 参数指纹 | 中 | OpenWrt 默认 `udhcp`/`OpenWrt` hostname | 配成 Windows：vendor/PRL/hostname |
 | 账号/MAC 绑定 | 中 | 换设备被拒 | 克隆 WAN MAC；先 logoff 原设备 |
 | 周期性重认证 | 中 | 现有一次性设计会漏 | 常驻监听 + 定时重认证 |
-| 静态 ID 校验 | 低中 | 服务器可能校验 0x54 | 先复用 `Static:AB45A862`，再试随机 |
+| 静态 ID 校验 | 低中 | 服务器可能校验 0x54 | 先复用 `<static-id>`，再试随机 |
 | Option 82/school code | 低 | 当前未实现；纯 DHCP 环境未必需要 | 上机抓 DHCP 报文确认 |
 | Go mipsle 非 first-class | 低中 | 需实测二进制 | softfloat；交叉编译 + 设备 smoke test |
 | 配置文件路径 | 低 | exe 目录只读 | 改 `/etc` + `/var` |

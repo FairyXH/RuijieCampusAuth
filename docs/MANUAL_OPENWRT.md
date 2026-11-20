@@ -147,7 +147,7 @@ opkg install --force-reinstall /tmp/ruijie-auth_0.2.0_mipsel_24kc.ipk
 把 JSON 放到 `/etc/ruijie-auth/profiles/`：
 
 ```bash
-scp "厦门华厦学院.json" root@192.168.1.1:/etc/ruijie-auth/profiles/
+scp "<学校>.json" root@192.168.1.1:/etc/ruijie-auth/profiles/
 ```
 
 页面“已安装档案”列表会出现它，点 **导入** 即可。
@@ -362,7 +362,7 @@ ruijie-auth interfaces
 
 # 导入档案
 ruijie-auth profile list
-ruijie-auth profile import --file "/tmp/厦门华厦学院.json"
+ruijie-auth profile import --file "/tmp/<学校>.json"
 
 # 锁定服务器
 ruijie-auth servers list
@@ -409,7 +409,7 @@ private-properties           通过 错误=[] 属性=1
   "devices": ["wan"],
   "server": "00:1a:a9:17:ff:ff",
   "auth_mode": "EAPMD5",
-  "profile": "厦门华厦学院",
+  "profile": "<学校档案名>",
   "reauth_interval": 21600,
   "server_messages": ["欢迎使用……"],
   "properties": [

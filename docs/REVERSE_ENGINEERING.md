@@ -72,10 +72,10 @@ PDB 路径泄漏：
 
 | 项 | 值 |
 |---|---|
-| 学校代码 | `HPVTC` |
-| 服务名 | `电信宽带服务` |
-| 静态 ID | `Static:AB45A862` |
-| 自助服务 | `http://netss.hxxy.edu.cn/selfservice/` |
+| 学校代码 | `<school-code>` |
+| 服务名 | `<service-name>` |
+| 静态 ID | `<static-id>` |
+| 自助服务 | `http://<school-domain>/selfservice/` |
 | 升级 | `http://update.rghall.com.cn/das/update` |
 | 引擎 | 5.0.2014.108 |
 | 认证模式 | EAPMD5 |
@@ -347,7 +347,7 @@ endpoint 未在二进制中固定，需现场配置/抓包。
 - IV `4163332331215164`
 - UTC time 8 字节
 - SU PORT 138
-- SAM IP 示例 `172.22.11.1`，端口 53
+- SAM IP 示例 `<server-ip>`，端口 53
 - `bUseHandshake2Sam`、`dwTimerToSAM`
 
 相关：`CDirectTranSrv`、`CDirTranThread`、`CSuDES`、`OnInit_SAM`、`ONSAMWantLogOff`。

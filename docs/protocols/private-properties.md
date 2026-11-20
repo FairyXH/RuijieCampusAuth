@@ -3,7 +3,7 @@
 状态：P2 已实现；2026-11-19 全量校对中**重写为原版分段格式**，与原版二进制
 逐字段一致（含真实抓包锁定向量）。
 依据：`8021x.exe` `ParsePrivateProperty`（0x537ee0）反编译 + Unicorn 实测 +
-本机 HXXY 服务器真实抓包（`build/capture/live-auth.pcap`）。
+真实校园网服务器抓包（`build/capture/live-auth.pcap`，示例值已脱敏）。
 
 ## 1. 位置
 
@@ -40,7 +40,7 @@
 | `0x5C` | `ENCRYPT_KEY` | `RC4(key="com.ruijie.www", 8 bytes)` |
 | `0x5D` | `ENCRYPT_IV` | `RC4(key="com.ruijie.www", 8 bytes)` |
 
-**实测（HXXY 真实服务器）**：`ENCRYPT_KEY = 7C73533126403871`、
+**实测（真实服务器）**：`ENCRYPT_KEY = 7C73533126403871`、
 `ENCRYPT_IV = 4163332331215164` —— 与 dircomm.log 中的 SAM DES key/IV
 完全一致（SAM 直通复用这两个值）。
 
@@ -79,16 +79,16 @@
 
 长度不符时原版**停止解析**（不是跳过）。默认 type 跳过 value 继续。
 
-## 5. 实测值（HXXY 真实服务器，2026-11-19 抓包）
+## 5. 实测值（真实服务器，2026-11-19 抓包）
 
 | 字段 | 值 |
 |---|---|
-| 段 1 消息 | `欢迎使用厦门华厦学院网络`（GBK） |
+| 段 1 消息 | `欢迎使用<学校>网络`（GBK） |
 | 段 5 hash | `0x19594C7A` |
 | 段 5 interval | 20 × 1000 = 20000ms |
 | SU_REAUTH_INTERV | 0（服务器不驱动重认证） |
 | INDICATE_PORT | 0x35 = 53 |
-| INDICATE_SERV_IP | 0xAC160B01 = 172.22.11.1 |
+| INDICATE_SERV_IP | 0xAC160B01 = <server-ip> |
 | ENCRYPT_KEY | 7C73533126403871 |
 | ENCRYPT_IV | 4163332331215164 |
 | SERVER_UTC_TIME | 00 00 00 00 6A FE F0 17（8B） |
@@ -98,7 +98,7 @@
 | WIFI_CNNT_NUM_FLAGS | 01 00 01 00 |
 
 MD5-Challenge 包尾部还携带 `[1311][0x2E][3][01]` 与
-`[1311][0x66][0x0E]["电信宽带服务"]`，由 `ReadRGVendorSeg`（0x51a890，
+`[1311][0x66][0x0E]["<service-name>"]`，由 `ReadRGVendorSeg`（0x51a890，
 平铺 TLV）解析，但受全局 `+0x33D4` 门控（默认关闭）——C# 不解析挑战包
 尾部，与原版默认行为一致。
 

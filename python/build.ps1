@@ -79,10 +79,10 @@ if ($Deploy) {
         throw "Deploy requires an elevated PowerShell session"
     }
     New-Item -ItemType Directory -Force -Path $DeployDir | Out-Null
-    $service = Get-Service -Name "HXXY-CampusAuth" -ErrorAction SilentlyContinue
+    $service = Get-Service -Name "RuijieCampusAuth" -ErrorAction SilentlyContinue
     if ($service -and $service.Status -ne "Stopped") {
         Write-Host "Stopping system service..."
-        Stop-Service -Name "HXXY-CampusAuth" -Force -ErrorAction SilentlyContinue
+        Stop-Service -Name "RuijieCampusAuth" -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 2
     }
     Copy-Item (Join-Path $serviceDir "*") $DeployDir -Recurse -Force

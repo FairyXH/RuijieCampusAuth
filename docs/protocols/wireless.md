@@ -42,7 +42,7 @@
 ## 3. 实测（2026-11-19）
 
 - `wireless-profile list`：1 个接口（Intel AX201），5 个配置
-  （ZCF、ZhangAndroid、HXXY-WiFi、ZXH、ZXH-WiFi4）。
+  （SSID 列表已脱敏）。
 - 未执行 create/connect/delete，避免改动现有网络。
 
 ## 4. 未确认 / 后续

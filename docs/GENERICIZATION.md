@@ -15,15 +15,15 @@
 | 位置 | 用途 |
 |---|---|
 | `profiles/*.json` | 学校档案，随仓库分发，不编进二进制 |
-| `profiles/厦门华厦学院.json` | 正式档案（已核对，可直接导入） |
+| `profiles/<学校>.json` | 正式档案（已核对，可直接导入） |
 | `profiles/README.md` | 字段说明与导入方法 |
 
 导入命令：
 
 ```bash
-dotnet RuijieCampusAuth.Cli.dll profile show "profiles/厦门华厦学院.json"
-dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json"
-dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json" --root "<安装目录>"
+dotnet RuijieCampusAuth.Cli.dll profile show "profiles/<学校>.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/<学校>.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/<学校>.json" --root "<安装目录>"
 ```
 
 导入语义：
@@ -39,14 +39,14 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json
 | 项 | 之前 | 现在 |
 |---|---|---|
 | GUI 标题/托盘 | 含学校缩写 | `锐捷认证器` |
-| 服务名 | `HXXY-CampusAuth` | `RuijieCampusAuth`（安装时移除旧服务） |
-| Linux unit | `hxxy-campus-auth.service` | `ruijie-campus-auth.service` |
-| IFEO 标记名 | `HXXYTakeover` | `RuijieTakeover`（恢复时兼容旧标记） |
-| 调试管道 | `HXXY-CampusAuth-Debug` | `RuijieCampusAuth-Debug` |
-| GUI 互斥锁 | `HXXY-CampusAuth-GUI` | `RuijieCampusAuth-GUI` |
-| 默认服务名 | `电信宽带服务` | 空，必须由 profile 提供 |
-| 默认静态 ID | `Static:AB45A862` | 空，必须由 profile 提供 |
-| 快捷方式 | `HXXY-CampusAuth.lnk` | `RuijieAuth.lnk` |
+| 服务名 | 旧命名（含学校缩写） | `RuijieCampusAuth`（安装时移除旧服务） |
+| Linux unit | 旧 unit 名 | `ruijie-campus-auth.service` |
+| IFEO 标记名 | 旧标记名 | `RuijieTakeover`（恢复时兼容旧标记） |
+| 调试管道 | 旧管道名 | `RuijieCampusAuth-Debug` |
+| GUI 互斥锁 | 旧互斥锁名 | `RuijieCampusAuth-GUI` |
+| 默认服务名 | `<service-name>` | 空，必须由 profile 提供 |
+| 默认静态 ID | `<static-id>` | 空，必须由 profile 提供 |
+| 快捷方式 | `RuijieCampusAuth.lnk` | `RuijieAuth.lnk` |
 
 兼容说明：
 
@@ -58,17 +58,17 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json
 
 ### Python 实现（`python/`）
 
-- 仍含学校命名的包 `ruijie_hxxy`、服务名与默认值。
-- 计划：改为 `ruijie_auth.generic`，读取同一套 `profiles/*.json`；保留 `ruijie_hxxy`
-  作为兼容别名。
-- 状态：未改动，等待 C# 协议层稳定后同步。
+- 发行名统一为 `ruijie-campus-auth`，导入名统一为 `ruijie_auth`；
+  历史兼容别名已移除。
+- 服务名与环境变量统一为 `RuijieCampusAuth` / `RUIJIE_SERVICE_DIR`。
+- 学校差异读取同一套 `profiles/*.json`，不再内置学校默认值。
 
 ### OpenWrt 插件（`openwrt/`）
 
 已完成（2026-11-20）：
 
 1. 包名/目录：`ruijie-auth`、`luci-app-ruijie-auth`，配置
-   `/etc/config/ruijie-auth`，零 `hxxy` 字样。
+   `/etc/config/ruijie-auth`，零学校缩写。
 2. 默认配置不含学校代码/服务名/静态 ID；`auth_mode` 默认 EAPMD5。
 3. 学校档案走 `profiles/*.json`，与 C# 同一 schema；LuCI 可上传/粘贴，
    CLI 为 `ruijie-auth profile import`。
@@ -82,8 +82,8 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json
 
 1. 停止旧 GUI 与服务。
 2. 部署新二进制（D 盘目录可保持 `RuijieCampusAuth`）。
-3. 执行 `RuijieCampusAuth.Cli.exe profile import "profiles/厦门华厦学院.json" --root <安装目录>`。
-4. 执行 `service install`：安装 `RuijieCampusAuth` 并删除旧 `HXXY-CampusAuth` 服务。
+3. 执行 `RuijieCampusAuth.Cli.exe profile import "profiles/<学校>.json" --root <安装目录>`。
+4. 执行 `service install`：安装 `RuijieCampusAuth` 并删除旧版本服务（旧名含学校缩写）。
 5. 更新计划任务/VBS 名称时，保留旧名称作为一次性迁移来源，确认新任务可用后再删除。
 6. 重启 GUI，确认标题、托盘、服务状态与认证均正常。
 
@@ -93,8 +93,8 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json
 dotnet build RuijieCampusAuth.slnx -c Release
 dotnet test RuijieCampusAuth.Core.Tests -c Release
 dotnet test RuijieCampusAuth.Service.Tests -c Release
-dotnet RuijieCampusAuth.Cli.dll profile show "profiles/厦门华厦学院.json"
-dotnet RuijieCampusAuth.Cli.dll profile import "profiles/厦门华厦学院.json" --root <安装目录>
+dotnet RuijieCampusAuth.Cli.dll profile show "profiles/<学校>.json"
+dotnet RuijieCampusAuth.Cli.dll profile import "profiles/<学校>.json" --root <安装目录>
 ```
 
 预期：导入后 `settings.json` 的 `profile_name` 为档案名，`service_name`/`static_id`

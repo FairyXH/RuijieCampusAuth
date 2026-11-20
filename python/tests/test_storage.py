@@ -114,11 +114,11 @@ def test_server_store_learns_and_updates(tmp_path) -> None:
     assert record.success_count == 1
     assert record.last_success
 
-    store.upsert("00:1a:a9:17:ff:ff", success=True, name="HXXY")
+    store.upsert("00:1a:a9:17:ff:ff", success=True, name="DEMO")
     loaded = store.get("00:1a:a9:17:ff:ff")
     assert loaded is not None
     assert loaded.success_count == 2
-    assert loaded.name == "HXXY"
+    assert loaded.name == "DEMO"
 
     assert store.rename("00:1a:a9:17:ff:ff", "主认证服务器")
     assert store.get("00:1a:a9:17:ff:ff").name == "主认证服务器"

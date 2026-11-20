@@ -16,7 +16,7 @@
 - UTC time（8 字节）
 - SU PORT：138
 - GetWay IP / SU IP
-- SAM IP：172.22.11.1，侦听端口 53
+- SAM IP：<server-ip>，侦听端口 53
 - `bUseHandshake2Sam`、`dwTimerToSAM`
 
 相关类：`CDirectTranSrv`、`CDirTranThread`、`CSuDES`、`CContextControlThread::ONSAMWantLogOff`。

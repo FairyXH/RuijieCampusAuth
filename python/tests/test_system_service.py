@@ -18,13 +18,13 @@ from ruijie_auth.system_service import (
 
 
 def test_service_root_honors_override(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("HXXY_SERVICE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUIJIE_SERVICE_DIR", str(tmp_path))
     assert service_root() == tmp_path
 
 
 @pytest.mark.skipif(os.name != "nt", reason="machine DPAPI is Windows-only")
 def test_service_config_roundtrip(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("HXXY_SERVICE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUIJIE_SERVICE_DIR", str(tmp_path))
     account = Account(username="student", password="secret")
     settings = AppSettings(
         interface="iface",
@@ -44,7 +44,7 @@ def test_service_config_roundtrip(tmp_path, monkeypatch) -> None:
 
 
 def test_service_status_roundtrip(tmp_path, monkeypatch) -> None:
-    monkeypatch.setenv("HXXY_SERVICE_DIR", str(tmp_path))
+    monkeypatch.setenv("RUIJIE_SERVICE_DIR", str(tmp_path))
     write_service_status("authenticated", "认证成功", interface="iface")
     status = read_service_status()
     assert status is not None

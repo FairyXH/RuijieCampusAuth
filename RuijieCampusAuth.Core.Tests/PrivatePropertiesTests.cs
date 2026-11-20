@@ -17,7 +17,7 @@ public sealed class PrivatePropertiesTests
     }
 
     /// <summary>
-    /// Vector captured live from the HXXY authentication server
+    /// Vector captured live from a campus authentication server
     /// (build/capture/live-auth.pcap, EAP Success frame 17, private block
     /// starting at frame offset 0x16). Every value below was cross-checked
     /// against the original 8021x.exe ParsePrivateProperty (0x537ee0)

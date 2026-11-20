@@ -3,7 +3,7 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "ruijie-campus-auth-hxxy"
+name = "ruijie-campus-auth"
 version = "0.9.0"
 description = "Cross-platform Ruijie-compatible EAP-MD5 campus network supplicant"
 readme = "README.md"

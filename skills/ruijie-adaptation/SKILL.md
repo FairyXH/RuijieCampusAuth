@@ -99,22 +99,23 @@ Unicorn 里跑不通的引擎态函数（GetMACAddr、CEapPEAPThread 内部）�
 tshark -i \Device\NPF_{网卡GUID} -f "ether proto 0x888e" -w capture.pcap
 ```
 
-仓库已有一份 HXXY 实测：`build/capture/live-auth.pcap`（EAP-Success 的
+仓库已有一份实网抓包：`build/capture/live-auth.pcap`（EAP-Success 的
 分段私有属性块 + 两份 569 字节私有尾，C# 重建 569/569 字节一致）。
 解析 pcapng 用 Python `struct` 直接走 EPB，不要依赖 tshark 文本导出。
 
 ## 阶段 4：编写学校配置档案（JSON）
 
-模板与字段权威文档：`profiles/README.md`。最小档案：
+模板与字段权威文档：`profiles/README.md`。以下为通用占位示例，不包含
+任何学校的实际域名、代码或标识：
 
 ```json
 {
-  "name": "某某学院",
-  "school_code": "HPVTC",
+  "name": "<学校名称>",
+  "school_code": "<school-code>",
   "auth_mode": "EAPMD5",
-  "service_name": "电信宽带服务",
-  "static_id": "Static:AB45A862",
-  "self_service_url": "http://netss.hxxy.edu.cn/selfservice/",
+  "service_name": "<service-name>",
+  "static_id": "<static-id>",
+  "self_service_url": "http://<school-domain>/selfservice/",
   "update_url": "http://update.rghall.com.cn/das/update",
   "portal_url": "",
   "sam_host": "",

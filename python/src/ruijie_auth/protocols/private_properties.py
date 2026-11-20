@@ -1,7 +1,7 @@
 """Server private-property parser (mirrors Core.Protocols.PrivateProperties).
 
 The wire format is the *original sectioned* layout recovered from
-8021x.exe ParsePrivateProperty (0x537EE0) and verified against a live HXXY
+8021x.exe ParsePrivateProperty (0x537EE0) and verified against a live campus
 capture:
 
   [1311][2B len][GBK message]                        section 1
