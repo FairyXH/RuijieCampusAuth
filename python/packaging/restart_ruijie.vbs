@@ -4,7 +4,9 @@
 '   1. takeover.ini enabled=1
 '   2. takeover.ini modified within HEARTBEAT_MAX_AGE seconds
 '   3. the PID recorded in takeover.ini is running as RuijieCampusAuth.exe
-'   4. IFEO marker HXXYTakeover=RuijieCampusAuth exists in the 64- or 32-bit view
+'      or RuijieCampusAuth.Service.exe
+'   4. IFEO marker RuijieTakeover=RuijieCampusAuth (or the legacy
+'      HXXYTakeover value) exists in the 64- or 32-bit view
 '
 ' Otherwise the launcher restores any stale policy, kills 8021x.exe and starts
 ' the original RuijieSupplicant.exe (the previous behavior).
@@ -16,7 +18,8 @@ Const TAKEOVER_EXE = "D:\Storageredirect\Program\RuijieCampusAuth\RuijieCampusAu
 Const ORIGINAL_EXE = "C:\Program Files\Ruijie Networks\Ruijie Supplicant\RuijieSupplicant.exe"
 Const ORIGINAL_DIR = "C:\Program Files\Ruijie Networks\Ruijie Supplicant"
 Const IFEO_KEY = "HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Image File Execution Options\8021x.exe"
-Const MARKER_NAME = "HXXYTakeover"
+Const MARKER_NAME = "RuijieTakeover"
+Const LEGACY_MARKER_NAME = "HXXYTakeover"
 Const MARKER_VALUE = "RuijieCampusAuth"
 Const TAKEOVER_PROCESS = "RuijieCampusAuth.exe"
 Const SERVICE_PROCESS = "RuijieCampusAuth.Service.exe"
@@ -215,16 +218,19 @@ Function IfeoKeyFor(name)
 End Function
 
 Function MarkerForName(name)
-    ' 8021x.exe is 32-bit: check the 32-bit view first, then 64-bit.
+    ' Check current and legacy markers in both registry views. The service
+    ' writes RuijieTakeover; older builds wrote HXXYTakeover.
     MarkerForName = IfeoValueHas(True, name, MARKER_NAME, MARKER_VALUE) _
-        Or IfeoValueHas(False, name, MARKER_NAME, MARKER_VALUE)
+        Or IfeoValueHas(False, name, MARKER_NAME, MARKER_VALUE) _
+        Or IfeoValueHas(True, name, LEGACY_MARKER_NAME, MARKER_VALUE) _
+        Or IfeoValueHas(False, name, LEGACY_MARKER_NAME, MARKER_VALUE)
 End Function
 
 Function MarkerPresent()
     MarkerPresent = MarkerForName("8021x.exe")
 End Function
 
-' Older builds wrote only the Debugger value, without HXXYTakeover.
+' Older builds wrote only the Debugger value, without a takeover marker.
 ' Treat that as a stale policy so the transition cannot leave 8021x blocked.
 Function LegacyDebuggerForName(name)
     LegacyDebuggerForName = IfeoValueHas(True, name, "Debugger", "cmd.exe") _
@@ -277,6 +283,7 @@ Sub ClearIfeoPolicy()
     For Each name In names
         If MarkerForName(name) Then
             DeleteIfeoValue name, MARKER_NAME
+            DeleteIfeoValue name, LEGACY_MARKER_NAME
             DeleteIfeoValue name, "Debugger"
         ElseIf LegacyDebuggerForName(name) Then
             DeleteIfeoValue name, "Debugger"
