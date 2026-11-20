@@ -304,3 +304,7 @@ sh scripts/build-image.sh    # 生成整机固件（默认 R3G Image Builder）
 | [docs/FROZEN_DEPLOYMENT.md](docs/FROZEN_DEPLOYMENT.md) | 部署、升级与运行环境记录 |
 | [skills/ruijie-adaptation/SKILL.md](skills/ruijie-adaptation/SKILL.md) | Agent 端到端适配作业手册 |
 | [tools/re_diff/README.md](tools/re_diff/README.md) | Unicorn 直调原版函数差分工具的使用 |
+
+## 10. 许可证
+
+本项目采用 MIT 许可证，详见 [LICENSE](LICENSE)。
