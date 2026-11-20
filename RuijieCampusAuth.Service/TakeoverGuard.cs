@@ -165,6 +165,12 @@ public sealed class TakeoverGuard
         }
         foreach (var name in services.GetSubKeyNames())
         {
+            // Never block our own service.
+            if (name.Equals(ServiceInstaller.ServiceName, StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("HXXY-CampusAuth", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
             using var key = services.OpenSubKey(name);
             if (key is null)
             {
