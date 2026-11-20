@@ -207,7 +207,30 @@ Deep Freeze：
   LuCI 页面 200、`lang_zh-cn`、translations 端点全量中文命中。
 - 仓库附带的正式档案已用 C# CLI 与 OpenWrt Go CLI 分别 `profile show`
   验证，并用 Go CLI 导入临时 UCI 配置，应用 13 个字段。
-- 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
+
+### 真实校园网端到端（2026-11-20）
+
+- **Ubuntu 桥接**：VMware 改为桥接后，Ubuntu `ens33`（`172.18.28.21/17`）
+  作为真实 802.1X 客户端。Go 守护进程与最终 C# 0.9.1 tar 包分别完成
+  EAP-MD5 认证，服务器 `00:1a:a9:17:ff:ff`，收到私有属性
+  `INDICATE_PORT=53`、`INDICATE_SERV_IP=2887125761`、
+  `MSG_CLIENT_PORT=138` 与欢迎消息；C# CLI 输出 `认证成功` /
+  `RESULT SUCCESS`。
+- **OpenWrt 桥接**：x86_64 QEMU 使用 `macvtap0`（挂在 `ens33`）获得
+  `172.18.28.23/17`，`ruijie-auth 0.9.0` 在 `br-lan` 上完成真实
+  EAP-MD5 认证；LuCI 登录 200，概览/账号/档案/设置四页均渲染，
+  运行时中文目录 79,255 字节且包含“锐捷认证器”。
+- **C# Linux 崩溃修复**：`struct pcap_pkthdr` 的 `timeval` 在 64 位
+  Unix 为 16 字节，旧代码按 Windows 8 字节布局读取 `caplen`，导致
+  `pcap-reader` 越界复制并崩溃。现按平台取偏移（Windows 8 / 64 位
+  Unix 16 / 32 位 Unix 8），提交 `d45e671`。
+- **账号单会话限制**：同一账号在 OpenWrt、Ubuntu、Windows 多端同时
+  认证时，后认证端会顶掉先认证端；表现为“服务器未返回可读原因”。
+  测试必须先在旧客户端执行 Logoff，或等待会话释放。
+- **发布**：`v0.9.0` 已发布；因 Linux 包早于上述修复，补发
+  `v0.9.1`（Windows/Linux 重新构建，OpenWrt ipk 代码未变，继续使用
+  0.9.0 包）。
+- 仍未验证：真实 RADIUS 上的 PEAP/EAP-TLS。
 
 ## 8. 已知问题 / 限制
 
@@ -228,6 +251,8 @@ Deep Freeze：
    依赖 TLS 引擎状态，无法零状态直调，未做二进制差分。
 10. C# 缺 MSCHAPv2 AuthenticatorResponse（S=）校验（服务端 Success
     消息验证）——待补。
+11. 校园账号通常只允许一个在线会话；同一账号在多台设备同时认证会
+    互相顶下线。交叉测试前必须让旧客户端 Logoff。
 
 ## 9. 安全/运维注意
 
@@ -265,7 +290,8 @@ Deep Freeze：
 - 远端：`origin https://github.com/FairyXH/RuijieCampusAuth.git`
 - 当前 HEAD 以 `git log` 为准。
 - 主要节点：OpenWrt 认证链复核与三份真实尾包向量；README 论文式重写与
-  全文档索引；仓库路径迁移；文档与 Python 包去校名化。
+  全文档索引；仓库路径迁移；文档与 Python 包去校名化；真实桥接端到端
+  认证与 `v0.9.1` 修复发布。
 
 仓库已从旧路径迁移到
 `D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变；
@@ -281,10 +307,12 @@ Deep Freeze：
    `SamDirectClient` 报文编解码。
 4. 补 MSCHAPv2 AuthenticatorResponse（S=）校验。
 5. 部署新构建：停旧服务/GUI → 复制到 D: → `service install`（迁移服务名）。
-6. OpenWrt 现场验证：刷入 R3G 镜像，导入学校档案，确认概览页
-   properties 与桌面版一致；PEAP 学校补一次隧道抓包。
+6. OpenWrt 现场验证：R3G 实机刷入镜像，导入学校档案；x86_64 QEMU
+   桥接真实校园网已完成认证与 LuCI 验证，PEAP 学校补一次隧道抓包。
 7. Python 服务宿主打包（`python/build.ps1` + PyInstaller）与 Linux systemd
    包装待实机验证。
+8. 发布 `v0.9.1` 修复包（Windows/Linux 重建；OpenWrt ipk 复用 0.9.0），
+   核对 release 资产 SHA256 与安装说明。
 
 差分校对工具链：`tools/re_diff/full_diff.py`（Unicorn 直调原版）+
 `tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
