@@ -263,14 +263,9 @@ Deep Freeze：
 - 分支：仅 `main`（本地与远端一致，临时特性分支已合并并删除）
 - 默认分支：`main`
 - 远端：`origin https://github.com/FairyXH/RuijieCampusAuth.git`
-- 最近提交：
-
-```
-docs: sync paths and context after repository migration
-aa32fdd Update
-38d257b feat: complete OpenWrt auth-chain audit and project index
-99c911a fix: TakeoverGuard excludes own service; VBS uses in-process StdRegProv
-```
+- 当前 HEAD 以 `git log` 为准。
+- 主要节点：OpenWrt 认证链复核与三份真实尾包向量；README 论文式重写与
+  全文档索引；仓库路径迁移；文档与 Python 包去校名化。
 
 仓库已从旧路径迁移到
 `D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变；
