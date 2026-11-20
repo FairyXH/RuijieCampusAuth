@@ -2,9 +2,14 @@
 
 日期：2026-11-18
 
+> **历史文档**：本文是移植前的可行性评估，保留当时对 `hxxy-auth`、UA3F、
+> https-dns-proxy、full-buildroot 等方案的权衡记录。最终实现已改为
+> `ruijie-auth` 纯用户态方案，移除 UA3F/DoH 依赖；当前架构、包名与验证
+> 结果见 `docs/OPENWRT_PORT.md` 与 `openwrt/README.md`。
+
 范围：`RuijieCampusAuth.Core`、`.Service`、`.Cli`、`.App` 与 `python/` 参考实现。
 
-目标：在 OpenWrt 软路由上完成 HXXY 校园网 802.1X 认证，并保留账号池、失败切换、
+目标：在 OpenWrt 软路由上完成锐捷校园网 802.1X 认证，并保留账号池、失败切换、
 服务器学习/锁定、发现缓存、状态/日志、家庭网络暂停等管理能力。
 
 ## 0. R3G 专项复核（2026-11-18）

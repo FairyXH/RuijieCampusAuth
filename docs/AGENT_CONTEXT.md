@@ -3,17 +3,25 @@
 > 跨会话交接文档。描述项目当前状态、架构、验证结果与下一步，不记录完整对话历史。
 > 最后更新：2026-11-20
 
+## 0. 仓库位置
+
+- 源码仓库：`D:\Files\Develop\Cross-Platform\RuijieCampusAuth`
+- 旧路径 `D:\Files\Develop\HXXY\ruijie-campus-auth-hxxy` 已废弃，文档与工具中的
+  旧路径引用已同步更新。
+- 部署目录仍为 `D:\Storageredirect\Program\RuijieCampusAuth`；源码迁移不影响
+  已安装的 Windows 服务。
+
 ## 1. 项目是什么
 
 通用的锐捷校园网第三方认证客户端（“锐捷认证器 / 锐捷校园网开放认证器”）。
 使用官方协议做兼容认证，不依赖官方进程；学校差异通过 `profiles/*.json` 导入。
-默认不内置任何学校配置。
+软件本体不写死学校参数；仓库附带 `profiles/厦门华厦学院.json` 正式档案。
 
-两套实现：
+三套实现：
 
 - **根目录 C# / .NET 10**：Core + CLI + Windows 服务/Linux systemd + Avalonia GUI。
 - **`python/`**：完整协议转译 + 数字菜单 CLI，无 GUI；协议模块与 C# 一一
-  对应，`pytest` 59 项通过。
+  对应，`pytest` 60 项通过。
 - **`openwrt/`**：Go 守护进程 + LuCI（2026-11-20 完成移植，见
   `docs/OPENWRT_PORT.md`）。
 
@@ -43,8 +51,9 @@ RuijieCampusAuth.Core/       协议、私有尾、EAPOL、PEAP/TLS、配置、�
 RuijieCampusAuth.Service/    AuthWorker, Guardian, Takeover, DebugPipeServer
 RuijieCampusAuth.App/        Avalonia GUI：账号/认证/服务器/服务/设置/档案/调试
 RuijieCampusAuth.Cli/        auth/config/service/debug/profile
-RuijieCampusAuth.Core.Tests/ 44 tests
-RuijieCampusAuth.Service.Tests/ 管道集成测试
+RuijieCampusAuth.Core.Tests/ 65 tests
+RuijieCampusAuth.App.Tests/  34 tests
+RuijieCampusAuth.Service.Tests/ 管道集成测试（需先停止运行中的服务）
 profiles/                    学校档案（厦门华厦学院.json 为正式档案）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
@@ -62,7 +71,10 @@ dotnet test RuijieCampusAuth.Service.Tests -c Release
 
 - SDK：.NET 10.0.302。
 - 发布：`build-csharp.ps1 -Runtime win-x64`（framework-dependent）。
-- 测试：Core 44 通过（含 9 个原版二进制差分向量）；Service 管道 1 通过。
+- 测试：Core 65 通过（含原版二进制差分向量）；App 34 通过；Python 60 通过。
+- Service 管道测试会占用全局命名管道 `RuijieCampusAuth-Debug`。本机有
+  运行中的 `RuijieCampusAuth.Service` 时，测试客户端会连到真实服务，
+  `DebugPipeTests` 可能误报；跑该测试前先 `Stop-Service RuijieCampusAuth`。
 
 ## 4. 部署与数据目录
 
@@ -81,9 +93,8 @@ dotnet test RuijieCampusAuth.Service.Tests -c Release
 
 Windows 服务：
 
-- 新代码服务名：`RuijieCampusAuth`。
-- 已部署的旧服务仍是 `HXXY-CampusAuth`；**重新 `service install` 后才会迁移**
-  （安装时会删除旧服务）。
+- 服务名：`RuijieCampusAuth`（显示名 `Ruijie Auth`）。
+- 已部署服务与进程位于 `D:\Storageredirect\Program\RuijieCampusAuth`。
 - LocalSystem，自动启动，`depend=npcap`，SCM 恢复 5s/10s/30s。
 - Linux unit：`ruijie-campus-auth.service`。
 
@@ -193,9 +204,11 @@ Deep Freeze：
   标题和 8 个页面全部命中，含账号池/WAN 多选/自检三条长说明。CLI 的
   `selftest`、`status`、`interfaces`、`accounts` 与日志级别标签也已中文化。
 - x86_64 OpenWrt QEMU 冒烟：`selftest` 通过；`interfaces` 将 br-lan 标为
-  WAN；daemon 在 br-lan 上完成 Logoff→4×Start→paused；`profile import`
-  写入 8 字段并生成 backup，reload 后状态显示 profile；LuCI 页面 200、
-  `lang_zh-cn`、translations 端点全量中文命中。
+  WAN；daemon 在 br-lan 上完成 Logoff→4×Start→paused；QEMU 演示档案
+  `profile import` 写入 8 字段并生成 backup，reload 后状态显示 profile；
+  LuCI 页面 200、`lang_zh-cn`、translations 端点全量中文命中。
+- 正式档案 `profiles/厦门华厦学院.json` 已用 C# CLI 与 OpenWrt Go CLI
+  分别 `profile show` 验证，并用 Go CLI 导入临时 UCI 配置，应用 13 个字段。
 - 未验证：真实校园网 WAN 上的端到端认证、真实 RADIUS 上的 PEAP。
 
 ## 8. 已知问题 / 限制
@@ -211,7 +224,8 @@ Deep Freeze：
 6. 原版 GetClientVersion/GetMACAddr/GetIPv4Info 需要设备/全局版本状态，
    Unicorn 无法构造（GetServiceName/GetDHCPAuthPhase 已差分）。
 7. GUI 单实例互斥锁：若生产 GUI 在运行，开发构建会静默退出（正常）。
-8. 新服务名尚未部署；当前机器仍运行旧 `HXXY-CampusAuth` 服务与旧二进制。
+8. 服务已以 `RuijieCampusAuth` 名称运行；若重新构建部署，仍按
+   “停服务/GUI → 复制 → `service install`”流程执行。
 9. MSCHAPv2：C# 通过 RFC 2759 官方向量；原版 CEapPEAPThread 内部函数
    依赖 TLS 引擎状态，无法零状态直调，未做二进制差分。
 10. C# 缺 MSCHAPv2 AuthenticatorResponse（S=）校验（服务端 Success
@@ -239,30 +253,29 @@ Deep Freeze：
 | `docs/protocols/*.md` | 各协议证据、字段、实现、未知项 |
 | `docs/OFFICIAL_CLIENT_FEATURE_MATRIX.md` | 功能矩阵与落位 |
 | `docs/OPENWRT_PORT.md` | C# → OpenWrt 移植对照与验证 |
-| `docs/FROZEN_DEPLOYMENT.md` | 冻结环境部署历史 |
-| `profiles/README.md` | 档案字段与导入 |
+| `docs/OPENWRT_BUILD_ENV.md` | OpenWrt 构建、镜像与 QEMU 测试记录 |
+| `docs/OPENWRT_FEASIBILITY.md` | OpenWrt 早期可行性评估（历史决策记录） |
+| `docs/protocols/README.md` | 逐协议档案索引 |
+| `docs/FROZEN_DEPLOYMENT.md` | 部署、升级与运行环境记录 |
+| `profiles/README.md` | 档案字段、正式档案与导入 |
+| `tools/re_diff/README.md` | Unicorn 原版函数差分工具 |
 
 ## 11. Git
 
 - 分支：`feat/debug-protocols`
+- 远端：`origin https://github.com/FairyXH/RuijieCampusAuth.git`
 - 最近提交：
 
 ```
-dc7f363 docs: record the OpenWrt port mapping and verification
-f624c36 feat: rebuild LuCI for the authenticator with a zh-cn catalog
-56fa153 feat: port the C# protocol core to the OpenWrt daemon
-4ea64d1 test: verify C# algorithms against original binary functions
-11efd64 feat: add multi-profile GUI switching and adaptation guide
-df1723c feat: add wireless profiles, SAM probe, and upgrade check
-8c513dd feat: add PEAP and EAP-TLS transport with phase2
-5e91881 feat: implement MSCHAPv2 and EAP TLS stream bridge
-22eee8b feat: add portal, client center, self-service, and message features
-77ae8d3 feat: add diagnostics debug features
-0054921 feat: add Windows DHCP control debug feature
-d641329 feat: parse server private properties and honor reauth interval
-ce6e31d refactor: genericize product defaults and add school profiles
-a8e8b91 feat: add debug feature framework, service pipe, and debug page
+aa32fdd Update
+38d257b feat: complete OpenWrt auth-chain audit and project index
+99c911a fix: TakeoverGuard excludes own service; VBS uses in-process StdRegProv
+3d9404b docs: add C#, Python and OpenWrt operation manuals
 ```
+
+仓库从 `D:\Files\Develop\HXXY\ruijie-campus-auth-hxxy` 迁移到
+`D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变。
+当前工作区为文档路径/命名同步，提交后以 `git log` 为准。
 
 ## 12. 下一步
 

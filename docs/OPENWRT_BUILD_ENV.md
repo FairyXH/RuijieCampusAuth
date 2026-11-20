@@ -2,6 +2,12 @@
 
 日期：2026-11-18
 
+> **状态说明（2026-11-20）**：本文保留 2026-11-18/19 的早期
+> `hxxy-auth` 原型构建环境与踩坑记录。当前实现已改名为 `ruijie-auth`，
+> 构建脚本、包名、产物与 LuCI 路径以 `openwrt/README.md`、
+> `docs/MANUAL_OPENWRT.md`、`docs/OPENWRT_PORT.md` 为准；下文出现旧包名
+> 的位置属于历史记录，不是当前命令。
+
 主机：Ubuntu 26.04.1 LTS（VMware），8 vCPU，7.2GB RAM，约 30GB 可用。
 本文只记录环境与命令，不保存任何登录凭据。
 
@@ -11,7 +17,7 @@
 - **Windows 实体机只做编辑、提交、推送**；不装 Go，不跑 Image Builder。
 - **Ubuntu VM 只做编译、测试、组镜像**：
   ```sh
-  cd ~/src/ruijie-campus-auth-hxxy/openwrt
+  cd ~/src/RuijieCampusAuth/openwrt   # 按实际 clone 目录调整
   sh scripts/build-go.sh
   sh scripts/build-image.sh
   ```
