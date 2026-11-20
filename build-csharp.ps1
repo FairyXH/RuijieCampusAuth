@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$Runtime = "win-x64",
+    [string]$Version = "0.9.0",
+    [switch]$SelfContained,
     [switch]$Deploy,
     [string]$DeployDir = "D:\Storageredirect\Program\RuijieCampusAuth"
 )
@@ -9,6 +11,11 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 New-Item -ItemType Directory -Force -Path logs | Out-Null
 
+# Keep MSBuild from leaving a persistent compiler/server node. Start-Process
+# -Wait can otherwise block on that child process long after publish finishes.
+$env:DOTNET_CLI_USE_MSBUILD_SERVER = "0"
+$env:MSBUILDDISABLENODEREUSE = "1"
+
 function Invoke-Native {
     param(
         [string]$FilePath,
@@ -16,15 +23,18 @@ function Invoke-Native {
         [string]$OutLog,
         [string]$ErrLog
     )
-    $process = Start-Process -FilePath $FilePath -ArgumentList $Arguments `
-        -Wait -PassThru -NoNewWindow `
-        -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog
-    return $process.ExitCode
+    Remove-Item $OutLog, $ErrLog -Force -ErrorAction SilentlyContinue
+    $stdout = & $FilePath @Arguments 2> $ErrLog
+    $stdout | Out-File -FilePath $OutLog -Encoding utf8
+    return $LASTEXITCODE
 }
 
 $publishDir = Join-Path $PSScriptRoot "publish\$Runtime"
 Remove-Item $publishDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+
+$selfContainedValue = if ($SelfContained) { "true" } else { "false" }
+$assemblyVersion = "$Version.0"
 
 $projects = @(
     "RuijieCampusAuth.Service\RuijieCampusAuth.Service.csproj",
@@ -38,9 +48,13 @@ foreach ($project in $projects) {
         "publish", $project,
         "-c", "Release",
         "-r", $Runtime,
-        "--self-contained", "false",
+        "--self-contained", $selfContainedValue,
         "-o", $publishDir,
-        "--nologo"
+        "--nologo",
+        "-p:UseSharedCompilation=false",
+        "-p", "Version=$Version",
+        "-p", "AssemblyVersion=$assemblyVersion",
+        "-p", "FileVersion=$assemblyVersion"
     ) "logs\publish.out.log" "logs\publish.err.log"
     if ($code -ne 0) {
         Get-Content "logs\publish.out.log" -Tail 100
