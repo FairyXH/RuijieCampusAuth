@@ -5,6 +5,13 @@ using RuijieCampusAuth.Core;
 using RuijieCampusAuth.Core.Debug;
 
 Console.OutputEncoding = Encoding.UTF8;
+
+if (args.Any(arg => arg is "--help" or "-h" or "help"))
+{
+    ConfigStore.PrintUsage();
+    return 0;
+}
+
 UserStore.MigrateLegacy(ServiceConfig.ServiceRoot);
 new UserStore(ServiceConfig.ServiceRoot).UpgradePasswordProtection();
 
@@ -512,17 +519,59 @@ internal static class ConfigStore
 
     private static string Decrypt(string encrypted)
     {
-        if (encrypted.StartsWith("dpapi:", StringComparison.Ordinal))
+        try
         {
-            var raw = Convert.FromBase64String(encrypted[6..]);
-            var plain = ProtectedData.Unprotect(raw, null, DataProtectionScope.CurrentUser);
-            return Encoding.UTF8.GetString(plain);
+            if (encrypted.StartsWith("machine-dpapi:", StringComparison.Ordinal))
+            {
+                var raw = Convert.FromBase64String(
+                    encrypted["machine-dpapi:".Length..]);
+                var plain = ProtectedData.Unprotect(
+                    raw, null, DataProtectionScope.LocalMachine);
+                return Encoding.UTF8.GetString(plain);
+            }
+            if (encrypted.StartsWith("dpapi:", StringComparison.Ordinal))
+            {
+                var raw = Convert.FromBase64String(encrypted[6..]);
+                var plain = ProtectedData.Unprotect(
+                    raw, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(plain);
+            }
+            if (encrypted.StartsWith("plain:", StringComparison.Ordinal))
+            {
+                return Encoding.UTF8.GetString(Convert.FromBase64String(encrypted[6..]));
+            }
+            return encrypted;
         }
-        if (encrypted.StartsWith("plain:", StringComparison.Ordinal))
+        catch (Exception ex) when (ex is CryptographicException or FormatException)
         {
-            return Encoding.UTF8.GetString(Convert.FromBase64String(encrypted[6..]));
+            throw new InvalidOperationException(
+                "无法解密账号密码；请在 GUI 中重新保存该账号，" +
+                "或运行时显式传入 --username/--password", ex);
         }
-        return encrypted;
+    }
+
+    public static void PrintUsage()
+    {
+        Console.WriteLine(
+            """
+            用法: RuijieCampusAuth.Cli <command> [options]
+
+            命令:
+              status                         查看服务状态
+              auth                           用当前设置执行一次认证
+              service install|uninstall|start|stop|status
+                                             管理 Windows 服务
+              config init|show|path|takeover on|off
+                                             管理 service.json
+              profile list|show|import       管理学校配置档案
+              debug list|status|run|...      调试功能
+              --list-devices                 列出 Npcap 网卡
+
+            常用选项:
+              --interface <name> --username <user> --password <pass>
+              --service-name <name> --static-id <id> --server <mac>
+              --timeout <s> --retries <n> --repeats <n>
+            """);
     }
 
     private static string? GetString(JsonElement element, string name)
