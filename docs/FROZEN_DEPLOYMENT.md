@@ -211,6 +211,17 @@ Get-Content "D:\Storageredirect\Program\RuijieCampusAuth\logs\service.log" -Tail
 - `restore incomplete; clearing IFEO directly`：VBS 兜底清理 IFEO。
 - `launching original supplicant`：VBS 判定接管不健康，已走原版回退。
 
+### 认证成功但网络管家报离线
+
+如果 WLAN 与校园网卡同时在线，WLAN 可能成为默认出口。NetworkGuardian
+的 Npcap 原始探测跟随默认路由，会对非默认校园网卡误报离线，服务旧逻辑
+会每约 15 秒 DHCP + Logoff + 重认证。
+
+当前服务在 Guardian 报离线达到阈值后，会用认证网卡源 IP 对
+`connectivity_url` 做 TCP 复核；复核成功则保持认证会话，失败才重认证。
+若希望 NetworkGuardian 自身也显示在线，可让校园网卡成为默认出口，或为
+其探测目标添加经校园网卡的静态 `/32` 路由。
+
 ### 家庭网络下服务状态为 paused
 
 这是预期行为：没有收到认证服务器响应，但 Guardian/TCP 检测到外网在线。
