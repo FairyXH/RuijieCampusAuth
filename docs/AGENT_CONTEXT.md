@@ -262,20 +262,22 @@ Deep Freeze：
 
 ## 11. Git
 
-- 分支：`feat/debug-protocols`
+- 分支：仅 `main`（本地与远端一致，临时特性分支已合并并删除）
+- 默认分支：`main`
 - 远端：`origin https://github.com/FairyXH/RuijieCampusAuth.git`
 - 最近提交：
 
 ```
+docs: sync paths and context after repository migration
 aa32fdd Update
 38d257b feat: complete OpenWrt auth-chain audit and project index
 99c911a fix: TakeoverGuard excludes own service; VBS uses in-process StdRegProv
-3d9404b docs: add C#, Python and OpenWrt operation manuals
 ```
 
 仓库从 `D:\Files\Develop\HXXY\ruijie-campus-auth-hxxy` 迁移到
-`D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变。
-当前工作区为文档路径/命名同步，提交后以 `git log` 为准。
+`D:\Files\Develop\Cross-Platform\RuijieCampusAuth`，源码内容与远端历史不变；
+`feat/debug-protocols`、`feat/openwrt-r3g`、`feat/ruijie-private-tail`
+已并入 `main` 并删除。
 
 ## 12. 下一步
 
