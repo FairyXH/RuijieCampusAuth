@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$Runtime = "win-x64",
-    [string]$Version = "0.9.0",
+    [string]$Version = "0.9.1",
     [switch]$SelfContained,
     [switch]$Deploy,
     [string]$DeployDir = "D:\Storageredirect\Program\RuijieCampusAuth"

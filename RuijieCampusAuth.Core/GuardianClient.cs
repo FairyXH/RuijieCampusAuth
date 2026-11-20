@@ -163,7 +163,7 @@ public sealed class GuardianClient : IDisposable
                 {
                     protocolVersion = ProtocolVersion,
                     capabilities = new { },
-                    clientInfo = new { name = "ruijie-campus-auth", version = "0.9.0" },
+                    clientInfo = new { name = "ruijie-campus-auth", version = "0.9.1" },
                 },
                 cancellationToken);
             _initialized = true;
