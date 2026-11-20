@@ -4,15 +4,6 @@ using System.Text;
 
 namespace RuijieCampusAuth.Core;
 
-[StructLayout(LayoutKind.Sequential)]
-public struct PcapPacketHeader
-{
-    public int TsSec;
-    public int TsUsec;
-    public uint Caplen;
-    public uint Len;
-}
-
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi)]
 public struct PcapIf
 {
@@ -162,12 +153,18 @@ public sealed class PcapDevice : IDisposable
             {
                 break;
             }
-            var header = Marshal.PtrToStructure<PcapPacketHeader>(headerPointer);
-            if (header.Caplen == 0 || dataPointer == IntPtr.Zero)
+            // struct pcap_pkthdr starts with struct timeval, whose width
+            // differs by platform: 4-byte long on Windows, 8-byte time_t on
+            // 64-bit Unix. Reading it as a fixed 4-byte struct corrupts
+            // caplen on Linux and leads to an out-of-bounds Marshal.Copy.
+            var caplen = (uint)Marshal.ReadInt32(
+                headerPointer,
+                PacketLengthOffset());
+            if (caplen == 0 || dataPointer == IntPtr.Zero)
             {
                 continue;
             }
-            var packet = new byte[header.Caplen];
+            var packet = new byte[caplen];
             Marshal.Copy(dataPointer, packet, 0, packet.Length);
             try
             {
@@ -178,6 +175,15 @@ public sealed class PcapDevice : IDisposable
                 // A subscriber must never kill the receive loop.
             }
         }
+    }
+
+    private static int PacketLengthOffset()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return 8; // two 4-byte longs
+        }
+        return IntPtr.Size == 8 ? 16 : 8; // timeval: time_t + suseconds_t
     }
 
     public void Send(byte[] frame)
