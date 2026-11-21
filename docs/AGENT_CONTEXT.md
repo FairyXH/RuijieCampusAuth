@@ -216,10 +216,10 @@ Deep Freeze：
   luci-compat；UA3F 3.7.0 通过 FILES 内置（`/usr/bin/ua3f`），
   `ruijie-disguise` 默认 `full`，UA3F S98 → disguise S99。DoH 使用自定义
   AdGuardHome 端点；外网探测为 TCP 53 四目标 + HTTP 204 回退。
-- R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
+- （历史，2026-11-20 构建）R3G 整机镜像：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
-  已在 squashfs 内逐项核对。
+  已在 squashfs 内逐项核对。当前产物以本文件上方的最终构建为准。
 - 产物整理到 `dist/openwrt/`（gitignored）：ipk、sysupgrade、Breed
   镜像、kernel1/rootfs0、manifest、mipsle/amd64 daemon、zh-cn lmo、
   `SHA256SUMS.txt`、`BUILD_INFO.txt`。刷机包

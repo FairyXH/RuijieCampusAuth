@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${OUT_DIR:-"$ROOT/build"}
 GOARCH=${GOARCH:-mipsle}
-VERSION=${VERSION:-0.1.0}
+VERSION=${VERSION:-0.9.0}
 MODULE=ruijie-auth
 COMMIT=$(git -C "$ROOT/.." rev-parse --short HEAD 2>/dev/null || echo dev)
 

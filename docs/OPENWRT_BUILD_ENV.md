@@ -2,11 +2,11 @@
 
 日期：2026-11-18
 
-> **状态说明（2026-11-20）**：本文保留 2026-11-18/19 的早期原型构建
-> 环境与踩坑记录。文中的包名与路径已按当前命名统一为 `ruijie-auth`；
-> 构建脚本、产物与 LuCI 路径以 `openwrt/README.md`、
-> `docs/MANUAL_OPENWRT.md`、`docs/OPENWRT_PORT.md` 为准。数值与大小
-> 来自当时构建，不代表当前版本。
+> **状态说明（2026-11-21 更新）**：本文保留 2026-11-18/19 的早期原型构建
+> 环境与踩坑记录。当前最终构建以 `dist/openwrt/BUILD_INFO.txt` 为准：
+> UA3F 3.7.0（IPID off + nft `ip id set 0`）、自定义 AdGuardHome DoH、
+> Vantage 主题 + app、TCP 53 四目标 + HTTP 204 探测、logs2。
+> 下面的数值若与 BUILD_INFO 冲突，以 BUILD_INFO 为准。
 
 主机：Ubuntu 26.04.1 LTS（VMware），8 vCPU，7.2GB RAM，约 30GB 可用。
 本文只记录环境与命令，不保存任何登录凭据。
@@ -114,26 +114,29 @@ sh scripts/build-image.sh
 - SHA256 `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`
 - `kernel1.bin` 3.1MB，SHA256
   `f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a`
-- `rootfs0.bin` 12MB，SHA256
-  `4aa9a27d571e71f11fba704b1d81fbc71aeda43d3f26986bdba84a76d99f1255`
-- 插件 ipk：`openwrt/build/ipk/ruijie-auth_0.1.0_mipsel_24kc.ipk`
-  （1.4MB，外层 tar.gz 格式）
-- rootfs squashfs 约 10MB（UA3F 17MB 压缩后 + 其他包）
+- `rootfs0.bin` 12,976,128 字节，SHA256
+  `778ef9b99f185b7675fa406f016b96f7e37050b0503b50a0c6451ab6a51e9792`
+- 插件 ipk：`ruijie-auth_0.9.0_mipsel_24kc.ipk`（2,742,009 字节，
+  外层 tar.gz 格式）
+- rootfs squashfs 11,621,376 字节（UA3F 17MB 压缩后 + 其他包）
 - `root.squashfs` 已确认包含：
-  - `/usr/sbin/ruijie-auth`（3.9MB，mipsle 静态，opkg 所有）
+  - `/usr/sbin/ruijie-auth`（约 7.6MB，mipsle 静态，含 HTTP 探测）
   - `/usr/bin/ua3f`（17MB，mipsle musl 动态，UA3F 3.7.0）
-  - `/etc/config/ua3f`（NFQUEUE，L3 开，UA 改写关）
+  - `/etc/config/ua3f`（NFQUEUE，L3 TTL/TS/window 开，IPID 关，UA 改写关）
   - `/etc/init.d/ua3f`（来自 UA3F ipk）
-  - `/etc/config/https-dns-proxy`（AliDNS + Tencent DoH，IPv4）
+  - `/etc/config/https-dns-proxy`（自定义 AdGuardHome DoH，IPv4）
   - `/etc/init.d/https-dns-proxy`
-  - `/etc/config/ruijie-auth`（`device=wan`、`disguise=full`，0600）
+  - `/etc/config/ruijie-auth`（`device=wan`、`disguise=full`，TCP 53 探测，0600）
   - `/etc/init.d/ruijie-auth`
-  - `/etc/init.d/ruijie-disguise`（nft TTL 128 + MSS 1460）
+  - `/etc/init.d/ruijie-disguise`（nft TTL 128 + MSS 1460 + IPID 0）
   - `/etc/sysctl.d/90-ruijie.conf`
   - `/etc/hotplug.d/iface/90-ruijie-auth`
   - `/etc/hotplug.d/net/90-ruijie-usbwan`（USB 共享自动接管）
   - `/etc/uci-defaults/90-ruijie-auth`（usbwan + firewall zone）
-  - `/etc/rc.d/S20https-dns-proxy`、`S95ruijie-auth`、`S99ruijie-disguise`
+  - `/www/luci-static/resources/view/ruijie-auth/logs2.js`
+  - Vantage theme/app 与中文 lmo
+  - `/etc/rc.d/S20https-dns-proxy`、`S95ruijie-auth`、`S98ua3f`、
+    `S99ruijie-disguise`
   - `/usr/share/luci/menu.d/luci-app-ruijie-auth.json`
   - `/usr/share/rpcd/acl.d/luci-app-ruijie-auth.json`
   - `/www/luci-static/resources/view/ruijie-auth/{overview,accounts,servers,mac,settings,logs}.js`
@@ -194,16 +197,19 @@ cd /opt/openwrt/breed
 
 Breed 里刷到第二个分区，环境变量设
 `autoboot.command = boot flash 0x600000`。工具脚本来自 Windows 时是
-CRLF，Ubuntu 上先 `sed -i 's/\r$//'`。该镜像尚未在真机验证。
+CRLF，Ubuntu 上先 `sed -i 's/\r$//'`。该镜像已在 R3G 真机验证
+（2026-11-21）。
 
 默认配置：
 
-- `disguise=full`：`ruijie-disguise` 应用 nft TTL/MSS，并启动 UA3F L3
-  （TTL 128、IPID 0、删除 TCP timestamp、SYN window 65535）。
+- `disguise=full`：`ruijie-disguise` 应用 nft TTL/MSS/IPID；UA3F 只排队
+  TCP SYN，删除 TCP timestamp / 设置 initial window。
 - UA 改写关闭（`rewrite_mode DIRECT`），不强制改微信/企业微信 UA。
 - sysctl：`ip_default_ttl=128`、`tcp_timestamps=0`、`tcp_ecn=0`、IPv6 关闭。
-- `https-dns-proxy` 默认 AliDNS `dns.alidns.com` + Tencent `doh.pub`，
-  IPv4 bootstrap，`force_dns` 开启。
+- `https-dns-proxy` 使用自定义 AdGuardHome DoH，IPv4 bootstrap，
+  `force_dns` 开启。
+- 外网探测：`connectivity_targets` 四个公共 DNS 的 TCP 53 并行，
+  全部失败再试 `generate_204`；`ruijie-auth probe` 可自检。
 - MAC 页/CLI 可写 `network.wan.macaddr`、`ifup wan` 并 reload daemon。
 - 概览页在无认证服务器且外网在线时显示 `paused`。
 

@@ -52,6 +52,11 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 
 > 上表是**认证器 ipk** 的依赖边界。固件镜像另含 UA3F、https-dns-proxy、
 > 防检测 kmod 和 Vantage 主题，这些是整机功能，不是 ipk 的依赖。
+>
+> 2026-11-21 实测补充：固件内置 UA3F 3.7.0、https-dns-proxy（自定义
+> AdGuardHome DoH）、Vantage 主题 + app；IPID 由 nftables
+> `ip id set 0` 改写，UA3F 只排队 TCP SYN；外网探测为 TCP 53 四目标 +
+> HTTP 204 回退，`ruijie-auth probe` 可自检；日志页为 logs2。
 
 > 只要路由器能跑 OpenWrt 24.10、有可用 WAN 口，就能用。无线中继/AP 模式
 > 不适合 802.1X 有线认证。
@@ -615,7 +620,7 @@ PATH=/opt/openwrt/gnu-bin:$PATH sh scripts/build-image.sh
 ### 12.4 版本号
 
 `VERSION=0.9.0 sh scripts/build-ipk.sh` 覆盖包版本；镜像里的
-`ruijie-auth version` 显示 `build-go.sh` 的 `VERSION`（默认 0.1.0）。
+`ruijie-auth version` 显示 `build-go.sh` 的 `VERSION`（默认 0.9.0）。
 
 ---
 

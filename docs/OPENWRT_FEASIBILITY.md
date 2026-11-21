@@ -418,8 +418,13 @@ config auth 'main'
     option discovery_cache '1'
     option logoff_on_stop '0'
     option pause_on_home '1'
-    option connectivity_url 'http://www.baidu.com/'
-    option disguise 'basic'        # off | basic | full
+    option connectivity_url 'http://connect.rom.miui.com/generate_204'
+    option connectivity_timeout '2'
+    list connectivity_targets '223.5.5.5:53'
+    list connectivity_targets '119.29.29.29:53'
+    list connectivity_targets '180.76.76.76:53'
+    list connectivity_targets '114.114.114.114:53'
+    option disguise 'full'          # off | basic | full
     option log_level 'info'
 
 config account 'a1'

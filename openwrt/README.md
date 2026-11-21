@@ -109,6 +109,7 @@ ruijie-auth version
 ruijie-auth daemon
 ruijie-auth status [--json]
 ruijie-auth log [--lines N]
+ruijie-auth probe
 ruijie-auth auth|logoff|pause|resume|reload
 ruijie-auth accounts [--json]
 ruijie-auth servers list|lock|unlock|remove|rename
