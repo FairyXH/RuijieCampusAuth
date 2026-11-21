@@ -1,0 +1,10 @@
+#!/bin/sh
+
+# OpenClash's own first-boot restore copies /tmp/openclash into /etc/openclash.
+# On this image the 61MB mihomo core and 11MB GeoSite already live in the
+# read-only rootfs; copying them up into the overlay wastes the entire data
+# partition. Drop just those large files from the restore source before
+# luci-openclash runs.
+rm -rf /tmp/openclash/core /tmp/openclash/GeoSite.dat
+
+exit 0

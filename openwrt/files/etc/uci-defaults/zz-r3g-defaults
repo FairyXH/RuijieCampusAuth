@@ -37,6 +37,14 @@ if [ -f /etc/config/ruijie-auth ]; then
 	/etc/init.d/ruijie-auth reload >/dev/null 2>&1 || true
 fi
 
+# Bind the web UI to all addresses. Binding 10.0.0.1 directly makes uhttpd
+# exit with "Address not available" when it starts before the LAN address
+# exists; the firewall still rejects WAN-side input.
+uci -q set uhttpd.main.listen_http='0.0.0.0:80'
+uci -q set uhttpd.main.listen_https='0.0.0.0:443'
+uci commit uhttpd
+/etc/init.d/uhttpd restart >/dev/null 2>&1 || true
+
 # Put the USB tethering and Wi-Fi STA interfaces into the existing wan
 # firewall zone. Both names are referenced by mwan3 but only appear when
 # the corresponding uplink is actually configured.

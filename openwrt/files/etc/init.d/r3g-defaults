@@ -27,4 +27,13 @@ start() {
 		done
 		/etc/init.d/vnstat restart >/dev/null 2>&1 || true
 	fi
+
+	# The SQM rc.d link can be lost when the overlay is preserved across
+	# sysupgrade. Restore it only when the user still has SQM enabled.
+	if [ -x /etc/init.d/sqm ] &&
+		[ "$(uci -q get sqm.wan.enabled)" = "1" ] &&
+		! /etc/init.d/sqm enabled; then
+		/etc/init.d/sqm enable
+		/etc/init.d/sqm start
+	fi
 }

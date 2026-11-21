@@ -137,7 +137,8 @@ fetch "$MIHOMO_URL" "$MIHOMO_GZ" "$MIHOMO_SHA256"
 
 STAGE="$OUT/files"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/usr/bin" "$STAGE/etc/openclash/core"
+mkdir -p "$STAGE/usr/bin" "$STAGE/etc/openclash/core" \
+	"$STAGE/etc/vnstat" "$STAGE/etc/nlbwmon"
 cp -a "$ROOT/files/." "$STAGE/"
 cp "$UA3F_DIR/root/usr/bin/ua3f" "$STAGE/usr/bin/ua3f"
 gzip -dc "$MIHOMO_GZ" >"$STAGE/etc/openclash/core/clash_meta"
