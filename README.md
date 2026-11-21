@@ -160,9 +160,11 @@ schema，导入时只覆盖档案声明的字段，并保留账号与未知配�
   LuCI 视图与中文 `.lmo`。
 - LuCI 运行时目录按 hash 校验菜单标题与 8 个页面词条，应用自身词条
   覆盖率 100%。
-- 2026-11-21 R3G 真机：最终 0.9.0 镜像已刷入，真实校园网 EAP-MD5
-  认证成功；UA3F 3.7.0、自定义 DoH、Vantage 主题/app、nftables IPID、
-  TCP 53 四目标 + HTTP 204 探测、logs2 均已验证。
+- 2026-11-21 R3G 真机：精简全功能 0.10.0 镜像已刷入并冷启动回归。
+  真实校园网 EAP-MD5 认证成功；UA3F 3.7.0（desync reorder）、自定义
+  DoH、Vantage、nftables IPID、mwan3 断链切换到 USB 共享再恢复、
+  SQM/CAKE 95M、USB RNDIS、MT7921U USB Wi-Fi、p910nd 9100、watchcat、
+  USB/IP 3240、TCP 53 + HTTP 204 探测、logs2 均已验证。
 
 ### 5.5 未验证项
 

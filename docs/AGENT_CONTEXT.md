@@ -466,42 +466,55 @@ Deep Freeze：
 `build/capture/`（live-auth.pcap、original-parse-truth.json、
 tail-compare.json、full-diff-report.json）。
 
-## 13. 2026-11-21 整机扩展构建（0.10.0）
+## 13. 2026-11-21 精简全功能固件（0.10.0）
 
-目标：把 R3G 做成刷入即用的整机固件，同时保持认证器 ipk 纯用户态。
+目标：USB 全功能 + R3G 板载 + 插件依赖 + 打印机，砍掉无关 kmod，保持
+插件功能完整；刷入后远程 sysupgrade，并做真机回归。
 
-- 包集：目标 feed 全部 1034 个 kmod（`scripts/kmods-all.txt`），排除 8 个
-  互斥/异构变体：ath10k 三个替代、hsdma-mtk、mwifiex-sdio、r8125-rss、
-  r8126-rss、sdhci-mt7620。完整 rootfs 89.3MB，UBI 117.4MiB，overlay
-  约 24MiB。
-- 上行：mwan3 2.11.16，校园 WAN → `usbwan` → `wwan`，httping 204 探测、
-  5 秒周期、连续 2 次失败切换。`90-ruijie-usbwan` 支持 RNDIS/NCM/ECM/
-  ipheth；`91-usb-wifi` 自动注册后插入的 USB 无线网卡。
-- QoS：SQM 1.6.0 + CAKE，默认 200/200 Mbit，`dual-srchost`/`dual-dsthost`
-  按主机隔离。
-- 统计：nlbwmon + vnstat2；`/var` 是 tmpfs，`zz-r3g-defaults` 把
-  vnstat DB 改到 `/etc/vnstat`（SaveInterval 15），nlbwmon 改到
-  `/etc/nlbwmon`（默认 24h commit）。vnstat 监控 wan/br-lan。
-- 代理/穿透：OpenClash 0.48.002 + mihomo 1.19.34 mipsle softfloat
-  （61MB 二进制，`small_flash_memory=0` 才会用 /etc 核心），默认
-  redir-host、不劫持 DNS、停止；frpc 0.51.3 预配置停止。
-- UPnP：miniupnpd-nftables，LAN 侧 secure mode，启用。
-- 首次启动：`zz-r3g-defaults` 必须最后运行（zz- 前缀），负责启用
-  UA3F/DoH/mwan3/SQM/统计/UPnP，关闭 OpenClash/frpc 占位服务，并把
-  `firewall.openclash` include 删除；该 include 指向只在 OpenClash 运行时
-  存在的 `/var/etc/openclash.include`，保留会让 fw4 启动失败。
-- 探针：`connectivity.TCPOn/HTTPOn` 用 SO_BINDTODEVICE 绑定校园网出口，
-  避免 USB/Wi-Fi 默认路由把校园网掉线误判为在线；CLI `probe --device`。
-- 构建：`vendor/` 固定 UA3F/OpenClash/mihomo/Vantage 的 ipk 与哈希；
-  `fetch-imagebuilder.sh` 固定 24.10.0 IB 与 SHA256；Image Builder 缓存
-  完整后一次构建约 8-10 分钟。
-- 验证：`go test`/`gofmt` 干净；MIPS chroot 中 `ruijie-auth 0.10.0
-  selftest` 通过，mihomo `-v` 正常，`zz-r3g-defaults` 语法通过；
-  UCI 解析 mwan3/sqm/vnstat 正常。
-- 产物：sysupgrade 92,509,306（8c4edddd...）、kernel1 3,181,020
-  （f1718d09...）、rootfs0 93,192,192（92572686...）、Breed 合并
-  101,580,800（143a60be...）、ipk 2,741,830（6f04f52f...）。
-- 刷写约束：sysupgrade 超过 R3G 的 /tmp 与 overlay，必须走 Breed
-  kernel1 + rootfs0；Breed 1.2 的“原厂→固件”也不接受 97MB 合并镜像。
-- 当前状态：构建、校验、离线验收完成；等待 Breed 实机刷入后验证
-  USB/Wi-Fi STA/mwan3/SQM/OpenClash/统计并更新本文件。
+- 包集：237 个 kmod（依赖闭包，`scripts/kmods-r3g.txt`），只保留
+  USB 全功能、ext4/f2fs/exfat/NTFS3/Btrfs/XFS、USB Wi-Fi、串口/网卡/
+  音频/视频/HID/打印机、R3G 板载和插件依赖。完整 feed 清单保留在
+  `kmods-all.txt` 对照。rootfs squashfs 53,279,744；rootfs0 55,967,744；
+  sysupgrade 56,474,746；overlay 首次启动约 49.5MiB。
+- 上行：mwan3 校园 WAN → `usbwan` → `wwan`。实测一加 Ace 5 RNDIS
+  识别为 `eth1`、取得 192.168.87.x；`ip link set wan down` 后 mwan3
+  自动切到 usbwan 并保持上网，wan 恢复后切回并重新认证。
+- 认证器：默认 `device=wan`。`auto` 在手机插上后会把 `eth1` 当校园
+  WAN，导致状态变“暂停”；首次启动脚本用 UCI 钉死 wan。
+- QoS：SQM/CAKE 95/95 Mbit（校园线 100Mbps 的 95%），
+  dual-srchost/dual-dsthost。SQM rc.d 链接在 sysupgrade 后可能丢失，
+  `r3g-defaults` init 会按 `sqm.wan.enabled=1` 恢复。
+- 统计：vnstat DB 在 `/etc/vnstat`（SaveInterval 5），nlbwmon 在
+  `/etc/nlbwmon`（commit 1h）。vnstatd 首启可能先于 DB 可写而退出，
+  `r3g-defaults` 每次启动重新 add wan/br-lan 并 restart。
+- 打印：`kmod-usb-printer` + `p910nd` + LuCI，TCP 9100；
+  `20-p910nd` 在 USB 打印机 add 后等待 `/dev/usb/lp0` 并重启服务。
+  无打印机时服务为 “active with no instances”；模拟 lp0 时 9100 监听通过。
+- 自动重启：watchcat，`ping_reboot`，6 小时无 ping、pinghosts
+  223.5.5.5/119.29.29.29，forcedelay 30，避免抖动重启循环。
+- USB/IP：usbipd 3240 + usbip/usbip-server/client + `usbip-share`。
+  手机绑定会触发 USB 重新枚举（bind 完成但随后 disconnect），
+  ADB/存储导出需设备不重置；功能与 CLI 已装好。
+- USB Wi-Fi：MT7921U（0e8d:7961）识别为 `radio2`（5G），实开
+  `USBTEST-5G` AP 成功，随后恢复 disabled。
+- 防检测：UA3F desync reorder=1（1500/8，80/443）实测 HTTPS 正常、
+  CPU 0%/空闲 93%；inject=0，TTL 1/2/3 均导致 TLS EOF，不能默认开。
+- OpenClash：核心/GeoSite 只在 rootfs；`luci-openclash` 的 keep.d
+  被 `r3g-defaults` 改为只保留 config/custom/overwrite/rule_provider/
+  proxy_provider/history，避免 sysupgrade 把 72MB 复制进 overlay。
+- uhttpd：监听 0.0.0.0:80/443；绑定 10.0.0.1 会在 LAN 地址晚就绪时
+  崩溃循环。WAN 侧仍由防火墙拒绝。
+- 首次启动兜底：`/etc/init.d/r3g-defaults`（S99）在
+  `/etc/uci-defaults/zz-r3g-defaults` 仍存在时执行并删除；解决
+  sysupgrade 保留 overlay 时 uci-defaults 不执行的问题。
+- 中文：luci.main.lang=zh_cn；补 `luci-i18n-firewall-zh-cn`、
+  `luci-i18n-package-manager-zh-cn`；OpenClash/UA3F 的 lmo 随包。
+- 产物：breed 64,356,352（561d3590...）、sysupgrade 56,474,746
+  （5e9215d5...）、kernel1 3,181,020（f1718d09...）、rootfs0
+  55,967,744（65e3bfb0...）、ipk 2,741,830（6f04f52f...）、manifest
+  15,633（ca9d039b...）。
+- 回归：构建/校验/离线 chroot 通过；真机多次 sysupgrade；冷启动后
+  认证、SQM 95M、UA3F reorder、uhttpd、usbipd、watchcat、统计和
+  overlay 余量全部保持。未接真实打印机；USB/IP 手机绑定受设备重置
+  限制，需换稳定设备复测。
+

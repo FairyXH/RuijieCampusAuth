@@ -108,15 +108,15 @@ Breed 不认 OpenWrt 的 sysupgrade tar，必须用重打包的 `...breed.bin`�
 
 ### 3.2 方式 B：只装 ipk（已有 OpenWrt，免刷机）
 
-产物：`ruijie-auth_0.9.0_mipsel_24kc.ipk`（架构按你的设备选）。
+产物：`ruijie-auth_0.10.0_mipsel_24kc.ipk`（架构按你的设备选）。
 
 ```bash
 # 电脑上把 ipk 传到路由器
-scp ruijie-auth_0.9.0_mipsel_24kc.ipk root@192.168.1.1:/tmp/
+scp ruijie-auth_0.10.0_mipsel_24kc.ipk root@192.168.1.1:/tmp/
 
 # 路由器上安装
 ssh root@192.168.1.1
-opkg install --force-reinstall /tmp/ruijie-auth_0.9.0_mipsel_24kc.ipk
+opkg install --force-reinstall /tmp/ruijie-auth_0.10.0_mipsel_24kc.ipk
 ```
 
 也可以在 LuCI **系统 → 软件包 → 上传软件包**。
@@ -138,7 +138,7 @@ opkg install --force-reinstall /tmp/ruijie-auth_0.9.0_mipsel_24kc.ipk
 cp /etc/config/<旧配置名> /etc/config/ruijie-auth
 
 # 安装新 ipk，然后启用新服务
-opkg install --force-reinstall /tmp/ruijie-auth_0.9.0_mipsel_24kc.ipk
+opkg install --force-reinstall /tmp/ruijie-auth_0.10.0_mipsel_24kc.ipk
 /etc/init.d/ruijie-auth enable
 /etc/init.d/ruijie-auth restart
 ```
@@ -619,8 +619,8 @@ PATH=/opt/openwrt/gnu-bin:$PATH sh scripts/build-image.sh
 
 ### 12.4 版本号
 
-`VERSION=0.9.0 sh scripts/build-ipk.sh` 覆盖包版本；镜像里的
-`ruijie-auth version` 显示 `build-go.sh` 的 `VERSION`（默认 0.9.0）。
+`VERSION=0.10.0 sh scripts/build-ipk.sh` 覆盖包版本；镜像里的
+`ruijie-auth version` 显示 `build-go.sh` 的 `VERSION`（默认 0.10.0）。
 
 ---
 

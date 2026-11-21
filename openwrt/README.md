@@ -96,28 +96,38 @@ Image Builder 的版本和 SHA256 由 `fetch-imagebuilder.sh` 固定。因此同
 
 ## 整机固件附加能力
 
-- **全量 kmod**：目标 feed 的 1034 个内核模块全部预装，USB 存储/UAS/
-  串口/网卡/无线网卡/音频/视频/HID、常用文件系统、板载 GPIO/I2C/SPI/
-  MMC/HWMON、完整 netfilter 与 VPN 模块都在 rootfs 里。互斥变体除外，
-  清单见 `scripts/kmods-all.txt`。
+- **精简 kmod**：只保留 USB 全功能、R3G 板载、插件依赖和打印机，共
+  237 个（依赖闭包）。清单见 `scripts/kmods-r3g.txt`；完整 feed 的
+  1034 个列表保留在 `scripts/kmods-all.txt` 对照。
 - **USB 存储**：`20-usb-mount` 热插拔自动挂载到 `/mnt/usb-<dev>`，支持
   vfat/exfat/NTFS3/ext4/f2fs/Btrfs/XFS；拔出时自动卸载。
 - **USB 网络**：`90-ruijie-usbwan` 识别 RNDIS/NCM/ECM 和 iPhone ipheth，
   自动创建 `usbwan`；`91-usb-wifi` 让后插入的 USB 无线网卡自动注册为
-  radio。
+  radio，实测 MT7921U 可开 5G AP。
+- **USB/IP**：`usbipd` 监听 3240，`usbip-server/client` 与
+  `/usr/sbin/usbip-share` 支持导出 ADB/串口/存储；绑定会解绑本地驱动，
+  手机 USB 共享会暂时断开。
+- **共享打印机**：`kmod-usb-printer` + `p910nd`，插打印机后自动监听
+  9100，`20-p910nd` 处理热插拔。
 - **上行故障切换**：`mwan3` 按 校园 WAN → USB 共享 → Wi-Fi STA 排序，
   httping 探测 204 端点，5 秒周期、连续 2 次失败切换；Wi-Fi STA 用
-  LuCI 无线页连接上游 AP，接口名 `wwan`。
-- **QoS**：SQM + CAKE，默认 200/200 Mbit，`dual-srchost`/`dual-dsthost`
-  按主机隔离，避免单设备占满带宽。
-- **流量统计**：`nlbwmon` 按设备、`vnstat2` 按接口，均为轻量实现。
+  LuCI 无线页连接上游 AP，接口名 `wwan`。认证器默认 `device=wan`，
+  避免 USB 共享插上后把 `eth1` 当成校园 WAN。
+- **QoS**：SQM + CAKE，默认 95/95 Mbit（100Mbps 校园线），
+  `dual-srchost`/`dual-dsthost` 按主机隔离。
+- **流量统计**：`nlbwmon` 按设备（1h 持久化）、`vnstat2` 按接口
+  （wan/br-lan，5 分钟保存），DB 在 `/etc`。
+- **自动重启**：`watchcat` 6 小时无 ping 才重启，避免网络抖动导致
+  重启循环。
 - **OpenClash**：0.48.002 + mihomo 1.19.34 softfloat 核心，默认
   `redir-host`、不劫持 DNS，和 dnsmasq + DoH 共存；无订阅时保持停止。
+  核心/GeoSite 只在 rootfs，keep.d 只备份用户配置，升级不会复制
+  72MB 到 overlay。
 - **frpc**：0.51.3 + LuCI，预配置但停止，填写服务器后一键启用。
 - **UPnP / WoL / 命令面板**：`miniupnpd-nftables`（LAN 侧、secure mode）、
   `luci-app-wol`、`luci-app-commands`。
-- **防检测零配置**：UA3F、nftables TTL/MSS/IPID、DoH、TCP+HTTP 探测
-  由 `zz-r3g-defaults` 在首次启动统一启用。
+- **防检测零配置**：UA3F（desync reorder 开、inject 关）、nftables
+  TTL/MSS/IPID、DoH、TCP+HTTP 探测由首次启动脚本统一启用。
 
 ## 配置与运行数据
 

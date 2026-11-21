@@ -110,15 +110,15 @@ sh scripts/build-image.sh
 结果：
 
 - `openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin`
-  约 14MB
-- SHA256 `001fb2df06f47760fe6e90a32f3e343fbc10ae0432e7e81ffb029ea6dfc1373a`
-- `kernel1.bin` 3.1MB，SHA256
+  56,474,746 字节
+- SHA256 `5e9215d59f45701d52b89c9c44780dc46bd5d26575c5ddc1dc26e717f8071a60`
+- `kernel1.bin` 3,181,020 字节，SHA256
   `f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a`
-- `rootfs0.bin` 12,976,128 字节，SHA256
-  `778ef9b99f185b7675fa406f016b96f7e37050b0503b50a0c6451ab6a51e9792`
-- 插件 ipk：`ruijie-auth_0.9.0_mipsel_24kc.ipk`（2,742,009 字节，
-  外层 tar.gz 格式）
-- rootfs squashfs 11,621,376 字节（UA3F 17MB 压缩后 + 其他包）
+- `rootfs0.bin` 55,967,744 字节，SHA256
+  `65e3bfb0b27ebefa52f17624e28d3cbc5c1af5e8d00f1ad10b51015eb76f1dd0`
+- 插件 ipk：`ruijie-auth_0.10.0_mipsel_24kc.ipk`（2,741,830 字节，
+  外层 tar.gz 格式，SHA256 `6f04f52f...`）
+- rootfs squashfs 53,279,744 字节（精简到 237 个 kmod）
 - `root.squashfs` 已确认包含：
   - `/usr/sbin/ruijie-auth`（约 7.6MB，mipsle 静态，含 HTTP 探测）
   - `/usr/bin/ua3f`（17MB，mipsle musl 动态，UA3F 3.7.0）
