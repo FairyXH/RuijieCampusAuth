@@ -11,8 +11,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	"ruijie-auth/internal/config"
+	"ruijie-auth/internal/connectivity"
 	"ruijie-auth/internal/control"
 	"ruijie-auth/internal/daemon"
 	"ruijie-auth/internal/netcfg"
@@ -41,6 +43,8 @@ func main() {
 		runStatus(os.Args[2:])
 	case "log":
 		runLog(os.Args[2:])
+	case "probe":
+		runProbe(os.Args[2:])
 	case "tail":
 		runTail(os.Args[2:])
 	case "selftest":
@@ -68,6 +72,41 @@ func main() {
 		usage()
 		os.Exit(2)
 	}
+}
+
+func runProbe(args []string) {
+	fs := flag.NewFlagSet("probe", flag.ExitOnError)
+	_ = fs.Parse(args)
+
+	cfg, err := config.Load("/etc/config/ruijie-auth")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	timeout := time.Duration(cfg.ConnectivityTimeout * float64(time.Second))
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+
+	ok := connectivity.TCP(context.Background(), cfg.ConnectivityTargets, timeout)
+	fmt.Printf("TCP 目标: %s\n", strings.Join(cfg.ConnectivityTargets, ", "))
+	fmt.Printf("TCP 探测: %s\n", onlineText(ok))
+
+	if !ok && (strings.HasPrefix(cfg.ConnectivityURL, "http://") ||
+		strings.HasPrefix(cfg.ConnectivityURL, "https://")) {
+		ok = connectivity.HTTP(context.Background(), cfg.ConnectivityURL, timeout)
+		fmt.Printf("HTTP 回退 %s: %s\n", cfg.ConnectivityURL, onlineText(ok))
+	}
+	if !ok {
+		os.Exit(1)
+	}
+}
+
+func onlineText(ok bool) string {
+	if ok {
+		return "在线"
+	}
+	return "离线"
 }
 
 func runStatus(args []string) {
@@ -677,6 +716,7 @@ func usage() {
   daemon           常驻认证守护进程（procd 使用）
   status --json    读取 /var/run/ruijie-auth/status.json
   log [--lines N]  输出认证日志末尾（默认 300 行）
+  probe            运行 TCP 多目标 + HTTP 回退外网探测
   auth|logoff|pause|resume|reload
                    通过控制 socket 操作守护进程
   accounts         查看 UCI 账号池（不输出密码）

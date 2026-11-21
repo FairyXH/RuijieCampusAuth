@@ -64,7 +64,12 @@ type Config struct {
 	RetryInterval   float64
 	PauseOnHome     bool
 	ConnectivityURL string
-	Disguise        string
+	// ConnectivityTargets are host:port TCP probes run in parallel. Any reply
+	// (including RST) proves the egress path is alive. The defaults mirror
+	// NetworkGuardian's four public DNS targets on TCP 53.
+	ConnectivityTargets []string
+	ConnectivityTimeout float64
+	Disguise            string
 	LogLevel        string
 	Autoguard       bool
 	Preempt         bool
@@ -93,8 +98,15 @@ func Default() Config {
 		CheckInterval:   2,
 		RetryInterval:   3,
 		PauseOnHome:     true,
-		ConnectivityURL: "http://www.baidu.com/",
-		Disguise:        "basic",
+		ConnectivityURL: "http://connect.rom.miui.com/generate_204",
+		ConnectivityTargets: []string{
+			"223.5.5.5:53",
+			"119.29.29.29:53",
+			"180.76.76.76:53",
+			"114.114.114.114:53",
+		},
+		ConnectivityTimeout: 2,
+		Disguise:            "basic",
 		LogLevel:        "info",
 		Autoguard:       true,
 		Preempt:         true,
@@ -122,6 +134,7 @@ func Load(path string) (Config, error) {
 func Parse(data string) (Config, error) {
 	cfg := Default()
 	cfg.Devices = nil
+	cfg.ConnectivityTargets = nil
 	var current *Account
 	authSection := false
 
@@ -172,7 +185,19 @@ func Parse(data string) (Config, error) {
 	if len(cfg.Devices) == 0 {
 		cfg.Devices = []string{AutoDevice}
 	}
+	if len(cfg.ConnectivityTargets) == 0 {
+		cfg.ConnectivityTargets = defaultConnectivityTargets()
+	}
 	return cfg, nil
+}
+
+func defaultConnectivityTargets() []string {
+	return []string{
+		"223.5.5.5:53",
+		"119.29.29.29:53",
+		"180.76.76.76:53",
+		"114.114.114.114:53",
+	}
 }
 
 func applyAuthOption(cfg *Config, key, value string) {
@@ -240,6 +265,16 @@ func applyAuthOption(cfg *Config, key, value string) {
 		cfg.PauseOnHome = boolValue(value)
 	case "connectivity_url":
 		cfg.ConnectivityURL = value
+	case "connectivity_targets":
+		for _, item := range strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\t'
+		}) {
+			if item != "" {
+				cfg.ConnectivityTargets = append(cfg.ConnectivityTargets, item)
+			}
+		}
+	case "connectivity_timeout":
+		cfg.ConnectivityTimeout = floatValue(value, cfg.ConnectivityTimeout)
 	case "disguise":
 		cfg.Disguise = value
 	case "log_level":

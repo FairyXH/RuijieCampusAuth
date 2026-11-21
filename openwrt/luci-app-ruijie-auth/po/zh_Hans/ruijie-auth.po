@@ -196,6 +196,21 @@ msgstr "帧伪装"
 msgid "Full (UA3F + L3 rewrite)"
 msgstr "完整（UA3F + L3 改写）"
 
+msgid "HTTP fallback URL"
+msgstr "HTTP 回退地址"
+
+msgid "TCP probe targets"
+msgstr "TCP 探测目标"
+
+msgid "host:port targets probed in parallel; any TCP reply means online."
+msgstr "并行探测的 host:port 目标；任一 TCP 回复即视为在线。"
+
+msgid "Used only when all TCP targets fail. A generate_204 endpoint must answer 204."
+msgstr "仅当所有 TCP 目标失败时使用；generate_204 端点必须返回 204。"
+
+msgid "Log read failed"
+msgstr "日志读取失败"
+
 msgid "Frames per request"
 msgstr "每次请求帧数"
 

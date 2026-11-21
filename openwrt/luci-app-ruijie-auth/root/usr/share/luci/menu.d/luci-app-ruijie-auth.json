@@ -92,7 +92,7 @@
 		"order": 80,
 		"action": {
 			"type": "view",
-			"path": "ruijie-auth/logs"
+			"path": "ruijie-auth/logs2"
 		},
 		"depends": {
 			"acl": [ "luci-app-ruijie-auth" ]

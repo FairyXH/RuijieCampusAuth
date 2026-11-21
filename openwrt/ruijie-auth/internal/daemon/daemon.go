@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"ruijie-auth/internal/config"
+	"ruijie-auth/internal/connectivity"
 	"ruijie-auth/internal/control"
 	"ruijie-auth/internal/logging"
 	"ruijie-auth/internal/netcfg"
@@ -149,7 +150,7 @@ func (d *runner) loop(ctx context.Context) {
 			}
 			continue
 		case supplicant.KindNoServer:
-			if cfg.PauseOnHome && d.probe(ctx, cfg.ConnectivityURL) {
+			if cfg.PauseOnHome && d.probe(ctx, cfg) {
 				d.setStatus("paused", "未检测到认证服务器，当前网络在线，暂停认证",
 					activeName(cfg), device, "")
 				switch d.pauseLoop(ctx, cfg) {
@@ -236,7 +237,7 @@ func (d *runner) runAccounts(ctx context.Context, cfg config.Config, accounts []
 				return network.Collect(device)
 			},
 			Probe: func(ctx context.Context) bool {
-				return d.probe(ctx, cfg.ConnectivityURL)
+				return d.probe(ctx, cfg)
 			},
 			Status: func(state, message, server string) {
 				d.setStatus(state, message, account.Username, device, server)
@@ -277,7 +278,7 @@ func (d *runner) pauseLoop(ctx context.Context, cfg config.Config) string {
 		case "logoff":
 			return "logoff"
 		case "timeout":
-			if !d.probe(ctx, cfg.ConnectivityURL) {
+			if !d.probe(ctx, cfg) {
 				return "resume"
 			}
 		}
@@ -375,7 +376,29 @@ func (d *runner) record(cfg config.Config, result supplicant.Result) {
 	}
 }
 
-func (d *runner) probe(ctx context.Context, rawURL string) bool {
+func (d *runner) probe(ctx context.Context, cfg config.Config) bool {
+	timeout := seconds(cfg.ConnectivityTimeout)
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+	if len(cfg.ConnectivityTargets) > 0 {
+		if connectivity.TCP(ctx, cfg.ConnectivityTargets, timeout) {
+			return true
+		}
+		if isHTTPProbeURL(cfg.ConnectivityURL) {
+			return connectivity.HTTP(ctx, cfg.ConnectivityURL, timeout)
+		}
+		return false
+	}
+	return d.probeLegacy(ctx, cfg.ConnectivityURL)
+}
+
+func isHTTPProbeURL(raw string) bool {
+	raw = strings.TrimSpace(raw)
+	return strings.HasPrefix(raw, "http://") || strings.HasPrefix(raw, "https://")
+}
+
+func (d *runner) probeLegacy(ctx context.Context, rawURL string) bool {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
 		return true

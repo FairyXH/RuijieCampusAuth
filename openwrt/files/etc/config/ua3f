@@ -14,7 +14,9 @@ config ua3f 'main'
 	option log_level 'INFO'
 	option l3_rewrite_ttl '1'
 	option l3_rewrite_ttl_value '128'
-	option l3_rewrite_ipid '1'
+	# IPID 改写会把几乎所有 TCP 包送入 NFQUEUE，MT7621 上会打满 CPU；
+	# 默认关闭，保留 TTL / TCP timestamp / TCP window（仅 SYN 入队）。
+	option l3_rewrite_ipid '0'
 	option l3_rewrite_tcpts '1'
 	option l3_rewrite_tcpwin '1'
 	option l3_rewrite_block_quic '0'

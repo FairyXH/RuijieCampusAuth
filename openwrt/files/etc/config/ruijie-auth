@@ -17,9 +17,13 @@ config auth 'main'
 	option discovery_cache '1'
 	option logoff_on_stop '0'
 	option pause_on_home '1'
-	# 外部探测在校园网/DoH 下容易误判，改用本机地址关闭 HTTP 探测；
-	# 会话状态以 EAPOL/status.json 为准。
-	option connectivity_url 'http://127.0.0.1/'
+	# 外网探测：先并行 TCP 多目标（任一回复即在线），全部失败再试 HTTP 204。
+	option connectivity_url 'http://connect.rom.miui.com/generate_204'
+	option connectivity_timeout '2'
+	list connectivity_targets '223.5.5.5:53'
+	list connectivity_targets '119.29.29.29:53'
+	list connectivity_targets '180.76.76.76:53'
+	list connectivity_targets '114.114.114.114:53'
 	option dhcp_mode 'none'
 	option dhcp_timeout '30'
 	option dhcp_option82 '0'

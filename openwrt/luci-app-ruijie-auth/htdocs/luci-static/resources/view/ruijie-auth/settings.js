@@ -119,8 +119,13 @@ return view.extend({
 		o.datatype = 'ufloat';
 		o.default = '3';
 
-		o = s.taboption('guard', form.Value, 'connectivity_url', _('Connectivity probe URL'));
-		o.default = 'http://www.baidu.com/';
+		o = s.taboption('guard', form.DynamicList, 'connectivity_targets', _('TCP probe targets'),
+			_('host:port targets probed in parallel; any TCP reply means online.'));
+		o.datatype = 'hostport';
+
+		o = s.taboption('guard', form.Value, 'connectivity_url', _('HTTP fallback URL'),
+			_('Used only when all TCP targets fail. A generate_204 endpoint must answer 204.'));
+		o.default = 'http://connect.rom.miui.com/generate_204';
 
 		o = s.taboption('guard', form.Flag, 'discovery_cache', _('Discovery cache'));
 		o.default = '1';
