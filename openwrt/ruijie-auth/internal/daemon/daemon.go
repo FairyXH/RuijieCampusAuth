@@ -149,8 +149,8 @@ func (d *runner) loop(ctx context.Context) {
 				return
 			}
 			continue
-			case supplicant.KindNoServer:
-				if cfg.PauseOnHome && d.probe(ctx, cfg, device) {
+		case supplicant.KindNoServer:
+			if cfg.PauseOnHome && d.probe(ctx, cfg, device) {
 				d.setStatus("paused", "未检测到认证服务器，当前网络在线，暂停认证",
 					activeName(cfg), device, "")
 				switch d.pauseLoop(ctx, cfg) {
