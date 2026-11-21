@@ -9,13 +9,21 @@
 # the filesystem label: labels are untrusted strings and cannot be used in
 # a path without sanitising them.
 
-[ "$ACTION" = "add" ] || exit 0
-
 case "$DEVNAME" in
 	/dev/sd[a-z][0-9]*|/dev/mmcblk[0-9]p[0-9]*|/dev/nvme[0-9]n[0-9]p[0-9]*) ;;
 	*) exit 0 ;;
 esac
 
+name=${DEVNAME##*/}
+mp="/mnt/usb-$name"
+
+if [ "$ACTION" = "remove" ]; then
+	mountpoint -q "$mp" && umount "$mp"
+	rmdir "$mp" 2>/dev/null || true
+	exit 0
+fi
+
+[ "$ACTION" = "add" ] || exit 0
 [ -x /sbin/block ] || exit 0
 
 i=0
@@ -31,8 +39,6 @@ info=$(block info "$DEVNAME" 2>/dev/null) || exit 0
 type=$(printf '%s\n' "$info" | sed -n 's/^TYPE="\(.*\)"$/\1/p')
 [ -n "$type" ] || exit 0
 
-name=${DEVNAME##*/}
-mp="/mnt/usb-$name"
 mkdir -p "$mp"
 
 case "$type" in
@@ -42,7 +48,8 @@ case "$type" in
 	exfat)
 		opts="rw,noatime,umask=0000"
 		;;
-	ntfs|ntfs3)
+	ntfs)
+		type=ntfs3
 		opts="rw,noatime,umask=0000"
 		;;
 	*)

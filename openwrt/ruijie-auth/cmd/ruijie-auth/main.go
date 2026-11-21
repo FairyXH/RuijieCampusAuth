@@ -76,6 +76,7 @@ func main() {
 
 func runProbe(args []string) {
 	fs := flag.NewFlagSet("probe", flag.ExitOnError)
+	device := fs.String("device", "", "bind probe sockets to this egress device (e.g. eth0.2)")
 	_ = fs.Parse(args)
 
 	cfg, err := config.Load("/etc/config/ruijie-auth")
@@ -88,13 +89,16 @@ func runProbe(args []string) {
 		timeout = 2 * time.Second
 	}
 
-	ok := connectivity.TCP(context.Background(), cfg.ConnectivityTargets, timeout)
+	ok := connectivity.TCPOn(context.Background(), *device, cfg.ConnectivityTargets, timeout)
 	fmt.Printf("TCP 目标: %s\n", strings.Join(cfg.ConnectivityTargets, ", "))
+	if *device != "" {
+		fmt.Printf("出口设备: %s\n", *device)
+	}
 	fmt.Printf("TCP 探测: %s\n", onlineText(ok))
 
 	if !ok && (strings.HasPrefix(cfg.ConnectivityURL, "http://") ||
 		strings.HasPrefix(cfg.ConnectivityURL, "https://")) {
-		ok = connectivity.HTTP(context.Background(), cfg.ConnectivityURL, timeout)
+		ok = connectivity.HTTPOn(context.Background(), *device, cfg.ConnectivityURL, timeout)
 		fmt.Printf("HTTP 回退 %s: %s\n", cfg.ConnectivityURL, onlineText(ok))
 	}
 	if !ok {

@@ -10,15 +10,15 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${OUT_DIR:-"$ROOT/build"}
-IB=${IB_DIR:-/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64}
+IB=${IB_DIR:-"$ROOT/build/ib/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64"}
 PROFILE=${PROFILE:-xiaomi_mi-router-3g}
 JOBS=${JOBS:-4}
-VERSION=${VERSION:-0.9.0}
+VERSION=${VERSION:-0.10.0}
 
 UA3F_VERSION=3.7.0
 UA3F_SHA256=a1d710233ab69af2e127193d7de81d7fd7c400294dc2147368694f2fd56e073f
 UA3F_URL="https://github.com/SunBK201/UA3F/releases/download/v${UA3F_VERSION}/ua3f_${UA3F_VERSION}-r1_mipsel_24kc.ipk"
-UA3F_IPK=${UA3F_IPK:-/opt/openwrt/ua3f/ua3f.ipk}
+UA3F_IPK=${UA3F_IPK:-"$OUT/ua3f/ua3f.ipk"}
 UA3F_DIR="$OUT/ua3f"
 
 THEME_VERSION=1.0.21
@@ -84,14 +84,16 @@ DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 PACKAGES=${PACKAGES:-$DEFAULT_PACKAGES}
 
 if [ ! -d "$IB" ]; then
-	echo "Image Builder not found: $IB" >&2
-	exit 2
+	IB=$(sh "$ROOT/scripts/fetch-imagebuilder.sh" "$ROOT/build/ib") || exit 2
 fi
 
 fetch() {
-	local url=$1 file=$2 sum=$3
+	local url=$1 file=$2 sum=$3 vendor
+	vendor="$ROOT/vendor/$(basename "$file")"
 	mkdir -p "$(dirname "$file")"
-	if [ ! -f "$file" ]; then
+	if [ -f "$vendor" ]; then
+		cp "$vendor" "$file"
+	elif [ ! -f "$file" ]; then
 		curl -fL --retry 4 --retry-all-errors -o "$file" "$url" || \
 			curl -fL --retry 4 --retry-all-errors -o "$file" "https://ghproxy.net/$url"
 	fi
@@ -109,13 +111,9 @@ extract_ipk() {
 VERSION="$VERSION" sh "$ROOT/scripts/build-ipk.sh"
 APP_IPK="$OUT/ipk/ruijie-auth_${VERSION}_mipsel_24kc.ipk"
 
-# UA3F: extract the binary; the init/config live in files/.
-if [ ! -f "$UA3F_IPK" ]; then
-	UA3F_IPK="$UA3F_DIR/ua3f.ipk"
-	fetch "$UA3F_URL" "$UA3F_IPK" "$UA3F_SHA256"
-else
-	printf '%s  %s\n' "$UA3F_SHA256" "$UA3F_IPK" | sha256sum -c -
-fi
+# UA3F: installed as a package so opkg can upgrade it later; the binary is
+# also extracted only to validate the package layout.
+fetch "$UA3F_URL" "$UA3F_IPK" "$UA3F_SHA256"
 extract_ipk "$UA3F_IPK" "$UA3F_DIR/root"
 if [ ! -x "$UA3F_DIR/root/usr/bin/ua3f" ]; then
 	echo "UA3F package layout is unexpected" >&2

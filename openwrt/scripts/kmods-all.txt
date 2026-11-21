@@ -25,9 +25,6 @@ kmod-ata-sil24
 kmod-ata-via-sata
 kmod-ath
 kmod-ath10k
-kmod-ath10k-ct
-kmod-ath10k-ct-smallbuffers
-kmod-ath10k-smallbuffers
 kmod-ath11k
 kmod-ath11k-pci
 kmod-ath12k
@@ -234,7 +231,6 @@ kmod-hfcmulti
 kmod-hfcpci
 kmod-hid
 kmod-hid-generic
-kmod-hsdma-mtk
 kmod-hwmon-ad7418
 kmod-hwmon-adcxx
 kmod-hwmon-adt7410
@@ -559,7 +555,6 @@ kmod-mtk-t7xx
 kmod-mux-core
 kmod-mux-gpio
 kmod-mwifiex-pcie
-kmod-mwifiex-sdio
 kmod-mwl8k
 kmod-nat46
 kmod-natsemi
