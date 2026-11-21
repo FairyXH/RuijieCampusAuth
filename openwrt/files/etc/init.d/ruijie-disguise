@@ -2,9 +2,11 @@
 
 # On-wire disguise for the R3G firmware.
 #
-# "basic" rewrites IPv4 TTL and TCP MSS with nftables only.
-# "full" keeps those rules and also starts UA3F (NFQUEUE L3 rewrite:
-# TTL/IPID/TCP timestamp/window). "off" removes the table and stops UA3F.
+# "basic" rewrites IPv4 TTL/IPID and TCP MSS with nftables only.
+# "full" keeps those rules and also starts UA3F (NFQUEUE: TCP timestamp/window).
+# UA3F's IPID rewrite is disabled on this build: nftables sets IPID=0 in-kernel,
+# which avoids queueing every TCP packet through userspace on MT7621.
+# "off" removes the table and stops UA3F.
 #
 # The ruijie-auth ipk itself does not depend on UA3F or any kmod; this
 # service belongs to the firmware image.
@@ -32,6 +34,7 @@ start() {
 		nft 'add chain inet ruijie post { type filter hook postrouting priority mangle; policy accept; }'
 		nft 'add rule inet ruijie post tcp flags syn tcp option maxseg size set 1460'
 		nft 'add rule inet ruijie post ip ttl set 128'
+		nft 'add rule inet ruijie post ip id set 0'
 	fi
 
 	if [ "$mode" = "full" ]; then
