@@ -1,14 +1,10 @@
 # Uplink order: campus WAN -> USB tethering -> Wi-Fi STA.
 #
-# mwan3 tracks each uplink through its own routing mark, so a link that is
-# physically up but has no Internet (unauthenticated campus port, phone
-# tethering without data) is marked down and the next member takes over.
-# httping to a generate_204 endpoint detects captive portals and DNS
-# blackholes that plain ping would miss.
-#
-# The `usbwan` interface is created by /etc/hotplug.d/net/90-ruijie-usbwan
-# when an Android/iPhone tethering netdev appears. `wwan` is created by LuCI
-# when the router joins an upstream AP. Both are optional at boot.
+# Tracking uses plain ICMP to two public DNS anycast addresses. The campus
+# network filters some HTTP 204 endpoints (connect.rom.miui.com was observed
+# failing), and an unreliable target makes mwan3 flap every ~30 seconds.
+# With flush_conntrack enabled each flap resets every client connection, so
+# the target must be stable. ICMP to 223.5.5.5 is consistently ~20 ms here.
 
 config globals 'globals'
 	option mmx_mask '0x3F00'
@@ -17,48 +13,48 @@ config globals 'globals'
 config interface 'wan'
 	option enabled '1'
 	option family 'ipv4'
-	option track_method 'httping'
-	option httping_ssl '0'
-	list track_ip 'connect.rom.miui.com/generate_204'
+	option track_method 'ping'
+	list track_ip '223.5.5.5'
+	list track_ip '119.29.29.29'
 	option reliability '1'
 	option count '1'
-	option timeout '3'
+	option timeout '2'
 	option interval '5'
 	option failure_interval '3'
 	option recovery_interval '3'
-	option down '2'
+	option down '3'
 	option up '2'
 	option flush_conntrack '1'
 
 config interface 'usbwan'
 	option enabled '1'
 	option family 'ipv4'
-	option track_method 'httping'
-	option httping_ssl '0'
-	list track_ip 'connect.rom.miui.com/generate_204'
+	option track_method 'ping'
+	list track_ip '223.5.5.5'
+	list track_ip '119.29.29.29'
 	option reliability '1'
 	option count '1'
-	option timeout '3'
+	option timeout '2'
 	option interval '5'
 	option failure_interval '3'
 	option recovery_interval '3'
-	option down '2'
+	option down '3'
 	option up '2'
 	option flush_conntrack '1'
 
 config interface 'wwan'
 	option enabled '1'
 	option family 'ipv4'
-	option track_method 'httping'
-	option httping_ssl '0'
-	list track_ip 'connect.rom.miui.com/generate_204'
+	option track_method 'ping'
+	list track_ip '223.5.5.5'
+	list track_ip '119.29.29.29'
 	option reliability '1'
 	option count '1'
-	option timeout '3'
+	option timeout '2'
 	option interval '5'
 	option failure_interval '3'
 	option recovery_interval '3'
-	option down '2'
+	option down '3'
 	option up '2'
 	option flush_conntrack '1'
 
