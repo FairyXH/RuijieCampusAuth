@@ -202,4 +202,13 @@ if [ -f /etc/config/usbipd ]; then
 	uci commit usbipd
 fi
 
+# IPv6 is disabled in sysctl, so an AAAA answer is a dead end for clients:
+# Android in particular treats the unreachable v6 address as a broken
+# connection and reports "no internet" while IPv4 works fine.
+if [ -f /etc/config/dhcp ]; then
+	uci -q set dhcp.@dnsmasq[0].filter_aaaa='1'
+	uci commit dhcp
+	/etc/init.d/dnsmasq restart >/dev/null 2>&1 || true
+fi
+
 exit 0
