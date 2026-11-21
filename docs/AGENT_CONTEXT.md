@@ -269,6 +269,31 @@ Deep Freeze：
   认证网卡源 IP 对 `connectivity_url` 做 TCP 复核（80/443），成功则保持
   会话，失败才重认证（提交 `8aad631`）。
 
+### R3G 真机核验与备份（2026-11-21）
+
+- 设备：小米路由器 3G 原版（R3G V1），MiWiFi 2.25.124，Linux 3.10.14，
+  MT7621A / 253124 KiB RAM / ESMT 128MiB NAND（2048B page、64B OOB、
+  HW ECC 4-bit），U-Boot 4.2.S.1，xHCI USB3；确为 V1，不是 4A/R3Gv2。
+- 原厂分区编号与 OpenWrt 不同：`mtd0` 是 `ALL` 主设备，`mtd1` 才是
+  Bootloader，`mtd4` 才是 factory；`mtd10/11/12` = rootfs0/rootfs1/
+  overlay，总边界仍是 `0xA00000 + 0x7580000`。工具包的备份说明、刷写
+  教程与 README 已按实测修正。
+- factory MAC 实测：`0xE000` = LAN（gmac0），`0xE006` = WAN（gmac1）；
+  旧文档标签写反，已修正。
+- 兼容性：sysupgrade CONTROL 的 `BOARD=xiaomi_mi-router-3g` 与设备一致；
+  Breed 镜像绝对偏移 `0x200000/0x600000/0xA00000` 与原厂 kernel0/
+  kernel1/rootfs0 对齐；工具包 Breed 文件 SHA256 与预期一致
+  （`05ebb31f...`），设备 mtd1 仍是原厂 bootloader。
+- 备份：`D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt\Backup`，457MB，
+  23 个分区 dump + OOB + 17 个文本快照，40 项 SHA256 全通过。
+  未取得含 OOB/ECC/坏块标记的 128MB 编程器级 raw 镜像，需进 Breed 后
+  做“完整 flash 备份”。
+- 风险：备份时 BaiduNetdisk 在运行并在目录内生成了
+  `backup.log.baiduyun.uploading.cfg`，需确认该目录不在同步范围并检查
+  云端副本；factory/MAC 不应上传。
+- 仍待办：刷 Breed → 进 Breed 做完整 flash 备份 → 刷 0.9.0 插件；固件
+  镜像内仍是 0.2.0，刷后需 `opkg install --force-reinstall` 新 ipk。
+
 ## 8. 已知问题 / 限制
 
 1. PEAP/EAP-TLS 没有真实 RADIUS 端到端验证；证书策略待确认。
