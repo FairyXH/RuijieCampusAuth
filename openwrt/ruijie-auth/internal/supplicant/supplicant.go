@@ -58,17 +58,17 @@ type Options struct {
 	// ProactiveReauth enables the server/configured interval timer. Off by
 	// default: a healthy session must not be re-authenticated on a timer.
 	ProactiveReauth bool
-	CheckInterval  time.Duration
-	DisableTail    bool
-	NoLogoffFirst  bool
-	Preempt        bool
-	Autoguard      bool
-	LogoffOnStop   bool
-	LockedServer   string
-	Network        func() protocol.NetworkInfo
-	Probe          func(context.Context) bool
-	Status         StatusFunc
-	Log            func(string)
+	CheckInterval   time.Duration
+	DisableTail     bool
+	NoLogoffFirst   bool
+	Preempt         bool
+	Autoguard       bool
+	LogoffOnStop    bool
+	LockedServer    string
+	Network         func() protocol.NetworkInfo
+	Probe           func(context.Context) bool
+	Status          StatusFunc
+	Log             func(string)
 }
 
 // Session runs one account until it fails, pauses, is reloaded, or is

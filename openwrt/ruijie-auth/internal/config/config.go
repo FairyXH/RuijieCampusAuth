@@ -54,21 +54,21 @@ type Config struct {
 	ADTimeout      float64
 	EngineVersion  string
 
-	Timeout         float64
-	Retries         int
-	Repeats         int
-	StartTimeout    float64
-	ResponseDelay   float64
-	ReauthInterval  int
+	Timeout        float64
+	Retries        int
+	Repeats        int
+	StartTimeout   float64
+	ResponseDelay  float64
+	ReauthInterval int
 	// ProactiveReauth schedules a re-authentication after the server's
 	// interval even while the session is healthy. Off by default: on this
 	// campus that timer itself can drop a working session.
 	ProactiveReauth bool
 	// QuietWindow pauses automatic authentication during the campus
 	// maintenance window (default 00:00-06:00), when the auth server is off.
-	QuietWindow bool
-	QuietStart  int
-	QuietEnd    int
+	QuietWindow     bool
+	QuietStart      int
+	QuietEnd        int
 	CheckInterval   float64
 	RetryInterval   float64
 	PauseOnHome     bool
@@ -83,16 +83,16 @@ type Config struct {
 	// ConnectivityFallbacks are well-known HTTPS sites used only after the
 	// DNS quorum and TCP probes both fail.
 	ConnectivityFallbacks []string
-	ConnectivityTimeout float64
-	Disguise            string
-	LogLevel            string
-	Autoguard           bool
-	Preempt             bool
-	DiscoveryCache      bool
-	LogoffOnStop        bool
-	PrivateTail         bool
-	LogoffFirst         bool
-	Accounts            []Account
+	ConnectivityTimeout   float64
+	Disguise              string
+	LogLevel              string
+	Autoguard             bool
+	Preempt               bool
+	DiscoveryCache        bool
+	LogoffOnStop          bool
+	PrivateTail           bool
+	LogoffFirst           bool
+	Accounts              []Account
 }
 
 // Default returns the built-in defaults. No school values are baked in.
