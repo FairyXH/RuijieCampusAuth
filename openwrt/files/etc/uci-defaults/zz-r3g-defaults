@@ -7,9 +7,12 @@
 # accounting and UPnP. OpenClash and frpc stay installed but stopped until
 # a subscription or server is configured, so an unattended router never
 # retries a placeholder endpoint forever.
+#
+# The zz- prefix makes this run after every package uci-defaults script,
+# including luci-openclash and luci-ua3f.
 
 for service in ua3f ruijie-disguise ruijie-auth https-dns-proxy \
-	mwan3 sqm nlbwmon vnstatd miniupnpd upnpd; do
+	mwan3 sqm nlbwmon vnstat miniupnpd upnpd; do
 	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
 done
 
@@ -48,6 +51,14 @@ if [ -f /etc/config/openclash ]; then
 	uci -q set openclash.config.router_self_proxy='1'
 	uci -q set openclash.config.auto_update='0'
 	uci commit openclash
+
+	# luci-openclash registers a firewall include pointing at
+	# /var/etc/openclash.include, a file that only exists while OpenClash
+	# runs. Leaving it registered with the service stopped makes fw4 fail
+	# to load its ruleset on the next reload. The OpenClash init script
+	# re-adds the include when the user enables the service.
+	uci -q delete firewall.openclash
+	uci commit firewall
 fi
 
 # UPnP: LAN side only, secure mode. The external interface is left dynamic
