@@ -266,7 +266,7 @@ func (d *runner) runAccounts(ctx context.Context, cfg config.Config, accounts []
 		}, d.opener)
 		result := session.Run(ctx, d.commands)
 		last = result
-		d.setResult(result)
+		d.setResult(cfg, result)
 		d.record(cfg, result)
 
 		if result.Kind == supplicant.KindFailure && result.Connected &&
@@ -499,7 +499,7 @@ func (d *runner) setContext(cfg config.Config, devices []string) {
 }
 
 // setResult stores the server properties and messages from the last session.
-func (d *runner) setResult(result supplicant.Result) {
+func (d *runner) setResult(cfg config.Config, result supplicant.Result) {
 	d.statusMu.Lock()
 	defer d.statusMu.Unlock()
 	if result.Properties != nil {

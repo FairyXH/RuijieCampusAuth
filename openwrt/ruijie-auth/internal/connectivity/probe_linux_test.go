@@ -48,3 +48,15 @@ func TestHTTPOnLoopback(t *testing.T) {
 		t.Fatal("HTTP probe bound to lo did not reach the test server")
 	}
 }
+
+func TestHTTPAnyOnLoopback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	urls := []string{"http://127.0.0.1:1/", server.URL + "/"}
+	if !HTTPAnyOn(context.Background(), "lo", urls, time.Second) {
+		t.Fatal("HTTPAnyOn did not accept a working URL")
+	}
+}
