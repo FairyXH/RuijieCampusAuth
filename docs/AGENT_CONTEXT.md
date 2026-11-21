@@ -348,7 +348,13 @@ Deep Freeze：
   DROP 规则；旧 `root/root` LuCI 登录已失效，SSH 旧密码被拒。
 - 约束边界已纠正：纯用户态/无 kmod 只针对认证器 ipk；固件包含
   UA3F/DoH/防检测 kmod/Vantage 主题。旧“UA3F/DoH 已移除”表述已删除。
-  新镜像已构建并覆盖 dist/工具包，尚未 sysupgrade 到设备。
+- **2026-11-21 已通过 sysupgrade 刷入（保留配置）**：OpenWrt 24.10.0
+  正常启动；Vantage 为默认主题（`luci.main.mediaurlbase=/luci-static/vantage`，
+  `vantage.css` HTTP 200）；https-dns-proxy 两实例运行（AliDNS + 腾讯），
+  dnsmasq upstream `127.0.0.1#5053/#5054`；UA3F 3.7.0 运行，
+  `UA3F_HELPER` 队列 10301 已拦截 SYN/IPID 流量，TTL/IPID/TCPTS/TCPWIN
+  全开；`disguise=full`。认证自动恢复为“已认证”，WAN `172.18.28.25/17`；
+  LAN/Wi-Fi/root 密码/防火墙 DROP 规则全部保留。
 
 ## 8. 已知问题 / 限制
 
