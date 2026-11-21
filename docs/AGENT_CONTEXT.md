@@ -291,8 +291,13 @@ Deep Freeze：
 - 风险：备份时 BaiduNetdisk 在运行并在目录内生成了
   `backup.log.baiduyun.uploading.cfg`，需确认该目录不在同步范围并检查
   云端副本；factory/MAC 不应上传。
-- 仍待办：刷 Breed → 进 Breed 做完整 flash 备份 → 刷 0.9.0 插件；固件
-  镜像内仍是 0.2.0，刷后需 `opkg install --force-reinstall` 新 ipk。
+- 2026-11-21 已把 Breed 写入原厂 Bootloader 分区（mtd1）：
+  `mtd write /tmp/MiR3G_V1_Breed.bin Bootloader` 返回 0，回读前 137250
+  字节 MD5 `e65d388129a6d1ac39abf99329f1978b` 与源文件一致，剩余部分
+  全 0xFF，factory 分区 MD5 未变。设备尚未重启。
+- 仍待办：断电按住复位上电进 Breed（192.168.1.1）→ 做完整 flash 备份
+  → 刷 OpenWrt → 装 0.9.0 插件。固件镜像内仍是 0.2.0，刷后需
+  `opkg install --force-reinstall` 新 ipk。
 
 ## 8. 已知问题 / 限制
 
