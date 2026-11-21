@@ -55,8 +55,9 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 >
 > 2026-11-21 实测补充：固件内置 UA3F 3.7.0、https-dns-proxy（自定义
 > AdGuardHome DoH）、Vantage 主题 + app；IPID 由 nftables
-> `ip id set 0` 改写，UA3F 只排队 TCP SYN；外网探测为 TCP 53 四目标 +
-> HTTP 204 回退，`ruijie-auth probe` 可自检；日志页为 logs2。
+> `ip id set 0` 改写，UA3F 只排队 TCP SYN；外网探测为 4 个公共 DNS
+> 并行真实查询 + TCP 53 回退，再用百度/Bing/QQ 二次确认；
+> `ruijie-auth probe` 可自检；日志页为 logs2。
 
 > 只要路由器能跑 OpenWrt 24.10、有可用 WAN 口，就能用。无线中继/AP 模式
 > 不适合 802.1X 有线认证。
@@ -258,7 +259,8 @@ scp "<学校>.json" root@192.168.1.1:/etc/ruijie-auth/profiles/
 
 **协议**
 - 认证超时、Start 次数、Start 间隔、每次请求帧数、响应延迟
-- 定时重认证间隔（服务器值优先）
+- 主动重认证（默认关闭；成功后不按定时器重认证）
+- 00:00-06:00 认证关闭时段（暂停自动尝试）
 - 附加私有尾、认证前先发注销、停止时发注销
 
 **守护**
@@ -312,11 +314,14 @@ scp "<学校>.json" root@192.168.1.1:/etc/ruijie-auth/profiles/
 | `repeats` | 3 | 每个请求重复发送次数 |
 | `start_timeout` | 3 | Start 重试间隔（秒） |
 | `response_delay` | 0.04 | 应答前延迟（秒），模仿原客户端 |
-| `reauth_interval` | 21600 | 定时重认证；服务器 `SU_REAUTH_INTERV` 优先 |
+| `reauth_interval` | 0 | 主动重认证间隔；0=关闭，成功后不重认证 |
+| `proactive_reauth` | 0 | 是否允许按服务器/配置间隔主动重认证 |
+| `quiet_window` | 1 | 00:00-06:00 认证关闭时段暂停自动尝试 |
+| `quiet_start` / `quiet_end` | 0 / 360 | 时段起止（分钟，360=06:00） |
 | `check_interval` | 2 | 自动守护的连通性检测间隔 |
 | `retry_interval` | 3 | 失败后重试间隔 |
 | `autoguard` | 1 | 探测失败时自动重新认证 |
-| `preempt` | 1 | 周期性重认证保持会话 |
+| `preempt` | 1 | 断线/被抢占时激进抢占重试 |
 | `pause_on_home` | 1 | 无认证服务器但网络在线时暂停 |
 | `dhcp_mode` | none | `before`/`after` 目前只记录，不驱动 udhcpc |
 

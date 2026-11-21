@@ -80,8 +80,9 @@ Image Builder 的版本和 SHA256 由 `fetch-imagebuilder.sh` 固定。因此同
 - PEAPv0 + MSCHAPv2（RFC 2759，含 MD4、DES 展开、奇偶校验），由
   `auth_mode` 选择；隧道分片、ACK、phase2 状态机与 C# 一致。EAP-TLS 协议栈
   已实现，但双向认证需要客户端证书，当前未开放证书配置入口。
-- 账号池（最多 5 个）、服务器学习/锁定、探测缓存、自动守护、定时重认证、
-  家庭网络暂停、Unix socket 控制、1MB 日志轮转。
+- 账号池（最多 5 个）、服务器学习/锁定、探测缓存、自动守护、
+  成功后不主动重认证、00:00-06:00 认证关闭时段、家庭网络暂停、
+  Unix socket 控制、1MB 日志轮转。
 - WAN 自动识别与多选；MAC 修改（写 `network.<section>.macaddr`）。
 - 学校档案：读取 `/etc/ruijie-auth/profiles`、`/usr/share/ruijie-auth/profiles`
   或上传/粘贴 JSON；导入语义与 C# 一致（只覆盖档案声明字段、先备份）。
@@ -127,7 +128,8 @@ Image Builder 的版本和 SHA256 由 `fetch-imagebuilder.sh` 固定。因此同
 - **UPnP / WoL / 命令面板**：`miniupnpd-nftables`（LAN 侧、secure mode）、
   `luci-app-wol`、`luci-app-commands`。
 - **防检测零配置**：UA3F（desync reorder 开、inject 关）、nftables
-  TTL/MSS/IPID、DoH、TCP+HTTP 探测由首次启动脚本统一启用。
+  TTL/MSS/IPID、DoH、DNS 查询 + TCP 53 + 百度/Bing/QQ 二次确认由
+  首次启动脚本统一启用。
 
 ## 配置与运行数据
 
@@ -190,8 +192,8 @@ ruijie-auth selftest
   HTTP UA 改写默认关闭（`rewrite_mode DIRECT`），避免破坏微信/企业微信。
 - `https-dns-proxy`：当前构建使用自定义 AdGuardHome DoH 端点，dnsmasq
   强制走 DoH；端点可在 `/etc/config/https-dns-proxy` 修改。
-- 外网探测：4 个公共 DNS 的 TCP 53 并行主探测（任一 SYN-ACK/RST 即在线），
-  全部失败后回退 `generate_204`；`ruijie-auth probe` 可直接自检。
+- 外网探测：4 个公共 DNS 并行真实 DNS 查询（任一成功即在线），失败后
+  TCP 53 兜底，再用百度/Bing/QQ 二次确认；`ruijie-auth probe` 可自检。
 - 日志：`ruijie-auth log` + LuCI logs2 页面（避开旧静态文件缓存）。
 
 `disguise=off` 时删除 nft 表并停止 UA3F。认证器二进制与这些包解耦，

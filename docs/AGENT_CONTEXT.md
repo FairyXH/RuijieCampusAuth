@@ -518,3 +518,31 @@ tail-compare.json、full-diff-report.json）。
   overlay 余量全部保持。未接真实打印机；USB/IP 手机绑定受设备重置
   限制，需换稳定设备复测。
 
+### 13.1 2026-11-21 最终修订
+
+- mwan3 原用 `connect.rom.miui.com/generate_204` 跟踪，实测每约 30 秒
+  online→offline→connecting→online 抖动；`flush_conntrack=1` 每次清空
+  所有连接，多设备时大面积卡顿。改为 ICMP 223.5.5.5/119.29.29.29，
+  down/up=3/2，实测连续 6 分钟 online 无切换。
+- 认证器关闭成功后主动重认证：`reauth_interval=0`、
+  `proactive_reauth=0`；服务器发起的重认证仍应答。
+- 新增 00:00-06:00 认证关闭时段 `quiet_window/quiet_start/quiet_end`。
+  实测 20:06-20:08 临时窗口：状态显示“校园网认证关闭时段”，窗口结束
+  自动重新认证成功。
+- 探测改为四台公共 DNS 并行真实 DNS 查询（默认 www.baidu.com），
+  任一成功即在线；TCP 53 兜底；再用百度/Bing/QQ HTTPS 二次确认。
+- Go 二进制内嵌 `time/tzdata`，procd 设置 `TZ=Asia/Shanghai`；修复
+  之前日志/quiet window 按 UTC 运行的问题。
+- NetworkGuardian 显示有线离线的根因是 Windows 有线网卡被我改成静态
+  10.0.0.120 且无默认网关；恢复 DHCP 后 Guardian 的 per-interface
+  探测为 online、outletMatchesPolicy=true，默认出口回到有线
+  （effective metric 11，WiFi 13）。
+- 最终产物：breed 64,487,424（9d6f01c9...）、sysupgrade 56,546,426
+  （243621d6...）、kernel1 3,181,020（f1718d09...）、rootfs0
+  56,098,816（d64f735a...）、ipk 2,848,622（adf4bad1...）、manifest
+  15,633（ca9d039b...）、mipsle 8,061,143（9849e0c2...）、amd64
+  7,352,504（7f4bf5c9...）、lmo 8,076（8b0ac639...）。
+- 最终镜像已在 R3G 刷入并验证：认证、DNS 探测、SQM 95M、mwan3 稳定、
+  HTTPS、UA3F reorder、uhttpd、usbipd、overlay 49.5MiB 均正常。
+
+

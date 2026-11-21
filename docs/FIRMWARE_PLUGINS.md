@@ -44,8 +44,13 @@ https-dns-proxy/vantage 的 zh-cn 包；OpenClash 与 UA3F 的中文 `.lmo`
   HTTPS 无影响，UA3F CPU 0%，系统空闲 93%。
 - UA3F `desync_inject=0`。本校园网实测 TTL 1/2/3、80/443 都会导致
   TLS 握手 EOF，因此默认关闭，避免刷入即断网。
-- 外网探测：4 个公共 DNS 的 TCP 53 并行 + HTTP 204 回退，探针可绑定
-  `wan` 出口。
+- 外网探测：4 个公共 DNS 并发真实 DNS 查询（默认 `www.baidu.com`），
+  任一成功即在线；失败后 TCP 53 兜底，再用百度/Bing/QQ 二次确认；
+  探针可绑定 `wan` 出口。
+- 认证保持：成功后不按定时器主动重认证；00:00-06:00 认证关闭时段暂停
+  自动尝试；断线/被抢占仍保留激进抢占重试。
+- mwan3 跟踪改为 ICMP 223.5.5.5/119.29.29.29，连续 3 次失败才切换，
+  避免 HTTP 204 端点抖动导致每 30 秒清空 conntrack。
 
 报文级证据（TTL/IPID/TS/window 与 reorder 拆分）见
 [`docs/UA3F_VERIFICATION.md`](UA3F_VERIFICATION.md)。
