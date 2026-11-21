@@ -202,8 +202,14 @@ Deep Freeze：
   `ruijie-auth_0.9.0_mipsel_24kc.ipk` 2,299,758 字节，SHA256
   `8da2e94b34b345f5ff429565b1285304e50f5d003cd0ecc3de9898529e13b3d1`；
   8 个 LuCI 页面与源码 LF blob 逐一一致，zh-cn lmo 未变。已覆盖
-  `dist/openwrt/` 与 R3G 工具包；两处固件镜像仍是 2026-11-20 构建
-  （内含 0.2.0），刷完镜像后需再装新 ipk 才是最新 LuCI。
+  `dist/openwrt/` 与 R3G 工具包。
+- **2026-11-21 固件重打**：Breed 镜像 15,466,496 字节，SHA256
+  `47031edf681ae67ba1196259936366938e1465439327e6690461ca75c2781b25`；
+  sysupgrade 9,155,706 字节，SHA256
+  `fb1ec6924dd3f1f6de0d459658d1493dad28aa5930dff09b25e7586446442077`；
+  kernel1 未变 `f1718d09...`，rootfs0 `5049d6b6...`，manifest 含
+  `ruijie-auth - 0.9.0`。镜像内 8 个 LuCI 页面、lmo、init 均与插件一致；
+  已覆盖 dist 与工具包，两处 `sha256sum -c` 全部通过。
 - R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
@@ -299,8 +305,8 @@ Deep Freeze：
   字节 MD5 `e65d388129a6d1ac39abf99329f1978b` 与源文件一致，剩余部分
   全 0xFF，factory 分区 MD5 未变；随后已进入 Breed（192.168.1.1），
   并完成上条所述全片 raw 备份。
-- 仍待办：刷 OpenWrt Breed 镜像 → 装 0.9.0 插件。固件镜像内仍是
-  0.2.0，刷后需 `opkg install --force-reinstall` 新 ipk。
+- 仍待办：刷 OpenWrt Breed 镜像（已含 0.9.0）→ 重启进系统确认 LuCI
+  8 页与中文目录；ipk 仅用于后续免刷更新。
 
 ## 8. 已知问题 / 限制
 
