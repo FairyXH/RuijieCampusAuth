@@ -108,6 +108,7 @@ sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 ruijie-auth version
 ruijie-auth daemon
 ruijie-auth status [--json]
+ruijie-auth log [--lines N]
 ruijie-auth auth|logoff|pause|resume|reload
 ruijie-auth accounts [--json]
 ruijie-auth servers list|lock|unlock|remove|rename
@@ -142,7 +143,8 @@ ruijie-auth selftest
   `disguise=full` 时同时启动 UA3F。
 - UA3F 3.7.0：NFQUEUE 模式，L3 改写 TTL/IPID/TCP timestamp/TCP window；
   HTTP UA 改写默认关闭（`rewrite_mode DIRECT`），避免破坏微信/企业微信。
-- `https-dns-proxy`：AliDNS + Tencent DoH，dnsmasq 强制走 DoH。
+- `https-dns-proxy`：当前构建使用自定义 AdGuardHome DoH 端点，dnsmasq
+  强制走 DoH；端点可在 `/etc/config/https-dns-proxy` 修改。
 
 `disguise=off` 时删除 nft 表并停止 UA3F。认证器二进制与这些包解耦，
 换机器时仍可只安装 ipk。

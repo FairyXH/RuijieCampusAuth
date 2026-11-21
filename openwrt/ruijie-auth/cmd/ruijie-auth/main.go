@@ -39,6 +39,8 @@ func main() {
 			version.Version, version.Commit, runtime.Version(), runtime.GOOS, runtime.GOARCH)
 	case "status":
 		runStatus(os.Args[2:])
+	case "log":
+		runLog(os.Args[2:])
 	case "tail":
 		runTail(os.Args[2:])
 	case "selftest":
@@ -87,6 +89,27 @@ func runStatus(args []string) {
 		stateText(snapshot.State), snapshot.Message, snapshot.Account,
 		snapshot.Interface, snapshot.Server,
 		protocol.ParseAuthMethod(snapshot.AuthMode).Display())
+}
+
+func runLog(args []string) {
+	fs := flag.NewFlagSet("log", flag.ExitOnError)
+	lines := fs.Int("lines", 300, "输出最后 N 行")
+	path := fs.String("file", "/var/log/ruijie-auth.log", "日志文件")
+	_ = fs.Parse(args)
+
+	data, err := os.ReadFile(*path)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+	text := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	start := len(text) - *lines
+	if start < 0 {
+		start = 0
+	}
+	for _, line := range text[start:] {
+		fmt.Println(line)
+	}
 }
 
 func stateText(state string) string {
@@ -653,6 +676,7 @@ func usage() {
   version          打印版本
   daemon           常驻认证守护进程（procd 使用）
   status --json    读取 /var/run/ruijie-auth/status.json
+  log [--lines N]  输出认证日志末尾（默认 300 行）
   auth|logoff|pause|resume|reload
                    通过控制 socket 操作守护进程
   accounts         查看 UCI 账号池（不输出密码）

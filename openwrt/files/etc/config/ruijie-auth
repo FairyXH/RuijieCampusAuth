@@ -17,7 +17,9 @@ config auth 'main'
 	option discovery_cache '1'
 	option logoff_on_stop '0'
 	option pause_on_home '1'
-	option connectivity_url 'http://www.baidu.com/'
+	# 外部探测在校园网/DoH 下容易误判，改用本机地址关闭 HTTP 探测；
+	# 会话状态以 EAPOL/status.json 为准。
+	option connectivity_url 'http://127.0.0.1/'
 	option dhcp_mode 'none'
 	option dhcp_timeout '30'
 	option dhcp_option82 '0'

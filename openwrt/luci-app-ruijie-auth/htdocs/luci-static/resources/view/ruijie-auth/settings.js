@@ -166,10 +166,11 @@ return view.extend({
 		o.placeholder = _('Provided by the school profile');
 
 		o = s.taboption('misc', form.ListValue, 'disguise', _('Frame disguise'),
-			_('Basic rewrites TTL and TCP MSS with nftables; it needs no kernel modules.'));
+			_('Basic rewrites TTL and TCP MSS; Full also runs UA3F for IPID, TCP timestamp and window.'));
 		o.value('off', _('Off'));
 		o.value('basic', _('Basic (TTL/MSS)'));
-		o.default = 'basic';
+		o.value('full', _('Full (UA3F + L3 rewrite)'));
+		o.default = 'full';
 
 		o = s.taboption('misc', form.ListValue, 'log_level', _('Log level'));
 		o.value('error', _('Error'));

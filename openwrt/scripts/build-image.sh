@@ -24,9 +24,13 @@ UA3F_DIR="$OUT/ua3f"
 THEME_VERSION=1.0.21
 THEME_SHA256=fcb3c7cc9bea21fdb2a895155ef5eda65ac6ed797d966b7595c7b314159d1bda
 THEME_I18N_SHA256=9aee7a13ec6c65036b99de5cc595975e90de1265ffaf12ca9b4523e13dc2fc42
+VANTAGE_APP_SHA256=5befdc0313457394e600238a265da848d611a80ae1786d7433196d770c4717f1
+VANTAGE_I18N_SHA256=d8767e292374d6c87620fe273930d96c8203e04ec7c7ae416bc840768be51537
 THEME_BASE_URL="https://github.com/anothaDev/luci-theme-vantage/releases/download/v${THEME_VERSION}"
 THEME_IPK=${THEME_IPK:-"$OUT/theme/luci-theme-vantage_${THEME_VERSION}-r1_all.ipk"}
 THEME_I18N_IPK=${THEME_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-theme-zh-cn_${THEME_VERSION}-r1_all.ipk"}
+VANTAGE_APP_IPK=${VANTAGE_APP_IPK:-"$OUT/theme/luci-app-vantage_${THEME_VERSION}-r1_all.ipk"}
+VANTAGE_I18N_IPK=${VANTAGE_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-zh-cn_${THEME_VERSION}-r1_all.ipk"}
 
 DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 	https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-zh-cn \
@@ -74,9 +78,11 @@ if [ ! -x "$UA3F_DIR/root/usr/bin/ua3f" ]; then
 	exit 2
 fi
 
-# Vantage theme + zh-cn catalog, installed through the Image Builder.
+# Vantage theme + app + zh-cn catalogs, installed through the Image Builder.
 fetch "$THEME_BASE_URL/luci-theme-vantage_${THEME_VERSION}-r1_all.ipk" "$THEME_IPK" "$THEME_SHA256"
 fetch "$THEME_BASE_URL/luci-i18n-vantage-theme-zh-cn_${THEME_VERSION}-r1_all.ipk" "$THEME_I18N_IPK" "$THEME_I18N_SHA256"
+fetch "$THEME_BASE_URL/luci-app-vantage_${THEME_VERSION}-r1_all.ipk" "$VANTAGE_APP_IPK" "$VANTAGE_APP_SHA256"
+fetch "$THEME_BASE_URL/luci-i18n-vantage-zh-cn_${THEME_VERSION}-r1_all.ipk" "$VANTAGE_I18N_IPK" "$VANTAGE_I18N_SHA256"
 
 STAGE="$OUT/files"
 rm -rf "$STAGE"
@@ -91,7 +97,7 @@ chmod 0755 "$STAGE/usr/bin/ua3f" \
 cd "$IB"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \
 	PROFILE="$PROFILE" \
-	PACKAGES="$PACKAGES $THEME_IPK $THEME_I18N_IPK $APP_IPK" \
+	PACKAGES="$PACKAGES $THEME_IPK $THEME_I18N_IPK $VANTAGE_APP_IPK $VANTAGE_I18N_IPK $APP_IPK" \
 	FILES="$STAGE" \
 	-j"$JOBS"
 

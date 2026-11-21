@@ -5,7 +5,8 @@
 
 return view.extend({
 	load: function() {
-		return fs.read('/var/log/ruijie-auth.log')
+		return fs.exec('/usr/sbin/ruijie-auth', [ 'log', '--lines', '400' ])
+			.then(function(res) { return res.stdout || ''; })
 			.catch(function() { return ''; });
 	},
 
@@ -15,8 +16,8 @@ return view.extend({
 		}, data || _('No log file yet.'));
 
 		poll.add(function() {
-			return fs.read('/var/log/ruijie-auth.log').then(function(text) {
-				pre.textContent = text || '';
+			return fs.exec('/usr/sbin/ruijie-auth', [ 'log', '--lines', '400' ]).then(function(res) {
+				pre.textContent = res.stdout || '';
 			}).catch(function() {});
 		}, 3);
 

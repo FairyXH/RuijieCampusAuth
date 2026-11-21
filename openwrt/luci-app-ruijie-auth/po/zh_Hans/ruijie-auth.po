@@ -76,8 +76,8 @@ msgstr "自动识别校园网 WAN 口"
 msgid "Basic (TTL/MSS)"
 msgstr "基础（TTL/MSS）"
 
-msgid "Basic rewrites TTL and TCP MSS with nftables; it needs no kernel modules."
-msgstr "基础模式用 nftables 改写 TTL 与 TCP MSS，不依赖内核模块。"
+msgid "Basic rewrites TTL and TCP MSS; Full also runs UA3F for IPID, TCP timestamp and window."
+msgstr "基础模式改写 TTL 与 TCP MSS；完整模式额外启动 UA3F，改写 IPID、TCP 时间戳和窗口。"
 
 msgid "Build"
 msgstr "构建"
@@ -192,6 +192,9 @@ msgstr "文件"
 
 msgid "Frame disguise"
 msgstr "帧伪装"
+
+msgid "Full (UA3F + L3 rewrite)"
+msgstr "完整（UA3F + L3 改写）"
 
 msgid "Frames per request"
 msgstr "每次请求帧数"
