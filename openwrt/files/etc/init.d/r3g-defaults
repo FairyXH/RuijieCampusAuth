@@ -12,8 +12,19 @@ START=99
 
 start() {
 	local defaults=/etc/uci-defaults/zz-r3g-defaults
-	[ -f "$defaults" ] || return 0
-	if sh "$defaults"; then
-		rm -f "$defaults"
+	if [ -f "$defaults" ]; then
+		if sh "$defaults"; then
+			rm -f "$defaults"
+		fi
+	fi
+
+	# vnstatd can start before its database is writable on the first boot
+	# after sysupgrade. Re-add the monitored interfaces and restart once so
+	# the database always ends up with wan and br-lan.
+	if [ -x /etc/init.d/vnstat ]; then
+		for iface in wan br-lan; do
+			vnstat --add -i "$iface" >/dev/null 2>&1 || true
+		done
+		/etc/init.d/vnstat restart >/dev/null 2>&1 || true
 	fi
 }

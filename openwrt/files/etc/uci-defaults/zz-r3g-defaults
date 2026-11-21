@@ -41,6 +41,14 @@ if [ -n "$wan_zone" ]; then
 	uci commit firewall
 fi
 
+# Uplink rules are IPv4-only; the IPv6 policy stays unreachable because
+# IPv6 is disabled in sysctl. Forcing this also fixes upgrades where the
+# old /etc/config/mwan3 is preserved from the overlay.
+if [ -f /etc/config/mwan3 ]; then
+	uci -q set mwan3.default_rule.family='ipv4'
+	uci commit mwan3
+fi
+
 # OpenClash: redir-host with DNS hijacking off, so dnsmasq + https-dns-proxy
 # stay in charge of DNS. The bundled mihomo core lives in /etc/openclash/core,
 # which is only used when small_flash_memory is 0. core_version stays 0 so
@@ -86,7 +94,9 @@ if [ -f /etc/vnstat.conf ]; then
 	mkdir -p /etc/vnstat
 	sed -i \
 		-e 's|^;DatabaseDir.*|DatabaseDir "/etc/vnstat"|' \
-		-e 's|^;SaveInterval 5|SaveInterval 15|' \
+		-e 's|^DatabaseDir .*|DatabaseDir "/etc/vnstat"|' \
+		-e 's|^;SaveInterval .*|SaveInterval 5|' \
+		-e 's|^SaveInterval .*|SaveInterval 5|' \
 		/etc/vnstat.conf
 fi
 if [ -f /etc/config/nlbwmon ]; then
