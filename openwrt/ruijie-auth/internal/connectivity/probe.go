@@ -18,6 +18,14 @@ import (
 // network/host unreachable does not. This mirrors the Npcap SYN probe's
 // "a TCP reply is enough" rule without needing raw sockets.
 func TCP(ctx context.Context, targets []string, timeout time.Duration) bool {
+	return TCPOn(ctx, "", targets, timeout)
+}
+
+// TCPOn is TCP bound to a specific egress device. With several active
+// uplinks (campus WAN, USB tethering, Wi-Fi STA), the unbound probe follows
+// the default route and can report "online" for the wrong uplink. Binding
+// makes the answer belong to the interface the authenticator is using.
+func TCPOn(ctx context.Context, device string, targets []string, timeout time.Duration) bool {
 	if len(targets) == 0 {
 		return false
 	}
@@ -30,7 +38,7 @@ func TCP(ctx context.Context, targets []string, timeout time.Duration) bool {
 	results := make(chan bool, len(targets))
 	for _, target := range targets {
 		go func(target string) {
-			dialer := net.Dialer{Timeout: timeout}
+			dialer := net.Dialer{Timeout: timeout, Control: deviceControl(device)}
 			conn, err := dialer.DialContext(ctx, "tcp", target)
 			if err == nil {
 				_ = conn.Close()
@@ -56,6 +64,11 @@ func TCP(ctx context.Context, targets []string, timeout time.Duration) bool {
 // HTTP performs the fallback check. A generate_204 endpoint must answer 204;
 // anything else (portal redirect, captive HTML, timeout) is treated as offline.
 func HTTP(ctx context.Context, rawURL string, timeout time.Duration) bool {
+	return HTTPOn(ctx, "", rawURL, timeout)
+}
+
+// HTTPOn is HTTP over a socket bound to device.
+func HTTPOn(ctx context.Context, device, rawURL string, timeout time.Duration) bool {
 	rawURL = strings.TrimSpace(rawURL)
 	if rawURL == "" {
 		return false
@@ -70,8 +83,15 @@ func HTTP(ctx context.Context, rawURL string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
+	dialer := &net.Dialer{Timeout: timeout, Control: deviceControl(device)}
+	transport := &http.Transport{
+		DialContext:       dialer.DialContext,
+		DisableKeepAlives: true,
+	}
+	defer transport.CloseIdleConnections()
 	client := &http.Client{
-		Timeout: timeout,
+		Timeout:   timeout,
+		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

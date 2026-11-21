@@ -1,0 +1,90 @@
+# Uplink order: campus WAN -> USB tethering -> Wi-Fi STA.
+#
+# mwan3 tracks each uplink through its own routing mark, so a link that is
+# physically up but has no Internet (unauthenticated campus port, phone
+# tethering without data) is marked down and the next member takes over.
+# httping to a generate_204 endpoint detects captive portals and DNS
+# blackholes that plain ping would miss.
+#
+# The `usbwan` interface is created by /etc/hotplug.d/net/90-ruijie-usbwan
+# when an Android/iPhone tethering netdev appears. `wwan` is created by LuCI
+# when the router joins an upstream AP. Both are optional at boot.
+
+config globals 'globals'
+	option mmx_mask '0x3F00'
+	option loglevel 'notice'
+
+config interface 'wan'
+	option enabled '1'
+	option family 'ipv4'
+	option track_method 'httping'
+	option httping_ssl '0'
+	list track_ip 'connect.rom.miui.com/generate_204'
+	option reliability '1'
+	option count '1'
+	option timeout '3'
+	option interval '5'
+	option failure_interval '3'
+	option recovery_interval '3'
+	option down '2'
+	option up '2'
+	option flush_conntrack '1'
+
+config interface 'usbwan'
+	option enabled '1'
+	option family 'ipv4'
+	option track_method 'httping'
+	option httping_ssl '0'
+	list track_ip 'connect.rom.miui.com/generate_204'
+	option reliability '1'
+	option count '1'
+	option timeout '3'
+	option interval '5'
+	option failure_interval '3'
+	option recovery_interval '3'
+	option down '2'
+	option up '2'
+	option flush_conntrack '1'
+
+config interface 'wwan'
+	option enabled '1'
+	option family 'ipv4'
+	option track_method 'httping'
+	option httping_ssl '0'
+	list track_ip 'connect.rom.miui.com/generate_204'
+	option reliability '1'
+	option count '1'
+	option timeout '3'
+	option interval '5'
+	option failure_interval '3'
+	option recovery_interval '3'
+	option down '2'
+	option up '2'
+	option flush_conntrack '1'
+
+config member 'wan_m1_w1'
+	option interface 'wan'
+	option metric '1'
+	option weight '1'
+
+config member 'usbwan_m2_w1'
+	option interface 'usbwan'
+	option metric '2'
+	option weight '1'
+
+config member 'wwan_m3_w1'
+	option interface 'wwan'
+	option metric '3'
+	option weight '1'
+
+config policy 'failover'
+	list use_member 'wan_m1_w1'
+	list use_member 'usbwan_m2_w1'
+	list use_member 'wwan_m3_w1'
+	option last_resort 'unreachable'
+
+config rule 'default_rule'
+	option dest_ip '0.0.0.0/0'
+	option proto 'all'
+	option sticky '0'
+	option policy 'failover'

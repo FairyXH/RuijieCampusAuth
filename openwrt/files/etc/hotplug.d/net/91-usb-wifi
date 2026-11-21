@@ -1,0 +1,26 @@
+#!/bin/sh
+
+# Register a newly plugged USB Wi-Fi adapter as a radio.
+#
+# OpenWrt enumerates radios at boot; a USB adapter added later has no UCI
+# radio section. `wifi config` adds missing phys without touching existing
+# ones, then `wifi reload` brings the new radio up. The delay covers the
+# gap between the netdev appearing and cfg80211 finishing registration.
+
+[ "$ACTION" = "add" ] || exit 0
+
+case "$INTERFACE" in
+	wlan*|phy*) ;;
+	*) exit 0 ;;
+esac
+
+[ -d "/sys/class/net/$INTERFACE/wireless" ] || exit 0
+[ -n "$(readlink -f "/sys/class/net/$INTERFACE/device" 2>/dev/null | grep usb)" ] || exit 0
+
+(
+	sleep 3
+	[ -d "/sys/class/net/$INTERFACE/wireless" ] || exit 0
+	/sbin/wifi config >/dev/null 2>&1 || exit 0
+	/sbin/wifi reload >/dev/null 2>&1 || true
+	logger -t usb-wifi "registered USB Wi-Fi radio $INTERFACE"
+) &

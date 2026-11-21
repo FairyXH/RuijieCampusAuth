@@ -32,11 +32,55 @@ THEME_I18N_IPK=${THEME_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-theme-zh-cn_${THE
 VANTAGE_APP_IPK=${VANTAGE_APP_IPK:-"$OUT/theme/luci-app-vantage_${THEME_VERSION}-r1_all.ipk"}
 VANTAGE_I18N_IPK=${VANTAGE_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-zh-cn_${THEME_VERSION}-r1_all.ipk"}
 
+# Every kernel module built for this target, minus the three mutually
+# exclusive variants. Kernel modules are tied to the exact kernel ABI, so
+# anything not preinstalled here can only be added by rebuilding the image.
+# The list is generated from the 24.10.0 ramips/mt7621 kmods index.
+KMODS_FILE=${KMODS_FILE:-"$ROOT/scripts/kmods-all.txt"}
+if [ ! -s "$KMODS_FILE" ]; then
+	echo "kmod list not found: $KMODS_FILE" >&2
+	exit 2
+fi
+ALL_KMODS=$(tr '\n' ' ' <"$KMODS_FILE")
+
+OPENCLASH_VERSION=0.48.002
+OPENCLASH_SHA256=f3f0d0514553aea8d542c62dc52ac26d1f79dbda24204280f1cb8ea7fff71e9e
+OPENCLASH_URL="https://github.com/vernesong/OpenClash/releases/download/v${OPENCLASH_VERSION}/luci-app-openclash_${OPENCLASH_VERSION}_all.ipk"
+OPENCLASH_IPK=${OPENCLASH_IPK:-"$OUT/openclash/luci-app-openclash_${OPENCLASH_VERSION}_all.ipk"}
+
+# MT7621 is a MIPS 24KEc without an FPU; the softfloat build is the correct
+# mihomo core. OpenClash looks for it at /etc/openclash/core/clash_meta.
+MIHOMO_VERSION=1.19.34
+MIHOMO_SHA256=b34bbb86196c32915abf4a5b361c11218ea1da4344a353768f570e79f69d2c04
+MIHOMO_URL="https://github.com/MetaCubeX/mihomo/releases/download/v${MIHOMO_VERSION}/mihomo-linux-mipsle-softfloat-v${MIHOMO_VERSION}.gz"
+MIHOMO_GZ=${MIHOMO_GZ:-"$OUT/openclash/mihomo-linux-mipsle-softfloat-v${MIHOMO_VERSION}.gz"}
+
+# Defaults chosen for a single-router, unattended deployment:
+# - wpad-mbedtls replaces the basic build so STA/enterprise/802.11r work.
+# - dnsmasq-full replaces dnsmasq; OpenClash needs its nftset/ipset support.
+# - tc-tiny is the smallest provider of the virtual `tc` package SQM needs.
+# - OpenClash and frpc are installed and configured but not started; both
+#   need user credentials before they can do anything useful.
 DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 	https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-zh-cn \
 	kmod-nft-queue kmod-nft-tproxy kmod-nfnetlink-queue kmod-nf-conntrack-netlink \
 	iptables iptables-mod-tproxy iptables-mod-extra iptables-mod-ipopt \
-	iptables-mod-nfqueue iptables-mod-conntrack-extra ipset luci-compat"
+	iptables-mod-nfqueue iptables-mod-conntrack-extra ipset luci-compat \
+	wpad-mbedtls -wpad-basic-mbedtls \
+	dnsmasq-full -dnsmasq \
+	mwan3 luci-app-mwan3 luci-i18n-mwan3-zh-cn \
+	sqm-scripts luci-app-sqm luci-i18n-sqm-zh-cn tc-tiny kmod-ifb kmod-sched-cake \
+	nlbwmon luci-app-nlbwmon luci-i18n-nlbwmon-zh-cn \
+	vnstat2 vnstati2 luci-app-vnstat2 luci-i18n-vnstat2-zh-cn \
+	frpc luci-app-frpc luci-i18n-frpc-zh-cn \
+	miniupnpd-nftables luci-app-upnp luci-i18n-upnp-zh-cn \
+	luci-app-wol luci-i18n-wol-zh-cn etherwake \
+	luci-app-commands luci-i18n-commands-zh-cn \
+	usbutils usb-modeswitch pciutils ethtool iw \
+	e2fsprogs dosfstools f2fs-tools ntfs-3g btrfs-progs \
+	bash curl ca-bundle unzip ip-full httping \
+	ruby ruby-yaml kmod-tun kmod-inet-diag kmod-netlink-diag \
+	$ALL_KMODS"
 PACKAGES=${PACKAGES:-$DEFAULT_PACKAGES}
 
 if [ ! -d "$IB" ]; then
@@ -84,12 +128,19 @@ fetch "$THEME_BASE_URL/luci-i18n-vantage-theme-zh-cn_${THEME_VERSION}-r1_all.ipk
 fetch "$THEME_BASE_URL/luci-app-vantage_${THEME_VERSION}-r1_all.ipk" "$VANTAGE_APP_IPK" "$VANTAGE_APP_SHA256"
 fetch "$THEME_BASE_URL/luci-i18n-vantage-zh-cn_${THEME_VERSION}-r1_all.ipk" "$VANTAGE_I18N_IPK" "$VANTAGE_I18N_SHA256"
 
+# OpenClash and its core are fetched with pinned checksums. The app package
+# does not ship a core, so the softfloat mihomo binary is staged separately.
+fetch "$OPENCLASH_URL" "$OPENCLASH_IPK" "$OPENCLASH_SHA256"
+fetch "$MIHOMO_URL" "$MIHOMO_GZ" "$MIHOMO_SHA256"
+
 STAGE="$OUT/files"
 rm -rf "$STAGE"
-mkdir -p "$STAGE/usr/bin"
+mkdir -p "$STAGE/usr/bin" "$STAGE/etc/openclash/core"
 cp -a "$ROOT/files/." "$STAGE/"
 cp "$UA3F_DIR/root/usr/bin/ua3f" "$STAGE/usr/bin/ua3f"
+gzip -dc "$MIHOMO_GZ" >"$STAGE/etc/openclash/core/clash_meta"
 chmod 0755 "$STAGE/usr/bin/ua3f" \
+	"$STAGE/etc/openclash/core/clash_meta" \
 	"$STAGE/etc/init.d/ua3f" \
 	"$STAGE/etc/init.d/ruijie-disguise" \
 	"$STAGE/etc/init.d/ruijie-auth" 2>/dev/null || true
@@ -97,7 +148,7 @@ chmod 0755 "$STAGE/usr/bin/ua3f" \
 cd "$IB"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \
 	PROFILE="$PROFILE" \
-	PACKAGES="$PACKAGES $THEME_IPK $THEME_I18N_IPK $VANTAGE_APP_IPK $VANTAGE_I18N_IPK $APP_IPK" \
+	PACKAGES="$PACKAGES $UA3F_IPK $THEME_IPK $THEME_I18N_IPK $VANTAGE_APP_IPK $VANTAGE_I18N_IPK $OPENCLASH_IPK $APP_IPK" \
 	FILES="$STAGE" \
 	-j"$JOBS"
 

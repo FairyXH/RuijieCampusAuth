@@ -149,8 +149,8 @@ func (d *runner) loop(ctx context.Context) {
 				return
 			}
 			continue
-		case supplicant.KindNoServer:
-			if cfg.PauseOnHome && d.probe(ctx, cfg) {
+			case supplicant.KindNoServer:
+				if cfg.PauseOnHome && d.probe(ctx, cfg, device) {
 				d.setStatus("paused", "未检测到认证服务器，当前网络在线，暂停认证",
 					activeName(cfg), device, "")
 				switch d.pauseLoop(ctx, cfg) {
@@ -237,7 +237,7 @@ func (d *runner) runAccounts(ctx context.Context, cfg config.Config, accounts []
 				return network.Collect(device)
 			},
 			Probe: func(ctx context.Context) bool {
-				return d.probe(ctx, cfg)
+				return d.probe(ctx, cfg, device)
 			},
 			Status: func(state, message, server string) {
 				d.setStatus(state, message, account.Username, device, server)
@@ -278,7 +278,7 @@ func (d *runner) pauseLoop(ctx context.Context, cfg config.Config) string {
 		case "logoff":
 			return "logoff"
 		case "timeout":
-			if !d.probe(ctx, cfg) {
+			if !d.probe(ctx, cfg, device) {
 				return "resume"
 			}
 		}
@@ -376,17 +376,17 @@ func (d *runner) record(cfg config.Config, result supplicant.Result) {
 	}
 }
 
-func (d *runner) probe(ctx context.Context, cfg config.Config) bool {
+func (d *runner) probe(ctx context.Context, cfg config.Config, device string) bool {
 	timeout := seconds(cfg.ConnectivityTimeout)
 	if timeout <= 0 {
 		timeout = 2 * time.Second
 	}
 	if len(cfg.ConnectivityTargets) > 0 {
-		if connectivity.TCP(ctx, cfg.ConnectivityTargets, timeout) {
+		if connectivity.TCPOn(ctx, device, cfg.ConnectivityTargets, timeout) {
 			return true
 		}
 		if isHTTPProbeURL(cfg.ConnectivityURL) {
-			return connectivity.HTTP(ctx, cfg.ConnectivityURL, timeout)
+			return connectivity.HTTPOn(ctx, device, cfg.ConnectivityURL, timeout)
 		}
 		return false
 	}

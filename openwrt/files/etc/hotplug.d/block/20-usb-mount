@@ -1,0 +1,58 @@
+#!/bin/sh
+
+# Zero-configuration USB storage mount.
+#
+# Hotplug runs before the filesystem is necessarily ready and the block
+# event can fire more than once, so this waits briefly, resolves the type
+# through `block info`, and skips devices that are already mounted. The
+# mount point is derived from the kernel name (/mnt/usb-sda1) rather than
+# the filesystem label: labels are untrusted strings and cannot be used in
+# a path without sanitising them.
+
+[ "$ACTION" = "add" ] || exit 0
+
+case "$DEVNAME" in
+	/dev/sd[a-z][0-9]*|/dev/mmcblk[0-9]p[0-9]*|/dev/nvme[0-9]n[0-9]p[0-9]*) ;;
+	*) exit 0 ;;
+esac
+
+[ -x /sbin/block ] || exit 0
+
+i=0
+while [ ! -b "$DEVNAME" ] && [ "$i" -lt 10 ]; do
+	sleep 1
+	i=$((i + 1))
+done
+[ -b "$DEVNAME" ] || exit 0
+
+mount | grep -q " $DEVNAME " && exit 0
+
+info=$(block info "$DEVNAME" 2>/dev/null) || exit 0
+type=$(printf '%s\n' "$info" | sed -n 's/^TYPE="\(.*\)"$/\1/p')
+[ -n "$type" ] || exit 0
+
+name=${DEVNAME##*/}
+mp="/mnt/usb-$name"
+mkdir -p "$mp"
+
+case "$type" in
+	vfat|msdos)
+		opts="rw,noatime,utf8,umask=0000"
+		;;
+	exfat)
+		opts="rw,noatime,umask=0000"
+		;;
+	ntfs|ntfs3)
+		opts="rw,noatime,umask=0000"
+		;;
+	*)
+		opts="rw,noatime"
+		;;
+esac
+
+if mount -t "$type" -o "$opts" "$DEVNAME" "$mp"; then
+	logger -t usb-mount "mounted $DEVNAME ($type) on $mp"
+else
+	logger -t usb-mount "failed to mount $DEVNAME ($type)"
+	rmdir "$mp" 2>/dev/null || true
+fi

@@ -1,0 +1,64 @@
+#!/bin/sh
+
+# First-boot defaults for the R3G full image.
+#
+# Everything that can work without user credentials is enabled here:
+# campus authentication/disguise, DoH, uplink failover, SQM, traffic
+# accounting and UPnP. OpenClash and frpc stay installed but stopped until
+# a subscription or server is configured, so an unattended router never
+# retries a placeholder endpoint forever.
+
+for service in ua3f ruijie-disguise ruijie-auth https-dns-proxy \
+	mwan3 sqm nlbwmon vnstatd miniupnpd upnpd; do
+	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
+done
+
+# These two need external configuration before they are useful.
+for service in openclash frpc; do
+	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" disable
+done
+
+# Put the USB tethering and Wi-Fi STA interfaces into the existing wan
+# firewall zone. Both names are referenced by mwan3 but only appear when
+# the corresponding uplink is actually configured.
+wan_zone=$(uci show firewall 2>/dev/null | \
+	sed -n "s/^firewall\.\(@zone\[[0-9]*\]\)\.name='wan'$/\1/p" | head -n1)
+if [ -n "$wan_zone" ]; then
+	for net in usbwan wwan; do
+		uci -q del_list "firewall.$wan_zone.network=$net"
+		uci -q add_list "firewall.$wan_zone.network=$net"
+	done
+	uci commit firewall
+fi
+
+# OpenClash: redir-host with DNS hijacking off, so dnsmasq + https-dns-proxy
+# stay in charge of DNS. The bundled mihomo core lives in /etc/openclash/core,
+# which is only used when small_flash_memory is 0. core_version stays 0 so
+# OpenClash does not try to download a core on first start.
+if [ -f /etc/config/openclash ]; then
+	uci -q set openclash.config.enable='0'
+	uci -q set openclash.config.operation_mode='redir-host'
+	uci -q set openclash.config.en_mode='redir-host'
+	uci -q set openclash.config.proxy_mode='rule'
+	uci -q set openclash.config.enable_redirect_dns='0'
+	uci -q set openclash.config.redirect_dns='0'
+	uci -q set openclash.config.small_flash_memory='0'
+	uci -q set openclash.config.core_version='0'
+	uci -q set openclash.config.intranet_allowed='1'
+	uci -q set openclash.config.router_self_proxy='1'
+	uci -q set openclash.config.auto_update='0'
+	uci commit openclash
+fi
+
+# UPnP: LAN side only, secure mode. The external interface is left dynamic
+# so it follows whichever uplink mwan3 currently prefers.
+if [ -f /etc/config/upnpd ]; then
+	uci -q set upnpd.config.enabled='1'
+	uci -q set upnpd.config.enable_upnp='1'
+	uci -q set upnpd.config.enable_natpmp='1'
+	uci -q set upnpd.config.secure_mode='1'
+	uci -q set upnpd.config.internal_iface='lan'
+	uci commit upnpd
+fi
+
+exit 0
