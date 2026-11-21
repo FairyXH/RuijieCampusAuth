@@ -300,6 +300,8 @@ sh scripts/build-image.sh    # 生成整机固件（默认 R3G Image Builder）
 | [docs/OPENWRT_PORT.md](docs/OPENWRT_PORT.md) | C# → OpenWrt 移植对照、行为对齐与验证 |
 | [docs/OPENWRT_BUILD_ENV.md](docs/OPENWRT_BUILD_ENV.md) | 构建环境、ipk/镜像打包与 Breed 镜像流程 |
 | [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt 移植可行性评估与 R3G 专项 |
+| [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | 精简固件预装插件、kmod、更新与构建 |
+| [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | UA3F/nftables 防检测的报文级实机验证 |
 
 ### 9.5 运维与工具
 

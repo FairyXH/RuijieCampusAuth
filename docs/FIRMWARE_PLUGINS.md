@@ -47,6 +47,9 @@ https-dns-proxy/vantage 的 zh-cn 包；OpenClash 与 UA3F 的中文 `.lmo`
 - 外网探测：4 个公共 DNS 的 TCP 53 并行 + HTTP 204 回退，探针可绑定
   `wan` 出口。
 
+报文级证据（TTL/IPID/TS/window 与 reorder 拆分）见
+[`docs/UA3F_VERIFICATION.md`](UA3F_VERIFICATION.md)。
+
 ## 内核模块
 
 预装 237 个 kmod（依赖闭包），清单见 `openwrt/scripts/kmods-r3g.txt`：
