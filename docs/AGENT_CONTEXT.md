@@ -330,6 +330,12 @@ Deep Freeze：
   PC 走 LAN 源地址 ping 也 3/3；DNS 经 `10.0.0.1` 解析正常。
 - `servers list` 在会话存活期间为空是预期行为：`record` 在会话结束后
   才写 `servers.json`，不影响认证与联网。
+- 2026-11-21 无线已启用：2.4G `ZhangCampus-2.4GHz`（自动信道，实测
+  信道 1，HT20）；5G `ZhangCampus`（信道 149，VHT80）；均 WPA2-PSK /
+  CCMP，country `CN`，桥接 `lan`。PC 扫描确认两个 SSID、信号 99%。
+- 2026-11-21 完整认证循环：`logoff` → `idle`（已注销）→ `auth` →
+  认证中（清理旧会话）→ 已认证（欢迎语 + server MAC），随后 ping 3/3。
+  下线后交换机仍有几秒放行窗口，短时间内 ping 仍通，属校园网侧策略延迟。
 
 ## 8. 已知问题 / 限制
 
