@@ -37,10 +37,13 @@ openwrt/
     po/zh_Hans/ruijie-auth.po    简体中文翻译
     root/.../menu.d、acl.d、uci-defaults
   files/                       ipk 里的系统文件（init、UCI 默认值、hotplug）
+  vendor/                      固定版本的外部插件（UA3F/OpenClash/mihomo/Vantage）
   scripts/
     build-go.sh                交叉编译
     build-ipk.sh               打 ipk（含 LuCI 与中文 .lmo）
     build-image.sh             组装固件
+    fetch-imagebuilder.sh      下载并校验固定版本 Image Builder
+    kmods-all.txt              目标 feed 的完整 kmod 清单
     po2lmo.py                  把 .po 编译成 LuCI 的 .lmo
 ```
 
@@ -53,8 +56,13 @@ Ubuntu 侧：
 cd openwrt
 sh scripts/build-go.sh      # 只编译 daemon
 sh scripts/build-ipk.sh     # 打 ipk（默认 mipsle，可用 GOARCH= 改）
+sh scripts/fetch-imagebuilder.sh  # 首次构建：下载并校验 24.10.0 IB
 sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 ```
+
+`build-image.sh` 优先使用 `vendor/` 里的固定版本插件，其次才联网下载；
+Image Builder 的版本和 SHA256 由 `fetch-imagebuilder.sh` 固定。因此同一
+份仓库在干净环境里可以复现同一套包和内核 ABI。
 
 `build-ipk.sh` 需要 `python3` 生成中文 `.lmo`；没有 python3 时只跳过翻译，
 其余照常构建。
@@ -86,6 +94,31 @@ sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
 - Windows 专用 DHCP 控制（`dhcp_mode` 目前只记录，不驱动 udhcpc）。
 - 无线 WPA2-Enterprise 档案管理与诊断页（OUI/ARP/代理探测）。
 
+## 整机固件附加能力
+
+- **全量 kmod**：目标 feed 的 1034 个内核模块全部预装，USB 存储/UAS/
+  串口/网卡/无线网卡/音频/视频/HID、常用文件系统、板载 GPIO/I2C/SPI/
+  MMC/HWMON、完整 netfilter 与 VPN 模块都在 rootfs 里。互斥变体除外，
+  清单见 `scripts/kmods-all.txt`。
+- **USB 存储**：`20-usb-mount` 热插拔自动挂载到 `/mnt/usb-<dev>`，支持
+  vfat/exfat/NTFS3/ext4/f2fs/Btrfs/XFS；拔出时自动卸载。
+- **USB 网络**：`90-ruijie-usbwan` 识别 RNDIS/NCM/ECM 和 iPhone ipheth，
+  自动创建 `usbwan`；`91-usb-wifi` 让后插入的 USB 无线网卡自动注册为
+  radio。
+- **上行故障切换**：`mwan3` 按 校园 WAN → USB 共享 → Wi-Fi STA 排序，
+  httping 探测 204 端点，5 秒周期、连续 2 次失败切换；Wi-Fi STA 用
+  LuCI 无线页连接上游 AP，接口名 `wwan`。
+- **QoS**：SQM + CAKE，默认 200/200 Mbit，`dual-srchost`/`dual-dsthost`
+  按主机隔离，避免单设备占满带宽。
+- **流量统计**：`nlbwmon` 按设备、`vnstat2` 按接口，均为轻量实现。
+- **OpenClash**：0.48.002 + mihomo 1.19.34 softfloat 核心，默认
+  `redir-host`、不劫持 DNS，和 dnsmasq + DoH 共存；无订阅时保持停止。
+- **frpc**：0.51.3 + LuCI，预配置但停止，填写服务器后一键启用。
+- **UPnP / WoL / 命令面板**：`miniupnpd-nftables`（LAN 侧、secure mode）、
+  `luci-app-wol`、`luci-app-commands`。
+- **防检测零配置**：UA3F、nftables TTL/MSS/IPID、DoH、TCP+HTTP 探测
+  由 `zz-r3g-defaults` 在首次启动统一启用。
+
 ## 配置与运行数据
 
 | 路径 | 用途 |
@@ -109,7 +142,7 @@ ruijie-auth version
 ruijie-auth daemon
 ruijie-auth status [--json]
 ruijie-auth log [--lines N]
-ruijie-auth probe
+ruijie-auth probe [--device <iface>]
 ruijie-auth auth|logoff|pause|resume|reload
 ruijie-auth accounts [--json]
 ruijie-auth servers list|lock|unlock|remove|rename
@@ -154,14 +187,21 @@ ruijie-auth selftest
 `disguise=off` 时删除 nft 表并停止 UA3F。认证器二进制与这些包解耦，
 换机器时仍可只安装 ipk。
 
-`files/etc/hotplug.d/net/90-ruijie-usbwan` 仍保留：插手机 USB 共享时自动
-建 `usbwan` 备用 WAN。它只是脚本，没有 kmod 也能安全存在（没有对应驱动时
-不会触发）。
+`files/etc/hotplug.d/net/90-ruijie-usbwan` 负责 USB 共享备用 WAN：识别
+RNDIS/NCM/ECM/ipheth 后自动创建 `usbwan`，并交给 mwan3 管理。固件已预装
+对应 usbnet 驱动，插上手机即可用；`91-usb-wifi` 负责后插入的 USB 无线
+网卡注册。
 
 ## 升级与迁移
 
 - `/etc/config/ruijie-auth` 是 conffile，`opkg install --force-reinstall`
   不会覆盖账号和档案。
+- UA3F、Vantage、OpenClash 同样以 ipk 安装，可在不重刷固件的情况下
+  `opkg install --force-reinstall <newer.ipk>` 升级；mihomo 核心直接替换
+  `/etc/openclash/core/clash_meta`。
+- 常驻 feed 包（mwan3/SQM/统计/frpc/UPnP）可直接 `opkg update && opkg
+  upgrade`。内核模块必须与 24.10.0 的 `6.6.73~3abe85de...-r1` 完全匹配，
+  不要跨版本升级内核。
 - 从改名前的老包迁移：老包的配置文件名与包名不同，先停老服务，把老配置
   内容手工复制到 `/etc/config/ruijie-auth`，再安装新 ipk。
 
