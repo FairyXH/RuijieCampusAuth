@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"time"
+	_ "time/tzdata"
 
 	"ruijie-auth/internal/config"
 	"ruijie-auth/internal/connectivity"
