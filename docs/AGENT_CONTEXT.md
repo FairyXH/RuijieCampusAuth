@@ -284,20 +284,23 @@ Deep Freeze：
   Breed 镜像绝对偏移 `0x200000/0x600000/0xA00000` 与原厂 kernel0/
   kernel1/rootfs0 对齐；工具包 Breed 文件 SHA256 与预期一致
   （`05ebb31f...`），设备 mtd1 仍是原厂 bootloader。
-- 备份：`D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt\Backup`，457MB，
-  23 个分区 dump + OOB + 17 个文本快照，40 项 SHA256 全通过。
-  未取得含 OOB/ECC/坏块标记的 128MB 编程器级 raw 镜像，需进 Breed 后
-  做“完整 flash 备份”。
+- 备份：`D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt\Backup`，589MB；
+  23 个分区 dump + OOB + 17 个文本快照 + Breed 全片 raw
+  （`MiR3G_V1_编程器固件模板_raw.bin`，138,412,032 字节 = 128MB 数据
+  + 4MB OOB，SHA256 `3c4532d4...`），43 项 SHA256 全通过。
+  raw 布局为 4×[512 数据 + 16 OOB]；拆 OOB 后 kernel0/1、rootfs0、
+  overlay、config..reserved0 与刷 Breed 前逐字节一致，rootfs1 仅 2 个
+  单比特差异；OOB spare[0] 全 0xFF，无坏块标记。
 - 风险：备份时 BaiduNetdisk 在运行并在目录内生成了
   `backup.log.baiduyun.uploading.cfg`，需确认该目录不在同步范围并检查
   云端副本；factory/MAC 不应上传。
 - 2026-11-21 已把 Breed 写入原厂 Bootloader 分区（mtd1）：
   `mtd write /tmp/MiR3G_V1_Breed.bin Bootloader` 返回 0，回读前 137250
   字节 MD5 `e65d388129a6d1ac39abf99329f1978b` 与源文件一致，剩余部分
-  全 0xFF，factory 分区 MD5 未变。设备尚未重启。
-- 仍待办：断电按住复位上电进 Breed（192.168.1.1）→ 做完整 flash 备份
-  → 刷 OpenWrt → 装 0.9.0 插件。固件镜像内仍是 0.2.0，刷后需
-  `opkg install --force-reinstall` 新 ipk。
+  全 0xFF，factory 分区 MD5 未变；随后已进入 Breed（192.168.1.1），
+  并完成上条所述全片 raw 备份。
+- 仍待办：刷 OpenWrt Breed 镜像 → 装 0.9.0 插件。固件镜像内仍是
+  0.2.0，刷后需 `opkg install --force-reinstall` 新 ipk。
 
 ## 8. 已知问题 / 限制
 
