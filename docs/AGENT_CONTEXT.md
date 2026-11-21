@@ -203,19 +203,19 @@ Deep Freeze：
   `8da2e94b34b345f5ff429565b1285304e50f5d003cd0ecc3de9898529e13b3d1`；
   8 个 LuCI 页面与源码 LF blob 逐一一致，zh-cn lmo 未变。已覆盖
   `dist/openwrt/` 与 R3G 工具包。
-- **2026-11-21 整机固件重打（UA3F/DoH/Vantage app/log）**：源码 main
-  `f63d86f`，sysupgrade 14,490,746 字节，SHA256
-  `64e4add7a0dfed00ceb5d225c4686d7d1fb7a5430a8de19d5966f9f4e8ece26d`；
-  Breed 21,102,592 字节，SHA256
-  `a741eea5c323016e4a64a8a62efdfc02f71064b69e3c404cf9a601a6d2491684`；
-  kernel1 未变 `f1718d09...`，rootfs0 12,713,984 字节 `a8b50249...`。
-  ipk 2,302,610 字节 `dd756473...`（新增 `log` 命令与 `full` 选项）。
+- **2026-11-21 最终整机固件**：源码 main `8f3d877`，sysupgrade
+  14,808,186 字节，SHA256
+  `75f3e71a520ad448006b3149b9907883d0bbdb42a5c1120182030bcbbb19f02d`；
+  Breed 21,364,736 字节，SHA256
+  `4d8a44d5cf998429288fd5e8105991f01a3174832ff03ea8ae02190734543160`；
+  kernel1 未变 `f1718d09...`，rootfs0 12,976,128 字节 `778ef9b9...`。
+  ipk 2,742,009 字节 `3a95271c...`（log/probe/full/logs2）。
   manifest 含 `luci-app-vantage`、`luci-i18n-vantage-zh-cn`、
   `luci-theme-vantage`、`https-dns-proxy`、`luci-app-https-dns-proxy`、
   `luci-i18n-https-dns-proxy-zh-cn`、防检测 kmod、iptables 模块、ipset、
   luci-compat；UA3F 3.7.0 通过 FILES 内置（`/usr/bin/ua3f`），
   `ruijie-disguise` 默认 `full`，UA3F S98 → disguise S99。DoH 使用自定义
-  AdGuardHome 端点；`connectivity_url` 默认 `http://127.0.0.1/`。
+  AdGuardHome 端点；外网探测为 TCP 53 四目标 + HTTP 204 回退。
 - R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
@@ -349,25 +349,33 @@ Deep Freeze：
   DROP 规则；旧 `root/root` LuCI 登录已失效，SSH 旧密码被拒。
 - 约束边界已纠正：纯用户态/无 kmod 只针对认证器 ipk；固件包含
   UA3F/DoH/防检测 kmod/Vantage 主题。旧“UA3F/DoH 已移除”表述已删除。
-- **2026-11-21 已通过 sysupgrade 刷入（保留配置）**：OpenWrt 24.10.0
-  正常启动；Vantage 主题 + `luci-app-vantage` 均已安装，默认主题
-  `/luci-static/vantage`，`admin/dashboard` 由 Vantage app 接管；
-  `https-dns-proxy` 使用自定义 AdGuardHome 端点（单实例 5053），
-  dnsmasq upstream 仅 `127.0.0.1#5053`，LuCI 菜单“HTTPS DNS 代理”中文正常；
-  UA3F 3.7.0 运行，`UA3F_HELPER` 队列 10301 拦截 SYN/IPID，TTL/IPID/
-  TCPTS/TCPWIN 全开；`disguise=full`。LAN 客户端经路由器 ping/DNS 正常。
-- **断网根因（2026-11-21）**：`connectivity_url=http://www.baidu.com/`
-  探测失败时，autoguard 每 5 秒触发“检测到掉线，重新认证”；
-  `logoff_first=1` 每次重认证先发 logoff，端口被真实踢下线，形成
-  5 秒一次的断网循环。停 UA3F 后循环仍在，CPU 空闲 97%，排除 UA3F 和
-  算力；手机/平板只是让探测更容易失败。修复：`connectivity_url` 改为
-  `http://127.0.0.1/`（探测恒真），认证连续稳定。锐捷没有可直接调用的
-  HTTP 状态接口；服务器私有属性只有 `INDICATE_SERV_IP/INDICATE_PORT/
-  MSG_CLIENT_PORT`，SAM direct 未实现；EAPOL 会话与 `status.json` 才是
-  权威状态。
-- **日志页修复**：旧页用 `fs.read`，ACL 拒绝导致空白；新增
-  `ruijie-auth log [--lines N]`，`logs.js` 改用 `fs.exec`。实机验证
-  `fs.exec` 返回完整中文日志，日志页 HTTP 200。
+- **2026-11-21 最终 sysupgrade（保留配置）**：OpenWrt 24.10 正常；
+  Vantage 主题 + app 默认；DoH 单实例 5053；UA3F 3.7.0 运行，
+  NFQUEUE 只排队 TCP SYN（`HOOK_TCP_SYN`），TCP timestamp/window 开启；
+  IPID 由 nftables `ip id set 0` 内核改写；`disguise=full`。
+  `ruijie-auth probe` 实测“在线”（4 个 TCP 53 目标中
+  223.5.5.5:53、114.114.114.114:53 可达）；认证稳定，无重认证循环；
+  LAN 客户端经路由器 ping/DNS 正常；CPU 95% idle、load 1.06。
+- **CPU/IPID 结论（2026-11-21）**：UA3F 原 IPID 规则把
+  `ip id != 0` 的所有 TCP 包送入 NFQUEUE（402,838 包 / 324MB，
+  UA3F 74% CPU，load 5.37，仅 10% idle），平板和电脑同时在线即卡顿。
+  关闭 UA3F IPID 后只剩 SYN（449 包），CPU 95% idle。为不降低防护，
+  `ruijie-disguise` 在 nftables 中执行 `ip id set 0`，与 UA3F 原行为
+  等价且内核开销接近零。IPID 是 IPv4 分片标识；多设备 NAT 下的 IPID
+  模式可被用于指纹共享，写 0 隐藏该模式（分片流量设 0 可能影响重组，
+  校园 TCP 普遍 DF，无影响）。
+- **外网探测（学习 NetworkGuardian）**：管家默认用 4 个公共 DNS 的
+  TCP 53 + ICMP，Npcap 二层直发，任一 TCP 回复（SYN-ACK/RST）或 ICMP
+  回复即在线，quorum=1，2s/轮 3.5s；另有 HTTP/HTTPS 回退（NCSI
+  connecttest 含 body marker、Baidu/Bing/QQ、gstatic/MIUI
+  generate_204），检查状态码、重定向与门户劫持。认证器用等效用户态
+  实现：TCP 53 四目标并行主探测 + MIUI 204 回退，`ruijie-auth probe`
+  可自检；不再依赖百度。
+- **日志页修复**：旧页 `fs.read` 被 ACL 拒绝；新增 `ruijie-auth log`
+  与 `logs2.js`（`fs.exec`），菜单 logs 指向 logs2 以绕开旧 JS 缓存。
+  实机 `fs.exec` 返回完整中文日志，页面 HTTP 200，翻译含“日志读取失败”。
+- UA3F 没有官方 LuCI；详细参数在 `/etc/config/ua3f`，认证器 LuCI 的
+  “帧伪装”提供 off/basic/full（full 启停 UA3F）。
 
 ## 8. 已知问题 / 限制
 

@@ -139,12 +139,16 @@ ruijie-auth selftest
 
 认证器 ipk 本身不带任何 kmod；固件镜像默认包含以下整机功能：
 
-- `ruijie-disguise`：nftables 基础改写（TTL=128、TCP MSS=1460）；
-  `disguise=full` 时同时启动 UA3F。
-- UA3F 3.7.0：NFQUEUE 模式，L3 改写 TTL/IPID/TCP timestamp/TCP window；
+- `ruijie-disguise`：nftables 改写 IPv4 TTL=128、TCP MSS=1460，并在内核
+  直接 `ip id set 0`；`disguise=full` 时同时启动 UA3F。
+- UA3F 3.7.0：NFQUEUE 只排队 TCP SYN，改写 TCP timestamp / initial window；
+  IPID 改写关闭（nft 已接管，避免 MT7621 上全量 NFQUEUE 打满 CPU）。
   HTTP UA 改写默认关闭（`rewrite_mode DIRECT`），避免破坏微信/企业微信。
 - `https-dns-proxy`：当前构建使用自定义 AdGuardHome DoH 端点，dnsmasq
   强制走 DoH；端点可在 `/etc/config/https-dns-proxy` 修改。
+- 外网探测：4 个公共 DNS 的 TCP 53 并行主探测（任一 SYN-ACK/RST 即在线），
+  全部失败后回退 `generate_204`；`ruijie-auth probe` 可直接自检。
+- 日志：`ruijie-auth log` + LuCI logs2 页面（避开旧静态文件缓存）。
 
 `disguise=off` 时删除 nft 表并停止 UA3F。认证器二进制与这些包解耦，
 换机器时仍可只安装 ipk。
