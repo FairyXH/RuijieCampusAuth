@@ -35,7 +35,8 @@ start() {
 	fi
 
 	if [ "$mode" = "full" ]; then
-		/etc/init.d/ua3f restart 2>/dev/null
+		# ua3f starts at S98; only start it here after a manual stop/reload.
+		pidof ua3f >/dev/null 2>&1 || /etc/init.d/ua3f start 2>/dev/null
 	else
 		/etc/init.d/ua3f stop 2>/dev/null
 	fi
