@@ -1,0 +1,19 @@
+#!/bin/sh
+
+# p910nd opens /dev/usb/lp0 at start; a printer plugged in after boot needs
+# the service restarted. The ls check avoids restarting on every USB event
+# (storage, tethering, Wi-Fi), and a remove event always restarts so a
+# stale listener does not keep the old device open.
+
+case "$ACTION" in
+	add|remove) ;;
+	*) exit 0 ;;
+esac
+
+if [ "$ACTION" = "add" ] && ! ls /dev/usb/lp* >/dev/null 2>&1; then
+	exit 0
+fi
+
+[ -x /etc/init.d/p910nd ] || exit 0
+/etc/init.d/p910nd restart >/dev/null 2>&1 || true
+logger -t p910nd "USB printer $ACTION"

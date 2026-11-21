@@ -1,0 +1,9 @@
+# Reboot only after six hours without a successful ping. This is long
+# enough that a campus outage or a late-night maintenance window does not
+# trigger a reboot loop, but short enough to recover a wedged router.
+config watchcat
+	option period '6h'
+	option mode 'ping_reboot'
+	option pinghosts '223.5.5.5 119.29.29.29'
+	option pingperiod '60'
+	option forcedelay '30'

@@ -32,11 +32,11 @@ THEME_I18N_IPK=${THEME_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-theme-zh-cn_${THE
 VANTAGE_APP_IPK=${VANTAGE_APP_IPK:-"$OUT/theme/luci-app-vantage_${THEME_VERSION}-r1_all.ipk"}
 VANTAGE_I18N_IPK=${VANTAGE_I18N_IPK:-"$OUT/theme/luci-i18n-vantage-zh-cn_${THEME_VERSION}-r1_all.ipk"}
 
-# Every kernel module built for this target, minus the three mutually
-# exclusive variants. Kernel modules are tied to the exact kernel ABI, so
-# anything not preinstalled here can only be added by rebuilding the image.
-# The list is generated from the 24.10.0 ramips/mt7621 kmods index.
-KMODS_FILE=${KMODS_FILE:-"$ROOT/scripts/kmods-all.txt"}
+# Kernel modules actually used by the R3G and by the preinstalled plugins:
+# full USB peripheral support, onboard mt76/GPIO, plugin dependencies and
+# USB printer. The list is the dependency closure of scripts/kmods-r3g.txt;
+# the full target-feed list is kept in scripts/kmods-all.txt for reference.
+KMODS_FILE=${KMODS_FILE:-"$ROOT/scripts/kmods-r3g.txt"}
 if [ ! -s "$KMODS_FILE" ]; then
 	echo "kmod list not found: $KMODS_FILE" >&2
 	exit 2
@@ -74,6 +74,8 @@ DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 	vnstat2 vnstati2 luci-app-vnstat2 luci-i18n-vnstat2-zh-cn \
 	frpc luci-app-frpc luci-i18n-frpc-zh-cn \
 	miniupnpd-nftables luci-app-upnp luci-i18n-upnp-zh-cn \
+	p910nd luci-app-p910nd luci-i18n-p910nd-zh-cn \
+	watchcat luci-app-watchcat luci-i18n-watchcat-zh-cn \
 	luci-app-wol luci-i18n-wol-zh-cn etherwake \
 	luci-app-commands luci-i18n-commands-zh-cn \
 	usbutils usb-modeswitch pciutils ethtool iw \

@@ -12,7 +12,7 @@
 # including luci-openclash and luci-ua3f.
 
 for service in ua3f ruijie-disguise ruijie-auth https-dns-proxy \
-	mwan3 sqm nlbwmon vnstat miniupnpd upnpd; do
+	mwan3 sqm nlbwmon vnstat miniupnpd upnpd p910nd watchcat; do
 	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
 done
 

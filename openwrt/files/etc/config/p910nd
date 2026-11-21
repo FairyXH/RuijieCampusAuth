@@ -1,0 +1,8 @@
+config p910nd
+	option device '/dev/usb/lp0'
+	# Actual TCP port is 9100 plus this value.
+	option port '0'
+	option bidirectional '1'
+	option enabled '1'
+	option runas_root '0'
+	option mdns '0'
