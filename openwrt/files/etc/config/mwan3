@@ -84,6 +84,7 @@ config policy 'failover'
 	option last_resort 'unreachable'
 
 config rule 'default_rule'
+	option family 'ipv4'
 	option dest_ip '0.0.0.0/0'
 	option proto 'all'
 	option sticky '0'

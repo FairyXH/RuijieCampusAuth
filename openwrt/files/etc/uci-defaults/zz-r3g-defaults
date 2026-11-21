@@ -21,6 +21,10 @@ for service in openclash frpc; do
 	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" disable
 done
 
+# Chinese LuCI by default; users can switch back to auto/English in LuCI.
+uci -q set luci.main.lang='zh_cn'
+uci -q commit luci
+
 # Put the USB tethering and Wi-Fi STA interfaces into the existing wan
 # firewall zone. Both names are referenced by mwan3 but only appear when
 # the corresponding uplink is actually configured.
@@ -85,6 +89,7 @@ fi
 if [ -f /etc/config/nlbwmon ]; then
 	mkdir -p /etc/nlbwmon
 	uci -q set nlbwmon.@nlbwmon[0].database_directory='/etc/nlbwmon'
+	uci -q set nlbwmon.@nlbwmon[0].commit_interval='1h'
 	uci -q commit nlbwmon
 fi
 

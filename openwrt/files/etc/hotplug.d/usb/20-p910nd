@@ -10,8 +10,14 @@ case "$ACTION" in
 	*) exit 0 ;;
 esac
 
-if [ "$ACTION" = "add" ] && ! ls /dev/usb/lp* >/dev/null 2>&1; then
-	exit 0
+if [ "$ACTION" = "add" ]; then
+	# usblp creates /dev/usb/lpN slightly after the uevent; wait for it.
+	i=0
+	while [ ! -e /dev/usb/lp0 ] && [ "$i" -lt 5 ]; do
+		sleep 1
+		i=$((i + 1))
+	done
+	[ -e /dev/usb/lp0 ] || exit 0
 fi
 
 [ -x /etc/init.d/p910nd ] || exit 0
