@@ -198,6 +198,12 @@ Deep Freeze：
 - amd64 原生与 mipsle（`qemu-mipsel`）`ruijie-auth selftest` 通过。
 - ipk 重新构建：`ruijie-auth_0.2.0_mipsel_24kc.ipk` 2,299,694 字节，
   SHA256 `377e8d4e07470e11df84822aa828a3c729460ffc98ed928d8f283319a96a3fe1`。
+- **2026-11-21 插件重打**：源码 main `9be8b58`，产物
+  `ruijie-auth_0.9.0_mipsel_24kc.ipk` 2,299,758 字节，SHA256
+  `8da2e94b34b345f5ff429565b1285304e50f5d003cd0ecc3de9898529e13b3d1`；
+  8 个 LuCI 页面与源码 LF blob 逐一一致，zh-cn lmo 未变。已覆盖
+  `dist/openwrt/` 与 R3G 工具包；两处固件镜像仍是 2026-11-20 构建
+  （内含 0.2.0），刷完镜像后需再装新 ipk 才是最新 LuCI。
 - R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
