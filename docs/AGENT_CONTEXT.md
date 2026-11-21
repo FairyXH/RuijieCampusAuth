@@ -465,3 +465,43 @@ Deep Freeze：
 `tools/csharp_diff/`（C# DiffRunner）；差分原始数据在
 `build/capture/`（live-auth.pcap、original-parse-truth.json、
 tail-compare.json、full-diff-report.json）。
+
+## 13. 2026-11-21 整机扩展构建（0.10.0）
+
+目标：把 R3G 做成刷入即用的整机固件，同时保持认证器 ipk 纯用户态。
+
+- 包集：目标 feed 全部 1034 个 kmod（`scripts/kmods-all.txt`），排除 8 个
+  互斥/异构变体：ath10k 三个替代、hsdma-mtk、mwifiex-sdio、r8125-rss、
+  r8126-rss、sdhci-mt7620。完整 rootfs 89.3MB，UBI 117.4MiB，overlay
+  约 24MiB。
+- 上行：mwan3 2.11.16，校园 WAN → `usbwan` → `wwan`，httping 204 探测、
+  5 秒周期、连续 2 次失败切换。`90-ruijie-usbwan` 支持 RNDIS/NCM/ECM/
+  ipheth；`91-usb-wifi` 自动注册后插入的 USB 无线网卡。
+- QoS：SQM 1.6.0 + CAKE，默认 200/200 Mbit，`dual-srchost`/`dual-dsthost`
+  按主机隔离。
+- 统计：nlbwmon + vnstat2；`/var` 是 tmpfs，`zz-r3g-defaults` 把
+  vnstat DB 改到 `/etc/vnstat`（SaveInterval 15），nlbwmon 改到
+  `/etc/nlbwmon`（默认 24h commit）。vnstat 监控 wan/br-lan。
+- 代理/穿透：OpenClash 0.48.002 + mihomo 1.19.34 mipsle softfloat
+  （61MB 二进制，`small_flash_memory=0` 才会用 /etc 核心），默认
+  redir-host、不劫持 DNS、停止；frpc 0.51.3 预配置停止。
+- UPnP：miniupnpd-nftables，LAN 侧 secure mode，启用。
+- 首次启动：`zz-r3g-defaults` 必须最后运行（zz- 前缀），负责启用
+  UA3F/DoH/mwan3/SQM/统计/UPnP，关闭 OpenClash/frpc 占位服务，并把
+  `firewall.openclash` include 删除；该 include 指向只在 OpenClash 运行时
+  存在的 `/var/etc/openclash.include`，保留会让 fw4 启动失败。
+- 探针：`connectivity.TCPOn/HTTPOn` 用 SO_BINDTODEVICE 绑定校园网出口，
+  避免 USB/Wi-Fi 默认路由把校园网掉线误判为在线；CLI `probe --device`。
+- 构建：`vendor/` 固定 UA3F/OpenClash/mihomo/Vantage 的 ipk 与哈希；
+  `fetch-imagebuilder.sh` 固定 24.10.0 IB 与 SHA256；Image Builder 缓存
+  完整后一次构建约 8-10 分钟。
+- 验证：`go test`/`gofmt` 干净；MIPS chroot 中 `ruijie-auth 0.10.0
+  selftest` 通过，mihomo `-v` 正常，`zz-r3g-defaults` 语法通过；
+  UCI 解析 mwan3/sqm/vnstat 正常。
+- 产物：sysupgrade 92,509,306（8c4edddd...）、kernel1 3,181,020
+  （f1718d09...）、rootfs0 93,192,192（92572686...）、Breed 合并
+  101,580,800（143a60be...）、ipk 2,741,830（6f04f52f...）。
+- 刷写约束：sysupgrade 超过 R3G 的 /tmp 与 overlay，必须走 Breed
+  kernel1 + rootfs0；Breed 1.2 的“原厂→固件”也不接受 97MB 合并镜像。
+- 当前状态：构建、校验、离线验收完成；等待 Breed 实机刷入后验证
+  USB/Wi-Fi STA/mwan3/SQM/OpenClash/统计并更新本文件。
