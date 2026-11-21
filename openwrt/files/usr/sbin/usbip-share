@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# Small front-end for the usbip server. Binding exports the whole USB
+# device, so a phone that is currently providing USB tethering will lose
+# its RNDIS interface until it is unbound. Disable USB tethering first if
+# the goal is to use adb over USB/IP.
+#
+# On the client:
+#   modprobe vhci-hcd
+#   usbip attach -r <router-lan-ip> -b <busid>
+
+set -eu
+
+case "${1:-list}" in
+	list|status)
+		usbip list -l
+		echo
+		echo "Bound devices:"
+		usbip list -r 127.0.0.1 2>/dev/null || true
+		;;
+	bind)
+		[ -n "${2:-}" ] || { echo "usage: $0 bind <busid>" >&2; exit 1; }
+		usbip bind -b "$2"
+		;;
+	unbind)
+		[ -n "${2:-}" ] || { echo "usage: $0 unbind <busid>" >&2; exit 1; }
+		usbip unbind -b "$2"
+		;;
+	*)
+		echo "usage: $0 list|bind <busid>|unbind <busid>" >&2
+		exit 1
+		;;
+esac

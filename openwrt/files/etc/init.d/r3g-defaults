@@ -1,0 +1,19 @@
+#!/bin/sh /etc/rc.common
+
+# Fallback for the case where /etc/uci-defaults/zz-r3g-defaults is still
+# present at the end of boot. Some sysupgrade paths preserve the overlay in
+# a way that skips uci_apply_defaults; without this fallback the default
+# language, stats persistence and firewall cleanup silently do not happen.
+#
+# The script is idempotent and deletes the defaults script after a
+# successful run, so it only executes once per image.
+
+START=99
+
+start() {
+	local defaults=/etc/uci-defaults/zz-r3g-defaults
+	[ -f "$defaults" ] || return 0
+	if sh "$defaults"; then
+		rm -f "$defaults"
+	fi
+}

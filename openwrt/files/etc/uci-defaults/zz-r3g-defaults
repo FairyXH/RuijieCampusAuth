@@ -12,13 +12,16 @@
 # including luci-openclash and luci-ua3f.
 
 for service in ua3f ruijie-disguise ruijie-auth https-dns-proxy \
-	mwan3 sqm nlbwmon vnstat miniupnpd upnpd p910nd watchcat; do
+	mwan3 sqm nlbwmon vnstat miniupnpd upnpd p910nd watchcat usbipd; do
 	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
 done
 
 # These two need external configuration before they are useful.
 for service in openclash frpc; do
-	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" disable
+	[ -x "/etc/init.d/$service" ] && {
+		/etc/init.d/"$service" stop
+		/etc/init.d/"$service" disable
+	}
 done
 
 # Chinese LuCI by default; users can switch back to auto/English in LuCI.
@@ -91,6 +94,15 @@ if [ -f /etc/config/nlbwmon ]; then
 	uci -q set nlbwmon.@nlbwmon[0].database_directory='/etc/nlbwmon'
 	uci -q set nlbwmon.@nlbwmon[0].commit_interval='1h'
 	uci -q commit nlbwmon
+fi
+
+# USB/IP server: LAN-side export of USB devices (adb, serial, storage).
+if [ -f /etc/config/usbipd ]; then
+	uci -q set usbipd.server.enable='1'
+	uci -q set usbipd.server.port='3240'
+	uci -q set usbipd.server.ipv4='1'
+	uci -q set usbipd.server.ipv6='0'
+	uci commit usbipd
 fi
 
 exit 0

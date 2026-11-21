@@ -76,6 +76,7 @@ DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 	miniupnpd-nftables luci-app-upnp luci-i18n-upnp-zh-cn \
 	p910nd luci-app-p910nd luci-i18n-p910nd-zh-cn \
 	watchcat luci-app-watchcat luci-i18n-watchcat-zh-cn \
+	usbip usbip-server usbip-client kmod-usbip kmod-usbip-server kmod-usbip-client \
 	luci-app-wol luci-i18n-wol-zh-cn etherwake \
 	luci-app-commands luci-i18n-commands-zh-cn \
 	usbutils usb-modeswitch pciutils ethtool iw \
@@ -143,7 +144,17 @@ chmod 0755 "$STAGE/usr/bin/ua3f" \
 	"$STAGE/etc/openclash/core/clash_meta" \
 	"$STAGE/etc/init.d/ua3f" \
 	"$STAGE/etc/init.d/ruijie-disguise" \
-	"$STAGE/etc/init.d/ruijie-auth" 2>/dev/null || true
+	"$STAGE/etc/init.d/ruijie-auth" \
+	"$STAGE/etc/init.d/r3g-defaults" \
+	"$STAGE/usr/sbin/usbip-share" 2>/dev/null || true
+
+# Ship the rc.d links for the firmware-only services. Package postinst
+# normally creates these, but ruijie-disguise and r3g-defaults are not in
+# a package, and enable-by-uci-defaults is not reliable across sysupgrade.
+mkdir -p "$STAGE/etc/rc.d"
+ln -sf ../init.d/ruijie-disguise "$STAGE/etc/rc.d/S99ruijie-disguise"
+ln -sf ../init.d/r3g-defaults "$STAGE/etc/rc.d/S99r3g-defaults"
+ln -sf ../init.d/usbipd "$STAGE/etc/rc.d/S80usbipd"
 
 cd "$IB"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \
