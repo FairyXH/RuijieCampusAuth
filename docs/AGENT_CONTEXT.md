@@ -203,13 +203,18 @@ Deep Freeze：
   `8da2e94b34b345f5ff429565b1285304e50f5d003cd0ecc3de9898529e13b3d1`；
   8 个 LuCI 页面与源码 LF blob 逐一一致，zh-cn lmo 未变。已覆盖
   `dist/openwrt/` 与 R3G 工具包。
-- **2026-11-21 固件重打**：Breed 镜像 15,466,496 字节，SHA256
-  `47031edf681ae67ba1196259936366938e1465439327e6690461ca75c2781b25`；
-  sysupgrade 9,155,706 字节，SHA256
-  `fb1ec6924dd3f1f6de0d459658d1493dad28aa5930dff09b25e7586446442077`；
-  kernel1 未变 `f1718d09...`，rootfs0 `5049d6b6...`，manifest 含
-  `ruijie-auth - 0.9.0`。镜像内 8 个 LuCI 页面、lmo、init 均与插件一致；
-  已覆盖 dist 与工具包，两处 `sha256sum -c` 全部通过。
+- **2026-11-21 整机固件重打（UA3F/DoH/Vantage）**：源码 main `04590a0`，
+  sysupgrade 14,367,866 字节，SHA256
+  `55000888c9a224e1f23a9ae1148bdbb85d73ae74551f32bab57cc2e7d2b3e775`；
+  Breed 20,971,520 字节，SHA256
+  `ef66dd4986839d9c49bc206134c044101b09ce597bd335bb77e8ff8f560c22fa`；
+  kernel1 未变 `f1718d09...`，rootfs0 12,582,912 字节 `d7bfd8a7...`。
+  manifest 含 `https-dns-proxy`、`luci-app-https-dns-proxy`、
+  `luci-theme-vantage`、`luci-i18n-vantage-theme-zh-cn`、
+  `kmod-nft-queue/tproxy`、iptables 模块、ipset、luci-compat；UA3F 3.7.0
+  通过 FILES 内置（`/usr/bin/ua3f`），`ruijie-disguise` 默认 `full`，
+  UA3F S98 → disguise S99，避免重复启动。Vantage 的 uci-defaults 首次
+  启动注册并设为默认主题；DoH 默认 AliDNS + Tencent。
 - R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
@@ -341,10 +346,9 @@ Deep Freeze：
   LuCI 登录恢复）；dropbear 与 uhttpd 只监听 `10.0.0.1:22/80/443`；
   wan zone input 改为 DROP，并新增 `Block-WAN-SSH/HTTP/HTTPS` 显式
   DROP 规则；旧 `root/root` LuCI 登录已失效，SSH 旧密码被拒。
-- 纠正（2026-11-21）：纯用户态/无 kmod 约束只针对认证器 ipk，不限制
-  固件。固件镜像正在重打，恢复 UA3F 3.7.0、https-dns-proxy（AliDNS +
-  Tencent DoH）、防检测 kmod，并内置 Vantage 主题和 zh-cn 翻译；
-  `ruijie-disguise` 默认 `full`。旧“UA3F/DoH 已移除”的表述已从文档删除。
+- 约束边界已纠正：纯用户态/无 kmod 只针对认证器 ipk；固件包含
+  UA3F/DoH/防检测 kmod/Vantage 主题。旧“UA3F/DoH 已移除”表述已删除。
+  新镜像已构建并覆盖 dist/工具包，尚未 sysupgrade 到设备。
 
 ## 8. 已知问题 / 限制
 
