@@ -341,10 +341,10 @@ Deep Freeze：
   LuCI 登录恢复）；dropbear 与 uhttpd 只监听 `10.0.0.1:22/80/443`；
   wan zone input 改为 DROP，并新增 `Block-WAN-SSH/HTTP/HTTPS` 显式
   DROP 规则；旧 `root/root` LuCI 登录已失效，SSH 旧密码被拒。
-- 当前镜像不含 UA3F 与 `https-dns-proxy`（0.9.0 构建刻意移除）；防检测
-  仅有 `ruijie-disguise` 的 nftables TTL=128/MSS=1460 + sysctl
-  （TTL 128、timestamps/ECN 关闭、IPv6 关闭）。恢复 UA3F/DoH 需重打镜像
-  或安装对应包。
+- 纠正（2026-11-21）：纯用户态/无 kmod 约束只针对认证器 ipk，不限制
+  固件。固件镜像正在重打，恢复 UA3F 3.7.0、https-dns-proxy（AliDNS +
+  Tencent DoH）、防检测 kmod，并内置 Vantage 主题和 zh-cn 翻译；
+  `ruijie-disguise` 默认 `full`。旧“UA3F/DoH 已移除”的表述已从文档删除。
 
 ## 8. 已知问题 / 限制
 

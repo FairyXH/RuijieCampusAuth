@@ -74,8 +74,9 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/<学校>.json" --root "
    CLI 为 `ruijie-auth profile import`。
 4. 算法层逐函数移植（私有尾、CRC、混淆、凭据加密、私有属性、RC4、
    MSCHAPv2、PEAP/EAP-TLS），测试向量与 C# 共用。
-5. 纯用户态、零 kmod 依赖；UA3F/NFQUEUE 已移除，防检测只保留 nft
-   TTL/MSS。
+5. 认证器纯用户态、零 kmod；固件按需包含 UA3F/NFQUEUE、
+   https-dns-proxy 与相应 kmod。两者边界不要混淆：ipk 保持可移植，
+   固件承载整机防检测能力。
 6. 构建脚本改名并加入 `.po → .lmo` 编译；ipk/固件均已验证可构建。
 
 ## 5. 部署迁移（现有 Windows 安装）

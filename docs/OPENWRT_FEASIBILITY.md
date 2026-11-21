@@ -3,9 +3,10 @@
 日期：2026-11-18
 
 > **历史文档**：本文是移植前的可行性评估，保留当时对早期原型、UA3F、
-> https-dns-proxy、full-buildroot 等方案的权衡记录。最终实现已改为
-> `ruijie-auth` 纯用户态方案，移除 UA3F/DoH 依赖；当前架构、包名与验证
-> 结果见 `docs/OPENWRT_PORT.md` 与 `openwrt/README.md`。
+> https-dns-proxy、full-buildroot 等方案的权衡记录。最终认证器仍为
+> `ruijie-auth` 纯用户态 ipk；固件构建后来恢复 UA3F/https-dns-proxy
+> 作为整机功能。当前架构、包名与验证结果见 `docs/OPENWRT_PORT.md` 与
+> `openwrt/README.md`。
 
 范围：`RuijieCampusAuth.Core`、`.Service`、`.Cli`、`.App` 与 `python/` 参考实现。
 

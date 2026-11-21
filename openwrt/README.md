@@ -6,10 +6,10 @@ OpenWrt 软路由端的锐捷校园网 802.1X 认证器：Go 守护进程 + LuCI
 
 ## 设计约束
 
-- **纯用户态，无专属 kmod 依赖**：认证器只用到 Linux 自带的 AF_PACKET
-  原始套接字和 Go 标准库。`opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；
-  同一二进制在任何同架构 OpenWrt 上都能跑，不需要按机型重编。镜像里出现
-  的 nftables kmod 来自 LuCI/firewall4 基础系统，不是认证器引入的。
+- **认证器纯用户态，无专属 kmod 依赖**：这条约束只针对认证器 ipk，不限制
+  固件。认证器只用到 Linux 自带的 AF_PACKET 原始套接字和 Go 标准库，
+  `opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；同一二进制在任何同架构
+  OpenWrt 上都能跑。固件本身按需包含 UA3F、https-dns-proxy 及相应 kmod。
 - **不做机型绑定**：WAN 口由 daemon 自动识别（ubus 逻辑接口 + 默认路由 +
   链路状态），也可在 LuCI 里多选候选网口。
 - **协议一致**：私有尾、CRC16/XMODEM、字节混淆、MD5 链式凭据加密、
@@ -134,11 +134,18 @@ ruijie-auth selftest
   （用 24.10 镜像里的 `https-dns-proxy.zh-cn.lmo` 反查校验：154/154 条
   键值和偏移完全相同）。
 
-## 防检测（可选）
+## 防检测与 DoH
 
-`ruijie-disguise` 只做纯 nftables 的 TTL=128 + TCP MSS=1460，无内核模块、
-无第三方守护进程。`disguise=off` 时删除表。UA3F/NFQUEUE 方案已移除，
-因为它依赖 `kmod-nft-queue` 等包，与本项目“一份编译到处跑”的约束冲突。
+认证器 ipk 本身不带任何 kmod；固件镜像默认包含以下整机功能：
+
+- `ruijie-disguise`：nftables 基础改写（TTL=128、TCP MSS=1460）；
+  `disguise=full` 时同时启动 UA3F。
+- UA3F 3.7.0：NFQUEUE 模式，L3 改写 TTL/IPID/TCP timestamp/TCP window；
+  HTTP UA 改写默认关闭（`rewrite_mode DIRECT`），避免破坏微信/企业微信。
+- `https-dns-proxy`：AliDNS + Tencent DoH，dnsmasq 强制走 DoH。
+
+`disguise=off` 时删除 nft 表并停止 UA3F。认证器二进制与这些包解耦，
+换机器时仍可只安装 ipk。
 
 `files/etc/hotplug.d/net/90-ruijie-usbwan` 仍保留：插手机 USB 共享时自动
 建 `usbwan` 备用 WAN。它只是脚本，没有 kmod 也能安全存在（没有对应驱动时

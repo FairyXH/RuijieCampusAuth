@@ -50,6 +50,9 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 | 依赖 | 运行时只有 `libc`、`luci-base`、`rpcd` |
 | 认证器不需要 | 专属 kmod、UA3F、NFQUEUE、iptables 扩展、USB 网卡驱动 |
 
+> 上表是**认证器 ipk** 的依赖边界。固件镜像另含 UA3F、https-dns-proxy、
+> 防检测 kmod 和 Vantage 主题，这些是整机功能，不是 ipk 的依赖。
+
 > 只要路由器能跑 OpenWrt 24.10、有可用 WAN 口，就能用。无线中继/AP 模式
 > 不适合 802.1X 有线认证。
 
