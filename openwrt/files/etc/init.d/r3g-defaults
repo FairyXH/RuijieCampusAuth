@@ -36,4 +36,19 @@ start() {
 		/etc/init.d/sqm enable
 		/etc/init.d/sqm start
 	fi
+
+	# OpenClash's package default keeps the whole /etc/openclash in the
+	# sysupgrade backup, including the 61MB core and 11MB GeoSite that
+	# already live in the rootfs. Restrict the backup to user data so an
+	# upgrade does not duplicate those files into the overlay.
+	mkdir -p /lib/upgrade/keep.d
+	cat >/lib/upgrade/keep.d/luci-app-openclash <<'EOF'
+/etc/openclash/config/
+/etc/openclash/custom/
+/etc/openclash/overwrite/
+/etc/openclash/rule_provider/
+/etc/openclash/proxy_provider/
+/etc/openclash/history/
+/etc/config/openclash
+EOF
 }
