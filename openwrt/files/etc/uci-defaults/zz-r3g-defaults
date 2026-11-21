@@ -66,6 +66,25 @@ if [ -f /etc/config/mwan3 ]; then
 	uci commit mwan3
 fi
 
+# SQM parameters are easy to lose across sysupgrade because the old overlay
+# config wins over the image file. Enforce the intended defaults once.
+if [ -f /etc/config/sqm ]; then
+	uci -q set sqm.wan.enabled='1'
+	uci -q set sqm.wan.interface='wan'
+	uci -q set sqm.wan.download='200000'
+	uci -q set sqm.wan.upload='200000'
+	uci -q set sqm.wan.qdisc='cake'
+	uci -q set sqm.wan.script='piece_of_cake.qos'
+	uci -q set sqm.wan.qdisc_advanced='0'
+	uci -q set sqm.wan.qdisc_really_really_advanced='1'
+	uci -q set sqm.wan.iqdisc_opts='dual-dsthost'
+	uci -q set sqm.wan.eqdisc_opts='dual-srchost'
+	uci -q set sqm.wan.linklayer='ethernet'
+	uci -q set sqm.wan.overhead='0'
+	uci commit sqm
+	/etc/init.d/sqm restart >/dev/null 2>&1 || true
+fi
+
 # OpenClash: redir-host with DNS hijacking off, so dnsmasq + https-dns-proxy
 # stay in charge of DNS. The bundled mihomo core lives in /etc/openclash/core,
 # which is only used when small_flash_memory is 0. core_version stays 0 so

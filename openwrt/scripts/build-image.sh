@@ -18,7 +18,7 @@ VERSION=${VERSION:-0.10.0}
 UA3F_VERSION=3.7.0
 UA3F_SHA256=a1d710233ab69af2e127193d7de81d7fd7c400294dc2147368694f2fd56e073f
 UA3F_URL="https://github.com/SunBK201/UA3F/releases/download/v${UA3F_VERSION}/ua3f_${UA3F_VERSION}-r1_mipsel_24kc.ipk"
-UA3F_IPK=${UA3F_IPK:-"$OUT/ua3f/ua3f.ipk"}
+UA3F_IPK=${UA3F_IPK:-"$OUT/ua3f/ua3f_${UA3F_VERSION}-r1_mipsel_24kc.ipk"}
 UA3F_DIR="$OUT/ua3f"
 
 THEME_VERSION=1.0.21
