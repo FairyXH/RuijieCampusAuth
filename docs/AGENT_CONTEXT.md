@@ -305,8 +305,23 @@ Deep Freeze：
   字节 MD5 `e65d388129a6d1ac39abf99329f1978b` 与源文件一致，剩余部分
   全 0xFF，factory 分区 MD5 未变；随后已进入 Breed（192.168.1.1），
   并完成上条所述全片 raw 备份。
-- 仍待办：刷 OpenWrt Breed 镜像（已含 0.9.0）→ 重启进系统确认 LuCI
-  8 页与中文目录；ipk 仅用于后续免刷更新。
+- **2026-11-21 刷入 OpenWrt**：Breed 1.2 的“小米 R3G 原厂 → 固件”
+  不接受合并的 15MB Breed 镜像（预处理失败）；实测有效的路径是
+  “常规固件 → 闪存布局 小米 R3G OpenWrt”，分别上传 kernel1 与
+  rootfs0。落点经刷后 raw 备份逐区确认：kernel1 → `0x600000`，
+  rootfs0 → `0xA00000`，kernel0（`0x200000`）保留原厂，bootloader /
+  factory / overlay 未动。工具包已补入 kernel1/rootfs0 两个分区文件。
+- Breed 环境变量 `autoboot.command = boot flash 0x600000` 已写入，
+  41 个原字段（MAC/SN/WiFi 等）全部保留。
+- 重启后 OpenWrt 24.10.0 正常启动：board `xiaomi,mi-router-3g`，
+  kernel 6.6.73，rootfs squashfs。`ruijie-auth 0.9.0` 守护进程运行，
+  设备端 `selftest` 全通过；8 个 LuCI 页面 HTTP 200 且哈希与源码一致；
+  中文目录含“锐捷认证器”。当前 `status` 为 `error: 没有可用账号`，
+  属未配置账号的正常状态；WAN 未插线。
+- MAC 映射注意：原厂 0xE000=LAN、0xE006=WAN；OpenWrt 24.10 相反
+  （wan=0xE000 的 ...33，br-lan=0xE006 的 ...34）。
+- 下一步：在 LuCI“服务 → 锐捷认证器”配置 WAN、账号和学校档案，
+  接上校园网 WAN 做真实 EAP-MD5 认证。
 
 ## 8. 已知问题 / 限制
 

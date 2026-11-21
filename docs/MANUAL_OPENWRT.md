@@ -65,6 +65,8 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 
 ```text
 openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-kernel1.bin
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-rootfs0.bin
 openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-breed.bin
 ```
 
@@ -81,10 +83,17 @@ openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-breed.bin
 Breed 不认 OpenWrt 的 sysupgrade tar，必须用重打包的 `...breed.bin`：
 
 1. 断电，按住复位孔上电，橙灯闪烁后松开；电脑接 LAN 口。
-2. 打开 `http://192.168.1.1`，进 Breed 的“固件更新”。
-3. 选 `...squashfs-breed.bin`，目标分区选**第二个（0x600000）**。
+2. 打开 `http://192.168.1.1`，进 Breed 的“固件更新 → 常规固件”。
+3. 闪存布局选“小米 R3G OpenWrt”，分别上传
+   `...-squashfs-kernel1.bin` 和 `...-squashfs-rootfs0.bin`。
+   实测落点：kernel1 → `0x600000`，rootfs0 → `0xA00000`，
+   kernel0（`0x200000`）保留原厂。
 4. 在“环境变量”确认 `autoboot.command = boot flash 0x600000`。
 5. 刷写完成后重启。
+
+> Breed 1.2 的“小米 R3G 原厂 → 固件”不接受合并的
+> `...-squashfs-breed.bin`（预处理失败）。该合并镜像保留给其他
+> 写入方式或整包恢复，常规刷机用上面的 kernel1 + rootfs0。
 
 > 已经在跑标准 OpenWrt 布局的设备，继续用 LuCI/sysupgrade 升级即可，
 > 不需要每次重打包 Breed 镜像。
