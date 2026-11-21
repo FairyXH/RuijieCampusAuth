@@ -85,6 +85,19 @@ if [ -f /etc/config/sqm ]; then
 	/etc/init.d/sqm restart >/dev/null 2>&1 || true
 fi
 
+# UA3F connection-level desync. Reorder is cheap and TLS-safe; inject
+# breaks HTTPS on this campus network, so it stays off.
+if [ -f /etc/config/ua3f ]; then
+	uci -q set ua3f.main.desync_reorder='1'
+	uci -q set ua3f.main.desync_reorder_bytes='1500'
+	uci -q set ua3f.main.desync_reorder_packets='8'
+	uci -q set ua3f.main.desync_inject='0'
+	uci -q set ua3f.main.desync_inject_ttl='3'
+	uci -q set ua3f.main.desync_ports='80,443'
+	uci commit ua3f
+	/etc/init.d/ua3f restart >/dev/null 2>&1 || true
+fi
+
 # OpenClash: redir-host with DNS hijacking off, so dnsmasq + https-dns-proxy
 # stay in charge of DNS. The bundled mihomo core lives in /etc/openclash/core,
 # which is only used when small_flash_memory is 0. core_version stays 0 so

@@ -21,6 +21,15 @@ config ua3f 'main'
 	option l3_rewrite_tcpwin '1'
 	option l3_rewrite_block_quic '0'
 	option l3_rewrite_bpf_offload '0'
+	# 连接级 desync：只有新连接建立阶段处理，CPU 开销接近零。
+	# reorder 实测不影响 TLS；inject 在本校园网会让 HTTPS 握手 EOF，
+	# 因此默认关闭 inject，保留 reorder。
+	option desync_reorder '1'
+	option desync_reorder_bytes '1500'
+	option desync_reorder_packets '8'
+	option desync_inject '0'
+	option desync_inject_ttl '3'
+	option desync_ports '80,443'
 	option header_rewrite '[]'
 	option body_rewrite '[]'
 	option url_redirect '[]'
