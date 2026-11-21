@@ -203,18 +203,19 @@ Deep Freeze：
   `8da2e94b34b345f5ff429565b1285304e50f5d003cd0ecc3de9898529e13b3d1`；
   8 个 LuCI 页面与源码 LF blob 逐一一致，zh-cn lmo 未变。已覆盖
   `dist/openwrt/` 与 R3G 工具包。
-- **2026-11-21 整机固件重打（UA3F/DoH/Vantage）**：源码 main `04590a0`，
-  sysupgrade 14,367,866 字节，SHA256
-  `55000888c9a224e1f23a9ae1148bdbb85d73ae74551f32bab57cc2e7d2b3e775`；
-  Breed 20,971,520 字节，SHA256
-  `ef66dd4986839d9c49bc206134c044101b09ce597bd335bb77e8ff8f560c22fa`；
-  kernel1 未变 `f1718d09...`，rootfs0 12,582,912 字节 `d7bfd8a7...`。
-  manifest 含 `https-dns-proxy`、`luci-app-https-dns-proxy`、
-  `luci-theme-vantage`、`luci-i18n-vantage-theme-zh-cn`、
-  `kmod-nft-queue/tproxy`、iptables 模块、ipset、luci-compat；UA3F 3.7.0
-  通过 FILES 内置（`/usr/bin/ua3f`），`ruijie-disguise` 默认 `full`，
-  UA3F S98 → disguise S99，避免重复启动。Vantage 的 uci-defaults 首次
-  启动注册并设为默认主题；DoH 默认 AliDNS + Tencent。
+- **2026-11-21 整机固件重打（UA3F/DoH/Vantage app/log）**：源码 main
+  `f63d86f`，sysupgrade 14,490,746 字节，SHA256
+  `64e4add7a0dfed00ceb5d225c4686d7d1fb7a5430a8de19d5966f9f4e8ece26d`；
+  Breed 21,102,592 字节，SHA256
+  `a741eea5c323016e4a64a8a62efdfc02f71064b69e3c404cf9a601a6d2491684`；
+  kernel1 未变 `f1718d09...`，rootfs0 12,713,984 字节 `a8b50249...`。
+  ipk 2,302,610 字节 `dd756473...`（新增 `log` 命令与 `full` 选项）。
+  manifest 含 `luci-app-vantage`、`luci-i18n-vantage-zh-cn`、
+  `luci-theme-vantage`、`https-dns-proxy`、`luci-app-https-dns-proxy`、
+  `luci-i18n-https-dns-proxy-zh-cn`、防检测 kmod、iptables 模块、ipset、
+  luci-compat；UA3F 3.7.0 通过 FILES 内置（`/usr/bin/ua3f`），
+  `ruijie-disguise` 默认 `full`，UA3F S98 → disguise S99。DoH 使用自定义
+  AdGuardHome 端点；`connectivity_url` 默认 `http://127.0.0.1/`。
 - R3G 整机镜像重新构建：9,155,706 字节（8.7MiB），SHA256
   `91f3520ac8837f3a40530813de0c488e00c0edecb94e96efe26f97954d0e1e5f`；
   rootfs 含 `ruijie-auth` 包、8 个 LuCI 视图、`ruijie-auth.zh-cn.lmo`，
@@ -349,12 +350,24 @@ Deep Freeze：
 - 约束边界已纠正：纯用户态/无 kmod 只针对认证器 ipk；固件包含
   UA3F/DoH/防检测 kmod/Vantage 主题。旧“UA3F/DoH 已移除”表述已删除。
 - **2026-11-21 已通过 sysupgrade 刷入（保留配置）**：OpenWrt 24.10.0
-  正常启动；Vantage 为默认主题（`luci.main.mediaurlbase=/luci-static/vantage`，
-  `vantage.css` HTTP 200）；https-dns-proxy 两实例运行（AliDNS + 腾讯），
-  dnsmasq upstream `127.0.0.1#5053/#5054`；UA3F 3.7.0 运行，
-  `UA3F_HELPER` 队列 10301 已拦截 SYN/IPID 流量，TTL/IPID/TCPTS/TCPWIN
-  全开；`disguise=full`。认证自动恢复为“已认证”，WAN `172.18.28.25/17`；
-  LAN/Wi-Fi/root 密码/防火墙 DROP 规则全部保留。
+  正常启动；Vantage 主题 + `luci-app-vantage` 均已安装，默认主题
+  `/luci-static/vantage`，`admin/dashboard` 由 Vantage app 接管；
+  `https-dns-proxy` 使用自定义 AdGuardHome 端点（单实例 5053），
+  dnsmasq upstream 仅 `127.0.0.1#5053`，LuCI 菜单“HTTPS DNS 代理”中文正常；
+  UA3F 3.7.0 运行，`UA3F_HELPER` 队列 10301 拦截 SYN/IPID，TTL/IPID/
+  TCPTS/TCPWIN 全开；`disguise=full`。LAN 客户端经路由器 ping/DNS 正常。
+- **断网根因（2026-11-21）**：`connectivity_url=http://www.baidu.com/`
+  探测失败时，autoguard 每 5 秒触发“检测到掉线，重新认证”；
+  `logoff_first=1` 每次重认证先发 logoff，端口被真实踢下线，形成
+  5 秒一次的断网循环。停 UA3F 后循环仍在，CPU 空闲 97%，排除 UA3F 和
+  算力；手机/平板只是让探测更容易失败。修复：`connectivity_url` 改为
+  `http://127.0.0.1/`（探测恒真），认证连续稳定。锐捷没有可直接调用的
+  HTTP 状态接口；服务器私有属性只有 `INDICATE_SERV_IP/INDICATE_PORT/
+  MSG_CLIENT_PORT`，SAM direct 未实现；EAPOL 会话与 `status.json` 才是
+  权威状态。
+- **日志页修复**：旧页用 `fs.read`，ACL 拒绝导致空白；新增
+  `ruijie-auth log [--lines N]`，`logs.js` 改用 `fs.exec`。实机验证
+  `fs.exec` 返回完整中文日志，日志页 HTTP 200。
 
 ## 8. 已知问题 / 限制
 
