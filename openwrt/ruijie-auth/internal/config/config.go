@@ -60,6 +60,15 @@ type Config struct {
 	StartTimeout    float64
 	ResponseDelay   float64
 	ReauthInterval  int
+	// ProactiveReauth schedules a re-authentication after the server's
+	// interval even while the session is healthy. Off by default: on this
+	// campus that timer itself can drop a working session.
+	ProactiveReauth bool
+	// QuietWindow pauses automatic authentication during the campus
+	// maintenance window (default 00:00-06:00), when the auth server is off.
+	QuietWindow bool
+	QuietStart  int
+	QuietEnd    int
 	CheckInterval   float64
 	RetryInterval   float64
 	PauseOnHome     bool
@@ -68,6 +77,12 @@ type Config struct {
 	// (including RST) proves the egress path is alive. The defaults mirror
 	// NetworkGuardian's four public DNS targets on TCP 53.
 	ConnectivityTargets []string
+	// ConnectivityDomain is resolved through every target as a real DNS
+	// query before the TCP/HTTP fallbacks. Any successful answer is online.
+	ConnectivityDomain string
+	// ConnectivityFallbacks are well-known HTTPS sites used only after the
+	// DNS quorum and TCP probes both fail.
+	ConnectivityFallbacks []string
 	ConnectivityTimeout float64
 	Disguise            string
 	LogLevel            string
@@ -94,16 +109,25 @@ func Default() Config {
 		Repeats:         3,
 		StartTimeout:    3,
 		ResponseDelay:   0.04,
-		ReauthInterval:  21600,
+		ReauthInterval:  0,
+		ProactiveReauth: false,
+		QuietWindow:     true,
+		QuietStart:      0,
+		QuietEnd:        360,
 		CheckInterval:   2,
 		RetryInterval:   3,
 		PauseOnHome:     true,
-		ConnectivityURL: "http://connect.rom.miui.com/generate_204",
+		ConnectivityURL: "https://www.baidu.com/",
 		ConnectivityTargets: []string{
 			"223.5.5.5:53",
 			"119.29.29.29:53",
 			"180.76.76.76:53",
 			"114.114.114.114:53",
+		},
+		ConnectivityDomain: "www.baidu.com",
+		ConnectivityFallbacks: []string{
+			"https://www.bing.com/",
+			"https://www.qq.com/",
 		},
 		ConnectivityTimeout: 2,
 		Disguise:            "basic",
@@ -135,6 +159,7 @@ func Parse(data string) (Config, error) {
 	cfg := Default()
 	cfg.Devices = nil
 	cfg.ConnectivityTargets = nil
+	cfg.ConnectivityFallbacks = nil
 	var current *Account
 	authSection := false
 
@@ -187,6 +212,12 @@ func Parse(data string) (Config, error) {
 	}
 	if len(cfg.ConnectivityTargets) == 0 {
 		cfg.ConnectivityTargets = defaultConnectivityTargets()
+	}
+	if len(cfg.ConnectivityFallbacks) == 0 {
+		cfg.ConnectivityFallbacks = []string{
+			"https://www.bing.com/",
+			"https://www.qq.com/",
+		}
 	}
 	return cfg, nil
 }
@@ -257,6 +288,14 @@ func applyAuthOption(cfg *Config, key, value string) {
 		cfg.ResponseDelay = floatValue(value, cfg.ResponseDelay)
 	case "reauth_interval":
 		cfg.ReauthInterval = intValue(value, cfg.ReauthInterval)
+	case "proactive_reauth":
+		cfg.ProactiveReauth = boolValue(value)
+	case "quiet_window":
+		cfg.QuietWindow = boolValue(value)
+	case "quiet_start":
+		cfg.QuietStart = intValue(value, cfg.QuietStart)
+	case "quiet_end":
+		cfg.QuietEnd = intValue(value, cfg.QuietEnd)
 	case "check_interval":
 		cfg.CheckInterval = floatValue(value, cfg.CheckInterval)
 	case "retry_interval":
@@ -265,6 +304,16 @@ func applyAuthOption(cfg *Config, key, value string) {
 		cfg.PauseOnHome = boolValue(value)
 	case "connectivity_url":
 		cfg.ConnectivityURL = value
+	case "connectivity_domain":
+		cfg.ConnectivityDomain = value
+	case "connectivity_fallbacks":
+		for _, item := range strings.FieldsFunc(value, func(r rune) bool {
+			return r == ',' || r == ' ' || r == '\t'
+		}) {
+			if item != "" {
+				cfg.ConnectivityFallbacks = append(cfg.ConnectivityFallbacks, item)
+			}
+		}
 	case "connectivity_targets":
 		for _, item := range strings.FieldsFunc(value, func(r rune) bool {
 			return r == ',' || r == ' ' || r == '\t'

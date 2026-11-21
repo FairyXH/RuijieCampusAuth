@@ -55,6 +55,9 @@ type Options struct {
 	StartTimeout   time.Duration
 	ResponseDelay  time.Duration
 	ReauthInterval time.Duration
+	// ProactiveReauth enables the server/configured interval timer. Off by
+	// default: a healthy session must not be re-authenticated on a timer.
+	ProactiveReauth bool
 	CheckInterval  time.Duration
 	DisableTail    bool
 	NoLogoffFirst  bool
@@ -389,7 +392,7 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 	}
 	startReauthTimer := func() {
 		interval := reauthFromServer(lastProperties, opts.ReauthInterval)
-		if opts.Preempt && interval > 0 {
+		if opts.ProactiveReauth && opts.Preempt && interval > 0 {
 			reauthC = time.After(interval)
 		} else {
 			reauthC = nil
@@ -696,7 +699,7 @@ func (s *Session) runTunnel(ctx context.Context, commands <-chan string) Result 
 		s.status("authenticated", attempt.session.Message, attempt.server)
 
 		var reauthC <-chan time.Time
-		if opts.Preempt && interval > 0 {
+		if opts.ProactiveReauth && opts.Preempt && interval > 0 {
 			reauthC = time.After(interval)
 		}
 		var checkC <-chan time.Time

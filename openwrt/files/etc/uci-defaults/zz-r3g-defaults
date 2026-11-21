@@ -33,6 +33,21 @@ uci -q commit luci
 # real campus authentication. Pin it once; users can still change it later.
 if [ -f /etc/config/ruijie-auth ]; then
 	uci -q set ruijie-auth.main.device='wan'
+	# A healthy session is never re-authenticated on a timer. Disconnects
+	# still use the aggressive preempt/retry path.
+	uci -q set ruijie-auth.main.reauth_interval='0'
+	uci -q set ruijie-auth.main.proactive_reauth='0'
+	# Campus auth server is off 00:00-06:00.
+	uci -q set ruijie-auth.main.quiet_window='1'
+	uci -q set ruijie-auth.main.quiet_start='0'
+	uci -q set ruijie-auth.main.quiet_end='360'
+	# Probe: real DNS queries + TCP 53, then Baidu/Bing/QQ confirmation.
+	uci -q set ruijie-auth.main.connectivity_domain='www.baidu.com'
+	uci -q set ruijie-auth.main.connectivity_url='https://www.baidu.com/'
+	uci -q delete ruijie-auth.main.connectivity_fallbacks
+	uci -q add_list ruijie-auth.main.connectivity_fallbacks='https://www.bing.com/'
+	uci -q add_list ruijie-auth.main.connectivity_fallbacks='https://www.qq.com/'
+	uci -q set ruijie-auth.main.connectivity_timeout='2'
 	uci commit ruijie-auth
 	/etc/init.d/ruijie-auth reload >/dev/null 2>&1 || true
 fi

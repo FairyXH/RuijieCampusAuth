@@ -7,7 +7,14 @@ config auth 'main'
 	option repeats '3'
 	option start_timeout '3'
 	option response_delay '0.04'
-	option reauth_interval '21600'
+	# 0 = never re-authenticate a healthy session on a timer. Server-side
+	# reauth requests are still answered; disconnect/preemption still retries.
+	option reauth_interval '0'
+	option proactive_reauth '0'
+	# Campus auth is closed 00:00-06:00; pause automatic attempts then.
+	option quiet_window '1'
+	option quiet_start '0'
+	option quiet_end '360'
 	option check_interval '2'
 	option retry_interval '3'
 	option autoguard '1'
@@ -17,8 +24,12 @@ config auth 'main'
 	option discovery_cache '1'
 	option logoff_on_stop '0'
 	option pause_on_home '1'
-	# 外网探测：先并行 TCP 多目标（任一回复即在线），全部失败再试 HTTP 204。
-	option connectivity_url 'http://connect.rom.miui.com/generate_204'
+	# 外网探测：先并行做真实 DNS 查询 + TCP 53，任一成功即在线；
+	# 全部失败后再用 Baidu/Bing/QQ 二次确认。
+	option connectivity_domain 'www.baidu.com'
+	option connectivity_url 'https://www.baidu.com/'
+	list connectivity_fallbacks 'https://www.bing.com/'
+	list connectivity_fallbacks 'https://www.qq.com/'
 	option connectivity_timeout '2'
 	list connectivity_targets '223.5.5.5:53'
 	list connectivity_targets '119.29.29.29:53'

@@ -127,6 +127,23 @@ func (d *runner) loop(ctx context.Context) {
 			continue
 		}
 
+		// Campus authentication is closed 00:00-06:00 by default. Do not
+		// hammer the server during that window; resume automatically when it
+		// ends, or immediately on a manual auth/resume command.
+		if d.inQuietWindow(cfg) {
+			switch d.quietLoop(ctx, cfg, device) {
+			case "stop":
+				return
+			case "reload":
+				continue
+			case "logoff":
+				if !d.idleLoop(ctx, cfg) {
+					return
+				}
+				continue
+			}
+		}
+
 		result := d.runAccounts(ctx, cfg, accounts)
 		d.record(cfg, result)
 		switch result.Kind {
@@ -226,6 +243,7 @@ func (d *runner) runAccounts(ctx context.Context, cfg config.Config, accounts []
 			StartTimeout:   seconds(cfg.StartTimeout),
 			ResponseDelay:  seconds(cfg.ResponseDelay),
 			ReauthInterval: reauthInterval(cfg),
+			ProactiveReauth: cfg.ProactiveReauth,
 			CheckInterval:  seconds(cfg.CheckInterval),
 			DisableTail:    !cfg.PrivateTail,
 			NoLogoffFirst:  !cfg.LogoffFirst,
@@ -382,13 +400,30 @@ func (d *runner) probe(ctx context.Context, cfg config.Config, device string) bo
 		timeout = 2 * time.Second
 	}
 	if len(cfg.ConnectivityTargets) > 0 {
-		if connectivity.TCPOn(ctx, device, cfg.ConnectivityTargets, timeout) {
-			return true
+		// Real DNS queries and TCP 53 handshakes run concurrently; either
+		// proves the campus egress works. The TCP path catches networks that
+		// filter UDP/53 but still answer TCP.
+		fast := make(chan bool, 2)
+		go func() {
+			fast <- connectivity.DNSOn(ctx, device, cfg.ConnectivityTargets, cfg.ConnectivityDomain, timeout)
+		}()
+		go func() {
+			fast <- connectivity.TCPOn(ctx, device, cfg.ConnectivityTargets, timeout)
+		}()
+		for i := 0; i < 2; i++ {
+			if <-fast {
+				return true
+			}
 		}
+
+		// Second confirmation through well-known sites. Any one success is
+		// online; a captive portal or total blackhole fails all of them.
+		urls := make([]string, 0, len(cfg.ConnectivityFallbacks)+1)
 		if isHTTPProbeURL(cfg.ConnectivityURL) {
-			return connectivity.HTTPOn(ctx, device, cfg.ConnectivityURL, timeout)
+			urls = append(urls, cfg.ConnectivityURL)
 		}
-		return false
+		urls = append(urls, cfg.ConnectivityFallbacks...)
+		return connectivity.HTTPAnyOn(ctx, device, urls, timeout)
 	}
 	return d.probeLegacy(ctx, cfg.ConnectivityURL)
 }
@@ -482,7 +517,9 @@ func (d *runner) setResult(result supplicant.Result) {
 	if len(result.Messages) > 0 {
 		d.messages = result.Messages
 	}
-	if result.ReauthInterval > 0 {
+	if !cfg.ProactiveReauth {
+		d.reauth = 0
+	} else if result.ReauthInterval > 0 {
 		d.reauth = int(result.ReauthInterval / time.Second)
 	} else if result.Properties != nil {
 		d.reauth = 0
@@ -547,10 +584,56 @@ func retryInterval(cfg config.Config) time.Duration {
 }
 
 func reauthInterval(cfg config.Config) time.Duration {
-	if !cfg.Preempt || cfg.ReauthInterval <= 0 {
+	if !cfg.ProactiveReauth || !cfg.Preempt || cfg.ReauthInterval <= 0 {
 		return 0
 	}
 	return time.Duration(cfg.ReauthInterval) * time.Second
+}
+
+// inQuietWindow reports whether the campus auth-off window is active.
+// Minutes are local time; a start greater than end wraps midnight.
+func (d *runner) inQuietWindow(cfg config.Config) bool {
+	if !cfg.QuietWindow || cfg.QuietStart == cfg.QuietEnd {
+		return false
+	}
+	now := time.Now()
+	minute := now.Hour()*60 + now.Minute()
+	start := ((cfg.QuietStart % 1440) + 1440) % 1440
+	end := ((cfg.QuietEnd % 1440) + 1440) % 1440
+	if start < end {
+		return minute >= start && minute < end
+	}
+	return minute >= start || minute < end
+}
+
+// quietLoop waits out the auth-off window while still accepting control
+// commands. A manual auth/resume overrides the window for this attempt.
+func (d *runner) quietLoop(ctx context.Context, cfg config.Config, device string) string {
+	for {
+		d.setStatus("paused", fmt.Sprintf("校园网认证关闭时段（%s-%s），暂停认证",
+			quietClock(cfg.QuietStart), quietClock(cfg.QuietEnd)),
+			activeName(cfg), device, "")
+		command, ok := d.wait(ctx, 30*time.Second)
+		if !ok {
+			return "stop"
+		}
+		switch command {
+		case "auth", "resume":
+			return "auth"
+		case "reload":
+			return "reload"
+		case "logoff", "pause":
+			return "logoff"
+		}
+		if !d.inQuietWindow(cfg) {
+			return "auth"
+		}
+	}
+}
+
+func quietClock(minutes int) string {
+	minutes = ((minutes % 1440) + 1440) % 1440
+	return fmt.Sprintf("%02d:%02d", minutes/60, minutes%60)
 }
 
 func seconds(value float64) time.Duration {

@@ -85,9 +85,29 @@ return view.extend({
 		o.default = '0.04';
 
 		o = s.taboption('runtime', form.Value, 'reauth_interval', _('Periodic re-auth interval (s)'),
-			_('The server value SU_REAUTH_INTERV overrides this when present.'));
+			_('0 disables proactive re-auth. A healthy session is never re-authenticated on a timer.'));
 		o.datatype = 'uinteger';
-		o.default = '21600';
+		o.default = '0';
+
+		o = s.taboption('runtime', form.Flag, 'proactive_reauth', _('Allow proactive re-auth'),
+			_('When enabled, the server/configured interval timer may re-authenticate a healthy session. Keep off.'));
+		o.default = '0';
+
+		o = s.taboption('runtime', form.Flag, 'quiet_window', _('Auth-off quiet window'),
+			_('Pause automatic authentication during the campus server maintenance window.'));
+		o.default = '1';
+
+		o = s.taboption('runtime', form.Value, 'quiet_start', _('Quiet window start (minutes)'),
+			_('Minutes since midnight, 0 = 00:00.'));
+		o.datatype = 'uinteger';
+		o.default = '0';
+		o.depends('quiet_window', '1');
+
+		o = s.taboption('runtime', form.Value, 'quiet_end', _('Quiet window end (minutes)'),
+			_('Minutes since midnight, 360 = 06:00.'));
+		o.datatype = 'uinteger';
+		o.default = '360';
+		o.depends('quiet_window', '1');
 
 		o = s.taboption('runtime', form.Flag, 'private_tail', _('Attach private tail'),
 			_('Append the Ruijie 569-byte tail to EAPOL and EAP frames.'));
@@ -119,13 +139,21 @@ return view.extend({
 		o.datatype = 'ufloat';
 		o.default = '3';
 
-		o = s.taboption('guard', form.DynamicList, 'connectivity_targets', _('TCP probe targets'),
-			_('host:port targets probed in parallel; any TCP reply means online.'));
+		o = s.taboption('guard', form.DynamicList, 'connectivity_targets', _('DNS/TCP probe targets'),
+			_('host:port targets queried in parallel; any DNS answer or TCP reply means online.'));
 		o.datatype = 'hostport';
 
-		o = s.taboption('guard', form.Value, 'connectivity_url', _('HTTP fallback URL'),
-			_('Used only when all TCP targets fail. A generate_204 endpoint must answer 204.'));
-		o.default = 'http://connect.rom.miui.com/generate_204';
+		o = s.taboption('guard', form.Value, 'connectivity_domain', _('DNS probe domain'),
+			_('Resolved through every target with a real DNS query.'));
+		o.default = 'www.baidu.com';
+
+		o = s.taboption('guard', form.Value, 'connectivity_url', _('HTTP confirmation URL'),
+			_('Used only when DNS and TCP probes fail. Must return 2xx (204 for generate_204).'));
+		o.default = 'https://www.baidu.com/';
+
+		o = s.taboption('guard', form.DynamicList, 'connectivity_fallbacks', _('HTTP fallback sites'),
+			_('Additional well-known sites tried in parallel after DNS/TCP fail.'));
+		o.datatype = 'url';
 
 		o = s.taboption('guard', form.Flag, 'discovery_cache', _('Discovery cache'));
 		o.default = '1';

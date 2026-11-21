@@ -196,17 +196,56 @@ msgstr "帧伪装"
 msgid "Full (UA3F + L3 rewrite)"
 msgstr "完整（UA3F + L3 改写）"
 
-msgid "HTTP fallback URL"
-msgstr "HTTP 回退地址"
+msgid "DNS/TCP probe targets"
+msgstr "DNS/TCP 探测目标"
 
-msgid "TCP probe targets"
-msgstr "TCP 探测目标"
+msgid "host:port targets queried in parallel; any DNS answer or TCP reply means online."
+msgstr "并行查询的 host:port 目标；任一 DNS 应答或 TCP 回复即视为在线。"
 
-msgid "host:port targets probed in parallel; any TCP reply means online."
-msgstr "并行探测的 host:port 目标；任一 TCP 回复即视为在线。"
+msgid "DNS probe domain"
+msgstr "DNS 探测域名"
 
-msgid "Used only when all TCP targets fail. A generate_204 endpoint must answer 204."
-msgstr "仅当所有 TCP 目标失败时使用；generate_204 端点必须返回 204。"
+msgid "Resolved through every target with a real DNS query."
+msgstr "通过每个目标执行真实 DNS 查询。"
+
+msgid "HTTP confirmation URL"
+msgstr "HTTP 二次确认地址"
+
+msgid "Used only when DNS and TCP probes fail. Must return 2xx (204 for generate_204)."
+msgstr "仅当 DNS/TCP 探测全部失败时使用；必须返回 2xx（generate_204 返回 204）。"
+
+msgid "HTTP fallback sites"
+msgstr "HTTP 备用确认站点"
+
+msgid "Additional well-known sites tried in parallel after DNS/TCP fail."
+msgstr "DNS/TCP 失败后并行尝试的知名站点。"
+
+msgid "0 disables proactive re-auth. A healthy session is never re-authenticated on a timer."
+msgstr "0 表示关闭主动重认证；已认证会话不会按定时器主动重认证。"
+
+msgid "Allow proactive re-auth"
+msgstr "允许主动重认证"
+
+msgid "When enabled, the server/configured interval timer may re-authenticate a healthy session. Keep off."
+msgstr "开启后服务器或配置的间隔可能主动重认证健康会话；建议保持关闭。"
+
+msgid "Auth-off quiet window"
+msgstr "认证关闭时段"
+
+msgid "Pause automatic authentication during the campus server maintenance window."
+msgstr "校园认证服务器关闭时段内暂停自动认证。"
+
+msgid "Quiet window start (minutes)"
+msgstr "认证关闭时段开始（分钟）"
+
+msgid "Minutes since midnight, 0 = 00:00."
+msgstr "从 0 点起的分钟数，0 = 00:00。"
+
+msgid "Quiet window end (minutes)"
+msgstr "认证关闭时段结束（分钟）"
+
+msgid "Minutes since midnight, 360 = 06:00."
+msgstr "从 0 点起的分钟数，360 = 06:00。"
 
 msgid "Log read failed"
 msgstr "日志读取失败"

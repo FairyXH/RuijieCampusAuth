@@ -13,8 +13,7 @@ import (
 	"time"
 )
 
-// TCP probes every target concurrently. Any successful handshake or RST
-// proves that the egress path reaches the public Internet. A timeout or
+// TCP probes every target concurrently. Any successful handshake or RST// proves that the egress path reaches the public Internet. A timeout or
 // network/host unreachable does not. This mirrors the Npcap SYN probe's
 // "a TCP reply is enough" rule without needing raw sockets.
 func TCP(ctx context.Context, targets []string, timeout time.Duration) bool {
@@ -54,6 +53,67 @@ func TCPOn(ctx context.Context, device string, targets []string, timeout time.Du
 	}
 
 	for range targets {
+		if <-results {
+			return true
+		}
+	}
+	return false
+}
+
+// DNSOn resolves domain through every server concurrently using a real
+// DNS query, pinned to device. Any successful answer proves that the DNS
+// path and the egress interface both work. This is the primary probe;
+// TCP 53 and HTTPS are only fallbacks.
+func DNSOn(ctx context.Context, device string, servers []string, domain string, timeout time.Duration) bool {
+	if len(servers) == 0 || strings.TrimSpace(domain) == "" {
+		return false
+	}
+	if timeout <= 0 {
+		timeout = 2 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	results := make(chan bool, len(servers))
+	for _, server := range servers {
+		go func(server string) {
+			address := server
+			if _, _, err := net.SplitHostPort(server); err != nil {
+				address = net.JoinHostPort(server, "53")
+			}
+			resolver := &net.Resolver{
+				PreferGo: true,
+				Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+					dialer := net.Dialer{Timeout: timeout, Control: deviceControl(device)}
+					return dialer.DialContext(ctx, "udp", address)
+				},
+			}
+			_, err := resolver.LookupHost(ctx, domain)
+			results <- err == nil
+		}(server)
+	}
+
+	for range servers {
+		if <-results {
+			return true
+		}
+	}
+	return false
+}
+
+// HTTPAnyOn tries every URL concurrently; any 2xx (or 204 for a
+// generate_204 URL) is enough. Used only after DNS and TCP probes fail.
+func HTTPAnyOn(ctx context.Context, device string, urls []string, timeout time.Duration) bool {
+	if len(urls) == 0 {
+		return false
+	}
+	results := make(chan bool, len(urls))
+	for _, raw := range urls {
+		go func(raw string) {
+			results <- HTTPOn(ctx, device, raw, timeout)
+		}(raw)
+	}
+	for range urls {
 		if <-results {
 			return true
 		}

@@ -89,17 +89,32 @@ func runProbe(args []string) {
 		timeout = 2 * time.Second
 	}
 
-	ok := connectivity.TCPOn(context.Background(), *device, cfg.ConnectivityTargets, timeout)
-	fmt.Printf("TCP 目标: %s\n", strings.Join(cfg.ConnectivityTargets, ", "))
+	dnsOK := connectivity.DNSOn(context.Background(), *device,
+		cfg.ConnectivityTargets, cfg.ConnectivityDomain, timeout)
+	tcpOK := false
+	if !dnsOK {
+		tcpOK = connectivity.TCPOn(context.Background(), *device, cfg.ConnectivityTargets, timeout)
+	}
+	fmt.Printf("DNS 目标: %s\n", strings.Join(cfg.ConnectivityTargets, ", "))
+	fmt.Printf("DNS 域名: %s\n", cfg.ConnectivityDomain)
 	if *device != "" {
 		fmt.Printf("出口设备: %s\n", *device)
 	}
-	fmt.Printf("TCP 探测: %s\n", onlineText(ok))
+	fmt.Printf("DNS 探测: %s\n", onlineText(dnsOK))
+	if !dnsOK {
+		fmt.Printf("TCP 53 回退: %s\n", onlineText(tcpOK))
+	}
+	ok := dnsOK || tcpOK
 
-	if !ok && (strings.HasPrefix(cfg.ConnectivityURL, "http://") ||
-		strings.HasPrefix(cfg.ConnectivityURL, "https://")) {
-		ok = connectivity.HTTPOn(context.Background(), *device, cfg.ConnectivityURL, timeout)
-		fmt.Printf("HTTP 回退 %s: %s\n", cfg.ConnectivityURL, onlineText(ok))
+	if !ok {
+		urls := make([]string, 0, len(cfg.ConnectivityFallbacks)+1)
+		if strings.HasPrefix(cfg.ConnectivityURL, "http://") ||
+			strings.HasPrefix(cfg.ConnectivityURL, "https://") {
+			urls = append(urls, cfg.ConnectivityURL)
+		}
+		urls = append(urls, cfg.ConnectivityFallbacks...)
+		ok = connectivity.HTTPAnyOn(context.Background(), *device, urls, timeout)
+		fmt.Printf("HTTP 二次确认: %s\n", onlineText(ok))
 	}
 	if !ok {
 		os.Exit(1)
