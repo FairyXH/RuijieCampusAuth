@@ -62,6 +62,7 @@ MIHOMO_GZ=${MIHOMO_GZ:-"$OUT/openclash/mihomo-linux-mipsle-softfloat-v${MIHOMO_V
 # - OpenClash and frpc are installed and configured but not started; both
 #   need user credentials before they can do anything useful.
 DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
+	luci-i18n-firewall-zh-cn luci-i18n-package-manager-zh-cn \
 	https-dns-proxy luci-app-https-dns-proxy luci-i18n-https-dns-proxy-zh-cn \
 	kmod-nft-queue kmod-nft-tproxy kmod-nfnetlink-queue kmod-nf-conntrack-netlink \
 	iptables iptables-mod-tproxy iptables-mod-extra iptables-mod-ipopt \

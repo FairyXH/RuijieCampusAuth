@@ -28,6 +28,15 @@ done
 uci -q set luci.main.lang='zh_cn'
 uci -q commit luci
 
+# The R3G campus port is always the logical wan interface. "auto" can pick
+# the USB tethering eth1 as soon as a phone is plugged in, which pauses the
+# real campus authentication. Pin it once; users can still change it later.
+if [ -f /etc/config/ruijie-auth ]; then
+	uci -q set ruijie-auth.main.device='wan'
+	uci commit ruijie-auth
+	/etc/init.d/ruijie-auth reload >/dev/null 2>&1 || true
+fi
+
 # Put the USB tethering and Wi-Fi STA interfaces into the existing wan
 # firewall zone. Both names are referenced by mwan3 but only appear when
 # the corresponding uplink is actually configured.
