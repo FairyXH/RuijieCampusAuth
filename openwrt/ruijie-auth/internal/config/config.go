@@ -70,14 +70,14 @@ type Config struct {
 	ConnectivityTargets []string
 	ConnectivityTimeout float64
 	Disguise            string
-	LogLevel        string
-	Autoguard       bool
-	Preempt         bool
-	DiscoveryCache  bool
-	LogoffOnStop    bool
-	PrivateTail     bool
-	LogoffFirst     bool
-	Accounts        []Account
+	LogLevel            string
+	Autoguard           bool
+	Preempt             bool
+	DiscoveryCache      bool
+	LogoffOnStop        bool
+	PrivateTail         bool
+	LogoffFirst         bool
+	Accounts            []Account
 }
 
 // Default returns the built-in defaults. No school values are baked in.
@@ -107,13 +107,13 @@ func Default() Config {
 		},
 		ConnectivityTimeout: 2,
 		Disguise:            "basic",
-		LogLevel:        "info",
-		Autoguard:       true,
-		Preempt:         true,
-		DiscoveryCache:  true,
-		LogoffOnStop:    false,
-		PrivateTail:     true,
-		LogoffFirst:     true,
+		LogLevel:            "info",
+		Autoguard:           true,
+		Preempt:             true,
+		DiscoveryCache:      true,
+		LogoffOnStop:        false,
+		PrivateTail:         true,
+		LogoffFirst:         true,
 	}
 }
 
