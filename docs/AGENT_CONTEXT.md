@@ -336,6 +336,15 @@ Deep Freeze：
 - 2026-11-21 完整认证循环：`logoff` → `idle`（已注销）→ `auth` →
   认证中（清理旧会话）→ 已认证（欢迎语 + server MAC），随后 ping 3/3。
   下线后交换机仍有几秒放行窗口，短时间内 ping 仍通，属校园网侧策略延迟。
+- 2026-11-21 安全加固：root 密码已设置（不记录）；rpcd login 密码改为
+  `/etc/shadow` 的 crypt hash（`$p$` 明文格式在该构建不可用，改 hash 后
+  LuCI 登录恢复）；dropbear 与 uhttpd 只监听 `10.0.0.1:22/80/443`；
+  wan zone input 改为 DROP，并新增 `Block-WAN-SSH/HTTP/HTTPS` 显式
+  DROP 规则；旧 `root/root` LuCI 登录已失效，SSH 旧密码被拒。
+- 当前镜像不含 UA3F 与 `https-dns-proxy`（0.9.0 构建刻意移除）；防检测
+  仅有 `ruijie-disguise` 的 nftables TTL=128/MSS=1460 + sysctl
+  （TTL 128、timestamps/ECN 关闭、IPv6 关闭）。恢复 UA3F/DoH 需重打镜像
+  或安装对应包。
 
 ## 8. 已知问题 / 限制
 
