@@ -479,6 +479,13 @@ tail-compare.json、full-diff-report.json）。
 - 上行：mwan3 校园 WAN → `usbwan` → `wwan`。实测一加 Ace 5 RNDIS
   识别为 `eth1`、取得 192.168.87.x；`ip link set wan down` 后 mwan3
   自动切到 usbwan 并保持上网，wan 恢复后切回并重新认证。
+- mwan3 rule 必须写 `use_policy`，写成 `policy` 会让整个 failover 静默
+  失效：`mwan3_rules` 链为空，流量不打 0x200 标记，全部落 netifd 主表。
+  主表里未设 metric 的 wan 默认路由（metric 0）压过 `usbwan` 的
+  metric 100，于是 wan 链路层仍 up、只是对端不响应（ping/ARP 全失败）时，
+  客户端收到 `Reply from <wan 地址>: Destination host unreachable`。
+  `zz-r3g-defaults` 已强制 `delete policy` + `set use_policy=failover`，
+  修复旧 overlay 里遗留的错误字段。
 - 认证器：默认 `device=wan`。`auto` 在手机插上后会把 `eth1` 当校园
   WAN，导致状态变“暂停”；首次启动脚本用 UCI 钉死 wan。
 - QoS：SQM/CAKE 95/95 Mbit（校园线 100Mbps 的 95%），

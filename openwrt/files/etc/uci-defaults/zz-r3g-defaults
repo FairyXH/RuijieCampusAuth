@@ -78,6 +78,11 @@ fi
 # old /etc/config/mwan3 is preserved from the overlay.
 if [ -f /etc/config/mwan3 ]; then
 	uci -q set mwan3.default_rule.family='ipv4'
+	# mwan3 only reads use_policy. A stale 'policy' option leaves
+	# mwan3_rules empty, so traffic keeps the netifd default route and
+	# follows a tracked-down uplink instead of failing over.
+	uci -q delete mwan3.default_rule.policy
+	uci -q set mwan3.default_rule.use_policy='failover'
 	# HTTP 204 trackers flap on this campus network; use stable ICMP targets
 	# so flush_conntrack does not reset every client every ~30 seconds.
 	for uplink in wan usbwan wwan; do
