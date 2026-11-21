@@ -71,8 +71,8 @@ fi
 if [ -f /etc/config/sqm ]; then
 	uci -q set sqm.wan.enabled='1'
 	uci -q set sqm.wan.interface='wan'
-	uci -q set sqm.wan.download='200000'
-	uci -q set sqm.wan.upload='200000'
+	uci -q set sqm.wan.download='95000'
+	uci -q set sqm.wan.upload='95000'
 	uci -q set sqm.wan.qdisc='cake'
 	uci -q set sqm.wan.script='piece_of_cake.qos'
 	uci -q set sqm.wan.qdisc_advanced='0'
