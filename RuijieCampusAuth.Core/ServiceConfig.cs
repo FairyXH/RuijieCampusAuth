@@ -36,6 +36,8 @@ public sealed class ServiceSettings
     public double AdTimeout { get; init; } = 120;
     public string EngineVersion { get; init; } = "";
     public bool UseServerReauth { get; init; } = true;
+    public bool Heartbeat { get; init; }
+    public double HeartbeatInterval { get; init; } = 30;
     public bool GuardianEnabled { get; init; }
     public string GuardianUrl { get; init; } = "http://127.0.0.1:18765/mcp";
     public double GuardianInterval { get; init; } = 5;
@@ -74,6 +76,8 @@ public sealed class ServiceSettings
             AdTimeout = settings.AdTimeout,
             EngineVersion = settings.EngineVersion,
             UseServerReauth = settings.UseServerReauth,
+            Heartbeat = settings.Heartbeat,
+            HeartbeatInterval = settings.HeartbeatInterval,
             GuardianEnabled = settings.GuardianEnabled,
             GuardianUrl = settings.GuardianUrl,
             GuardianInterval = settings.GuardianInterval,
@@ -142,6 +146,8 @@ public sealed class ServiceConfig
             AdTimeout = GetDouble(settingsElement, "ad_timeout") ?? 120,
             EngineVersion = GetString(settingsElement, "engine_version"),
             UseServerReauth = GetBool(settingsElement, "use_server_reauth") ?? true,
+            Heartbeat = GetBool(settingsElement, "heartbeat") ?? false,
+            HeartbeatInterval = GetDouble(settingsElement, "heartbeat_interval") ?? 30,
             GuardianEnabled = GetBool(settingsElement, "guardian_enabled") ?? false,
             GuardianUrl = GetStringOr(settingsElement, "guardian_url", "http://127.0.0.1:18765/mcp"),
             GuardianInterval = GetDouble(settingsElement, "guardian_interval") ?? 5,
@@ -224,6 +230,8 @@ public sealed class ServiceConfig
                 ad_timeout = settings.AdTimeout,
                 engine_version = settings.EngineVersion,
                 use_server_reauth = settings.UseServerReauth,
+                heartbeat = settings.Heartbeat,
+                heartbeat_interval = settings.HeartbeatInterval,
                 guardian_enabled = settings.GuardianEnabled,
                 guardian_url = settings.GuardianUrl,
                 guardian_interval = settings.GuardianInterval,

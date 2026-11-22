@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using RuijieCampusAuth.Core;
 using RuijieCampusAuth.Core.Protocols;
 
@@ -63,7 +64,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 }
                 logger.LogInformation("尝试账号: {Account}", account.Username);
                 (bool ok, bool attempted, bool connected, string? server, string interfaceName,
-                    int? reauth) result;
+                    int? reauth, PrivatePropertiesResult? properties) result;
                 try
                 {
                     result = await Authenticate(
@@ -80,7 +81,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 {
                     logger.LogError(ex, "认证过程异常");
                     ServiceStatus.Write("error", $"认证异常: {ex.Message}");
-                    result = (false, false, false, null, settings.Interface, null);
+                    result = (false, false, false, null, settings.Interface, null, null);
                 }
                 if (!result.ok)
                 {
@@ -116,7 +117,12 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                     }
                     break;
                 }
-                await HoldAsync(settings, result.reauth, stoppingToken);
+                await HoldAsync(
+                    settings,
+                    result.interfaceName,
+                    result.reauth,
+                    result.properties,
+                    stoppingToken);
                 break;
             }
             if (!authenticated)
@@ -286,7 +292,7 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
     }
 
     private async Task<(bool ok, bool attempted, bool connected, string? server, string interfaceName,
-        int? reauth)> Authenticate(
+        int? reauth, PrivatePropertiesResult? properties)> Authenticate(
         ServiceSettings settings,
         string username,
         string password,
@@ -341,7 +347,8 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
             _store.ClearDiscovery();
         }
         return (ok, true, supplicant.Connected, supplicant.ServerMac, interfaceName,
-            settings.UseServerReauth ? supplicant.ServerReauthIntervalSeconds : null);
+            settings.UseServerReauth ? supplicant.ServerReauthIntervalSeconds : null,
+            supplicant.LastPrivateProperties);
     }
 
     private string ResolveInterface(ServiceSettings settings)
@@ -381,7 +388,9 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
 
     private async Task HoldAsync(
         ServiceSettings settings,
+        string interfaceName,
         int? reauthIntervalSeconds,
+        PrivatePropertiesResult? properties,
         CancellationToken stoppingToken)
     {
         _guardianFailures = 0;
@@ -397,8 +406,15 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 "服务器要求每 {Seconds}s 重新认证",
                 reauthIntervalSeconds);
         }
+        using var heartbeat = StartHeartbeat(settings, interfaceName, properties, out var heartbeatReauth);
         while (!stoppingToken.IsCancellationRequested)
         {
+            if (heartbeatReauth.Requested)
+            {
+                ServiceStatus.Write("reauth", "SAM 直通心跳超时，触发重新认证");
+                logger.LogInformation("SAM 直通心跳超时，开始重新认证");
+                return;
+            }
             if (reauthAt is { } deadline && DateTimeOffset.UtcNow >= deadline)
             {
                 ServiceStatus.Write("reauth", "到达服务器重认证间隔");
@@ -415,6 +431,78 @@ public sealed class AuthWorker(ILogger<AuthWorker> logger) : BackgroundService
                 TimeSpan.FromSeconds(Math.Max(0.5, settings.CheckInterval)),
                 stoppingToken);
         }
+    }
+
+    /// <summary>Signals that the SAM direct-comm heartbeat went unanswered.</summary>
+    private sealed class HeartbeatTrigger
+    {
+        public volatile bool Requested;
+    }
+
+    /// <summary>
+    ///     Starts the SAM direct-comm heartbeat (dircomm) when the setting is
+    ///     on and the authentication delivered the key/IV and SAM address.
+    /// </summary>
+    private DirCommHeartbeatMonitor? StartHeartbeat(
+        ServiceSettings settings,
+        string interfaceName,
+        PrivatePropertiesResult? properties,
+        out HeartbeatTrigger trigger)
+    {
+        trigger = new HeartbeatTrigger();
+        if (!settings.Heartbeat || properties is null)
+        {
+            return null;
+        }
+        var key = FindProperty(properties, PrivatePropertyType.EncryptKey)?.Raw;
+        var iv = FindProperty(properties, PrivatePropertyType.EncryptIv)?.Raw;
+        var serverIp = FindProperty(properties, PrivatePropertyType.IndicateServerIp)?.Number;
+        var port = FindProperty(properties, PrivatePropertyType.IndicatePort)?.Number;
+        if (key is null || key.Length != 8 || iv is null || iv.Length != 8 ||
+            serverIp is null || port is null)
+        {
+            logger.LogInformation("服务器未下发直通参数，SAM 心跳不启动");
+            return null;
+        }
+        if (!DirCommHeartbeat.TryGetAdapterIdentity(interfaceName, out var ip, out var mac))
+        {
+            logger.LogWarning("SAM 心跳未启动: 无法读取 {Interface} 的 IP/MAC", interfaceName);
+            return null;
+        }
+        var intervalSeconds = settings.HeartbeatInterval;
+        var hello = FindProperty(properties, PrivatePropertyType.HelloInterval)?.Number;
+        if (hello is > 0)
+        {
+            intervalSeconds = hello.Value;
+        }
+        var localPort = (int)(FindProperty(properties, PrivatePropertyType.MessageClientPort)?.Number ?? 0);
+        var serviceName = Encoding.GetEncoding("GB18030").GetBytes(settings.ServiceName);
+        var monitor = new DirCommHeartbeatMonitor(
+            serviceName,
+            ip,
+            mac,
+            key,
+            iv,
+            DirCommHeartbeat.ParseServerAddress((uint)serverIp.Value, port.Value),
+            localPort,
+            TimeSpan.FromSeconds(Math.Max(1, intervalSeconds)),
+            DirCommHeartbeat.DefaultRetry,
+            DirCommHeartbeat.DefaultTimeout,
+            message => logger.LogInformation("{Message}", message));
+        var captured = trigger;
+        monitor.ReauthRequested += () => captured.Requested = true;
+        logger.LogInformation(
+            "SAM 心跳已启动: {Server} 每 {Interval}s",
+            DirCommHeartbeat.ParseServerAddress((uint)serverIp.Value, port.Value),
+            intervalSeconds);
+        return monitor;
+    }
+
+    private static PrivateProperty? FindProperty(
+        PrivatePropertiesResult properties,
+        PrivatePropertyType type)
+    {
+        return properties.Properties.FirstOrDefault(item => item.Type == (byte)type);
     }
 
     private async Task<bool> OnlineAsync(

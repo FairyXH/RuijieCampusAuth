@@ -116,6 +116,8 @@ public sealed class UserSettings
     public double AdTimeout { get; set; } = 120;
     public string EngineVersion { get; set; } = "";
     public bool UseServerReauth { get; set; } = true;
+    public bool Heartbeat { get; set; }
+    public double HeartbeatInterval { get; set; } = 30;
     public DebugSettings Debug { get; set; } = new();
 }
 
