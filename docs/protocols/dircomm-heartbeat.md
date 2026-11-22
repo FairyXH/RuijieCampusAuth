@@ -91,7 +91,24 @@
 4. 监听本机 138 端口接收 SAM 推送（强制下线→重认证，保持现有行为）；
 5. 心跳重试计数 >3 → 主动重认证（对齐官方行为，替代纯探测判定）。
 
-## 5. 方法学记录
+## 5. 实现状态（2026-11-23）
+
+两端已按本档案落地（提交 35a25a3 / 9a440ff / 0d1b631）：
+
+- **OpenWrt（Go）**：`internal/dircomm` 包（TLV 构建、53×128 表嵌入、
+  DES-CBC、Monitor 循环）；supplicant 常驻会话在 EAP 成功且服务器下发
+  key/IV/IP/端口后启动，`HELLO_INTERV` 覆盖缺省间隔，连续 3 次无响应
+  触发重认证。UCI：`ruijie-auth.main.heartbeat='1'`（默认关）、
+  `heartbeat_interval`（秒，缺省 30）。测试：9 项含 DES 实网向量；
+  `go test ./...` 全绿，mipsle 交叉编译通过。
+- **Windows C#**：`Core/Protocols/DirCommHeartbeat.cs`（同一格式，
+  表作为嵌入资源）+ `DirCommHeartbeatMonitor`；AuthWorker 在 Hold
+  阶段启动，设置 `heartbeat: true`（settings.json，默认关）、
+  `heartbeat_interval`。测试 8 项；Core.Tests 73/73。
+- 待实网验证：SAM 对我们构造的心跳是否回应/是否改变会话行为；
+  下行推送报文解析（当前仅记录字节数）。
+
+## 6. 方法学记录
 
 - REA/Ghidra（12.1.4）打开该 PE 正常，但 MCP 客户端 30s 超时取消
   会终止临时库并重新导入，默认分析（3.4MB PE）永远跑不完——**该
