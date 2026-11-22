@@ -22,9 +22,12 @@ config ua3f 'main'
 	option l3_rewrite_block_quic '0'
 	option l3_rewrite_bpf_offload '0'
 	# 连接级 desync：只有新连接建立阶段处理，CPU 开销接近零。
-	# reorder 实测不影响 TLS；inject 在本校园网会让 HTTPS 握手 EOF，
-	# 因此默认关闭 inject，保留 reorder。
-	option desync_reorder '1'
+	# reorder 会打乱 80/443 新连接前 8 个包、总量 <1500 字节的包序；
+	# Windows 的 TCP 栈能靠重传硬扛，但 Android/iOS 会直接判定超时
+	# （实测一加 Ace 5 与平板所有网页 ERR_CONNECTION_TIMED_OUT，
+	# 关闭后立即恢复）。TTL/timestamp/window 改写不破坏 TCP 语义，保留。
+	# inject 在本校园网会让 HTTPS 握手 EOF，同样保持关闭。
+	option desync_reorder '0'
 	option desync_reorder_bytes '1500'
 	option desync_reorder_packets '8'
 	option desync_inject '0'
