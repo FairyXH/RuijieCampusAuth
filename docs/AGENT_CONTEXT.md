@@ -628,6 +628,27 @@ tail-compare.json、full-diff-report.json）。
 - 结论修正：掉线=外部**有线**客户端抢有线槽（硬踢，同秒）+外部无线设备
   88 分钟 WLC 重认证引发账号级 ACL 抖动（软中断）。协议实现无缺失。
 
+### 14.2 无线 STA 实验、Windows 热点与信道勘察（2026-11-22 深夜）
+
+- **R3G 存在 STA 配置**：`wireless.wifinet2`（radio1/5G，HXXY-WiFi，
+  PEAP+EAP-MSCHAPv2，identity=<account>，当前 disabled=1）。21:08:56
+  启用→21:09:04 PEAP 认证成功（对应明细 21:09:15 无 IP 0 秒会话，STA
+  未挂 network 无 DHCP）→21:10:52 移除。两次"5G AP 弹跳"（21:08:56/
+  21:10:53 三客户端同秒掉线）=AP+STA 同 radio 重配置，非 DFS 雷达。
+  STA 每次关联即用本账号做一次无线认证，在 1+2 政策下自耗名额。
+  21:17:15 的 10.80.2.86 攻击发生在 STA 移除且 wpa_supplicant 静默
+  之后，外部有线竞争者 X 结论不变。
+- **本机 Windows 移动热点 "ZhangWindows" 在广播**（BSSID 76:13:EA:
+  82:60:4F=本地连接*10/ICS 192.168.137.1，2.4G ch1，-13dBm 贴脸），
+  与路由器 2.4G 同信道互踩；也是 192.168.137.x 网段实体的来源。
+- **信道勘察（路由器权威扫描）**：5G 仅 7 AP——ch36 华为不卡5g(-76)、
+  ch48 ZCF(-59)、ch149×4（校园 wy_5G+隐藏）、ch157 HXXY-WiFi(-67)；
+  **52-64 与 100-140 DFS 块全空**。2.4G：ch1=6 AP（校园 Ruijie
+  多 SSID 全家桶+自家热点）、ch4=1、ch6=2、ch11=6（另一台校园 AP）、
+  ch13=1（华为不卡-60）。5G 维持 52（VHT80）；2.4G 最佳 ch13，次选
+  ch6；DFS 运行时 mac80211 拒绝离信道扫描（勘察需临时挪非 DFS）。
+
+
 
 
 
