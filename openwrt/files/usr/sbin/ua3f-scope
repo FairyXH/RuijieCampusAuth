@@ -7,8 +7,8 @@
 # enough to break Android/iOS connections (Windows just retransmits through
 # it). Insert an early return for every egress except the campus uplink.
 #
-# desync_reorder only helps where DPI is present, so enable it only while
-# the campus uplink actually carries an IPv4 address.
+# desync_reorder only helps where DPI is present, so keep it available on
+# the campus uplink; this script never turns it on by itself (see below).
 #
 # Never assume a device name: the campus uplink comes from the authenticator
 # (ruijie-auth), which may be configured as auto and resolved at runtime.
@@ -54,9 +54,15 @@ if ip -4 addr show "$CAMPUS_DEV" 2>/dev/null | grep -q "inet "; then
 	campus_active=1
 fi
 
-want=0
-[ "$campus_active" = 1 ] && want=1
+# desync_reorder never gets forced on here: reordering the first segments of
+# 80/443 connections breaks Android/iOS TLS and games (Sky: CotL "server
+# busy") even on the DPI path, because their servers drop out-of-order TLS
+# records instead of retransmitting like a desktop stack. It stays opt-in
+# via ua3f.main.desync_reorder=1; this script only auto-disables it while
+# the campus uplink has no address, where there is no DPI to hide from.
 cur=$(uci -q get ua3f.main.desync_reorder)
+want=0
+[ "$campus_active" = 1 ] && [ "$cur" = 1 ] && want=1
 if [ "$cur" != "$want" ]; then
 	uci -q set ua3f.main.desync_reorder="$want"
 	uci -q commit ua3f
