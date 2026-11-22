@@ -122,6 +122,32 @@ msg="TCP Desync server started" reorder_bytes=1500 reorder_packets=8
 - `desync_inject` 实测 TTL 1/2/3、端口 80/443 均导致 TLS 握手 EOF，
   因此默认关闭；这是本校园网兼容性取舍，不是资源问题。
 
+## 2026-11-22 修订：desync_reorder 默认关闭（含校园口）
+
+"开启 reorder 后 HTTPS 正常"只覆盖了 Windows 桌面栈（靠重传恢复）。
+实测乱序会破坏不重传的端点：
+
+- Android/iOS：`ERR_CONNECTION_TIMED_OUT`（2026-11-22 早先记录）。
+- 光遇（sky.exe）：登录 HTTPS 一直"服务器繁忙"，登录服务器丢弃乱序
+  TLS 记录；关闭 reorder 后立即恢复。
+
+曾经的行为链：2292e4c 把默认改为 0，但 41a6bdf 的 `ua3f-scope`（cron
+每分钟）在校园口有地址时强制改回 1，存量 overlay 配置叠加使修复从未
+生效。修复见 fdbcfa3：`ua3f-scope` 只做"校园口无地址时自动关闭"，
+永不强制开启；显式 `ua3f.main.desync_reorder=1` 才会在校园口保留。
+
+现状（2026-11-22 之后）：reorder 全局关闭，保留 SYN 队列、TCP
+timestamp/window 归一、TTL=128、IPID=0、MSS 1460。对 NAT 共享检测
+（TTL/IPID/时间戳指纹）的防护完整；反 SNI 重组的一层不再使用。
+
+## 附：`ip id set 0` 的分片风险
+
+内核 postrouting 的 `ip id set 0` 会把**所有**出站 IPv4 包的 ID 置
+0，包括分片。TCP 因普遍 DF 无碍；**UDP 大包一旦分片，所有分片同 ID
+将无法重组**。若有游戏/应用出现大包不通小包通的现象，优先排查此条
+（可选缓解：规则加 `ip frag-off 0` 限制只改首包，或对 UDP 流量跳过）。
+
+
 ## 复现
 
 ```sh
