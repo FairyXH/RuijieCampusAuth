@@ -374,6 +374,12 @@ endpoint 未在二进制中固定，需现场配置/抓包。
 
 相关：`CDirectTranSrv`、`CDirTranThread`、`CSuDES`、`OnInit_SAM`、`ONSAMWantLogOff`。
 
+**2026-11-23 更新**：心跳报文格式已静态逆向恢复（TLV 体 + 发送端
+封装 + 53×128 混淆表提取），完整档案见
+[`protocols/dircomm-heartbeat.md`](protocols/dircomm-heartbeat.md)；
+`build/capture/` 存有混淆表与魔数槽二进制。仍待验证：CSuDES 精确
+模式/填充、选择头是否上线、SAM 下行报文布局。
+
 **未确认**：完整报文头/字段布局、DES 作用范围与填充、序号/重传语义。当前 C# 只提供 UDP 探针 + DES 工具，不伪造握手。
 
 ## 11. 升级
