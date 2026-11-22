@@ -364,6 +364,14 @@ Deep Freeze：
   等价且内核开销接近零。IPID 是 IPv4 分片标识；多设备 NAT 下的 IPID
   模式可被用于指纹共享，写 0 隐藏该模式（分片流量设 0 可能影响重组，
   校园 TCP 普遍 DF，无影响）。
+- **desync reorder 破坏移动端 TCP（2026-11-22）**：UA3F `desync_reorder=1`
+  会把 80/443 新连接前 8 个包（总量 <1500 字节）重排来对抗 DPI。Windows
+  的 TCP 栈靠重传能恢复（有线与 Wi-Fi 都实测 HTTP 200），但 Android/iOS
+  直接超时：一加 Ace 5 与平板所有网页 `ERR_CONNECTION_TIMED_OUT`，同一个
+  SSID 上的 Windows 笔记本却完全正常；`/etc/init.d/ua3f stop` 后移动端
+  立即恢复。默认改为 `desync_reorder='0'`，只保留 TTL / TCP timestamp /
+  TCP window 这类单包字段改写。另外 USB/4G 出口不做流量检测，UA3F 在该
+  出口没有意义，4G 模式下可直接 `ua3f.enabled=0`。
 - **外网探测（学习 NetworkGuardian）**：管家默认用 4 个公共 DNS 的
   TCP 53 + ICMP，Npcap 二层直发，任一 TCP 回复（SYN-ACK/RST）或 ICMP
   回复即在线，quorum=1，2s/轮 3.5s；另有 HTTP/HTTPS 回退（NCSI
