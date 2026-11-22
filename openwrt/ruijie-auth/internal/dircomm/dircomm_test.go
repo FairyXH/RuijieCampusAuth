@@ -51,12 +51,20 @@ func TestTableEntry(t *testing.T) {
 	if !bytes.Equal(first, want) {
 		t.Errorf("table entry 0 starts %x, want %x", first, want)
 	}
-	entry, err := TableEntry(2)
+	entry, err := TableEntry(0)
 	if err != nil {
-		t.Fatalf("TableEntry(2): %v", err)
+		t.Fatalf("TableEntry(0): %v", err)
 	}
-	if !bytes.Equal(entry, obfuscationTable[2*tableEntrySize:3*tableEntrySize]) {
-		t.Error("TableEntry(2) does not slice entry 2")
+	if !bytes.Equal(entry, obfuscationTable[:tableEntrySize]) {
+		t.Error("TableEntry(0) does not slice entry 0")
+	}
+	entry, err = TableEntry(1)
+	if err != nil {
+		t.Fatalf("TableEntry(1): %v", err)
+	}
+	start := SelectorIndex(1) * tableEntrySize
+	if !bytes.Equal(entry, obfuscationTable[start:start+tableEntrySize]) {
+		t.Errorf("TableEntry(1) does not slice entry %d", SelectorIndex(1))
 	}
 }
 

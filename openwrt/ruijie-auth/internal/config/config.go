@@ -66,13 +66,15 @@ type Config struct {
 	ProactiveReauth bool
 	// QuietWindow pauses automatic authentication during the campus
 	// maintenance window (default 00:00-06:00), when the auth server is off.
-	QuietWindow     bool
-	QuietStart      int
-	QuietEnd        int
-	CheckInterval   float64
-	RetryInterval   float64
-	PauseOnHome     bool
-	ConnectivityURL string
+	QuietWindow       bool
+	QuietStart        int
+	QuietEnd          int
+	CheckInterval     float64
+	RetryInterval     float64
+	Heartbeat         bool
+	HeartbeatInterval float64
+	PauseOnHome       bool
+	ConnectivityURL   string
 	// ConnectivityTargets are host:port TCP probes run in parallel. Any reply
 	// (including RST) proves the egress path is alive. The defaults mirror
 	// NetworkGuardian's four public DNS targets on TCP 53.
@@ -98,26 +100,28 @@ type Config struct {
 // Default returns the built-in defaults. No school values are baked in.
 func Default() Config {
 	return Config{
-		Enabled:         true,
-		Devices:         []string{AutoDevice},
-		AuthMode:        "EAPMD5",
-		DHCPMode:        "none",
-		DHCPTimeout:     30,
-		ADTimeout:       120,
-		Timeout:         20,
-		Retries:         4,
-		Repeats:         3,
-		StartTimeout:    3,
-		ResponseDelay:   0.04,
-		ReauthInterval:  0,
-		ProactiveReauth: false,
-		QuietWindow:     true,
-		QuietStart:      0,
-		QuietEnd:        360,
-		CheckInterval:   2,
-		RetryInterval:   3,
-		PauseOnHome:     true,
-		ConnectivityURL: "https://www.baidu.com/",
+		Enabled:           true,
+		Devices:           []string{AutoDevice},
+		AuthMode:          "EAPMD5",
+		DHCPMode:          "none",
+		DHCPTimeout:       30,
+		ADTimeout:         120,
+		Timeout:           20,
+		Retries:           4,
+		Repeats:           3,
+		StartTimeout:      3,
+		ResponseDelay:     0.04,
+		ReauthInterval:    0,
+		ProactiveReauth:   false,
+		QuietWindow:       true,
+		QuietStart:        0,
+		QuietEnd:          360,
+		CheckInterval:     2,
+		RetryInterval:     3,
+		Heartbeat:         false,
+		HeartbeatInterval: 30,
+		PauseOnHome:       true,
+		ConnectivityURL:   "https://www.baidu.com/",
 		ConnectivityTargets: []string{
 			"223.5.5.5:53",
 			"119.29.29.29:53",
@@ -300,6 +304,10 @@ func applyAuthOption(cfg *Config, key, value string) {
 		cfg.CheckInterval = floatValue(value, cfg.CheckInterval)
 	case "retry_interval":
 		cfg.RetryInterval = floatValue(value, cfg.RetryInterval)
+	case "heartbeat":
+		cfg.Heartbeat = boolValue(value)
+	case "heartbeat_interval":
+		cfg.HeartbeatInterval = floatValue(value, cfg.HeartbeatInterval)
 	case "pause_on_home":
 		cfg.PauseOnHome = boolValue(value)
 	case "connectivity_url":

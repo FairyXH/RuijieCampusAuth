@@ -42,7 +42,7 @@ var obfuscationTable []byte
 
 const (
 	// tableEntries x tableEntrySize must match the embedded table.
-	tableEntries  = 53
+	tableEntries   = 53
 	tableEntrySize = 128
 
 	// selectorHashMultiplier and selectorModulus mirror the constants in
@@ -60,10 +60,10 @@ const (
 	// DefaultRetry / DefaultTimeout mirror dircomm.log (重传 2 次,
 	// 超时 2000 ms). ReauthThreshold mirrors the global counter checked
 	// before the "直通心跳超时重认证" path.
-	DefaultInterval      = 30 * time.Second
-	DefaultRetry         = 2
-	DefaultTimeout       = 2 * time.Second
-	ReauthThreshold      = 3
+	DefaultInterval = 30 * time.Second
+	DefaultRetry    = 2
+	DefaultTimeout  = 2 * time.Second
+	ReauthThreshold = 3
 )
 
 // Config carries the per-session heartbeat inputs extracted from the
@@ -205,12 +205,12 @@ type Event struct {
 
 // MonitorOptions configures the runtime heartbeat loop.
 type MonitorOptions struct {
-	Config   Config
-	Server   string // "ip:port" — INDICATE_SERV_IP:INDICATE_PORT
-	LocalPort int   // MSG_CLIENT_PORT, the UDP source port to bind
-	Interval time.Duration
-	Retry    int
-	Timeout  time.Duration
+	Config    Config
+	Server    string // "ip:port" — INDICATE_SERV_IP:INDICATE_PORT
+	LocalPort int    // MSG_CLIENT_PORT, the UDP source port to bind
+	Interval  time.Duration
+	Retry     int
+	Timeout   time.Duration
 	// Log receives human-readable status lines (optional).
 	Log func(string)
 }
@@ -219,6 +219,7 @@ type MonitorOptions struct {
 type Monitor struct {
 	opts    MonitorOptions
 	conn    *net.UDPConn
+	server  *net.UDPAddr
 	events  chan Event
 	stopped chan struct{}
 	once    sync.Once
@@ -230,8 +231,9 @@ func NewMonitor(opts MonitorOptions) (*Monitor, error) {
 	if err := opts.Config.Validate(); err != nil {
 		return nil, err
 	}
-	if _, _, err := net.SplitHostPort(opts.Server); err != nil {
-		return nil, fmt.Errorf("dircomm: invalid server address %q: %w", opts.Server, err)
+	server, err := net.ResolveUDPAddr("udp4", opts.Server)
+	if err != nil {
+		return nil, fmt.Errorf("dircomm: resolve server %q: %w", opts.Server, err)
 	}
 	if opts.Interval <= 0 {
 		opts.Interval = DefaultInterval
@@ -250,6 +252,7 @@ func NewMonitor(opts MonitorOptions) (*Monitor, error) {
 	return &Monitor{
 		opts:    opts,
 		conn:    conn,
+		server:  server,
 		events:  make(chan Event, 8),
 		stopped: make(chan struct{}),
 	}, nil
@@ -333,7 +336,7 @@ func (m *Monitor) beat(seq uint32) bool {
 		return false
 	}
 	for attempt := 0; attempt <= m.opts.Retry; attempt++ {
-		if _, err := m.conn.Write(packet); err != nil {
+		if _, err := m.conn.WriteToUDP(packet, m.server); err != nil {
 			m.log("SAM 心跳发送失败: " + err.Error())
 			return false
 		}
@@ -346,7 +349,7 @@ func (m *Monitor) beat(seq uint32) bool {
 		select {
 		case <-m.stopped:
 			return false
-		case <-time.After(m.opts.Retry * 0):
+		default:
 		}
 	}
 	return false

@@ -7,6 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"net"
+
+	"ruijie-auth/internal/dircomm"
 	"ruijie-auth/internal/protocol"
 	"ruijie-auth/internal/transport"
 )
@@ -59,16 +62,22 @@ type Options struct {
 	// default: a healthy session must not be re-authenticated on a timer.
 	ProactiveReauth bool
 	CheckInterval   time.Duration
-	DisableTail     bool
-	NoLogoffFirst   bool
-	Preempt         bool
-	Autoguard       bool
-	LogoffOnStop    bool
-	LockedServer    string
-	Network         func() protocol.NetworkInfo
-	Probe           func(context.Context) bool
-	Status          StatusFunc
-	Log             func(string)
+	// Heartbeat enables the SAM direct-comm heartbeat (dircomm package)
+	// once the server delivers ENCRYPT_KEY/ENCRYPT_IV plus the SAM
+	// address/port properties. HeartbeatInterval is the fallback period
+	// when the server sends no HELLO_INTERV.
+	Heartbeat         bool
+	HeartbeatInterval time.Duration
+	DisableTail       bool
+	NoLogoffFirst     bool
+	Preempt           bool
+	Autoguard         bool
+	LogoffOnStop      bool
+	LockedServer      string
+	Network           func() protocol.NetworkInfo
+	Probe             func(context.Context) bool
+	Status            StatusFunc
+	Log               func(string)
 }
 
 // Session runs one account until it fails, pauses, is reloaded, or is
@@ -281,6 +290,18 @@ func messagesFrom(eap []byte) ([]string, *protocol.PrivatePropertiesResult) {
 	return messages, &parsed
 }
 
+func propertyBytes(result *protocol.PrivatePropertiesResult, typ byte) []byte {
+	if result == nil {
+		return nil
+	}
+	for _, property := range result.Properties {
+		if property.Type == typ && property.Raw != nil {
+			return property.Raw
+		}
+	}
+	return nil
+}
+
 func propertyNumber(result *protocol.PrivatePropertiesResult, typ byte) (int64, bool) {
 	if result == nil {
 		return 0, false
@@ -405,7 +426,84 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 			checkC = nil
 		}
 	}
+	var heartbeat *dircomm.Monitor
+	hbEvents := func() <-chan dircomm.Event {
+		if heartbeat != nil {
+			return heartbeat.Events()
+		}
+		return nil
+	}
+	stopHeartbeat := func() {
+		if heartbeat != nil {
+			heartbeat.Stop()
+			heartbeat = nil
+		}
+	}
+	defer stopHeartbeat()
+	startHeartbeat := func() {
+		stopHeartbeat()
+		if !opts.Heartbeat || lastProperties == nil {
+			return
+		}
+		key := propertyBytes(lastProperties, byte(protocol.EncryptKey))
+		iv := propertyBytes(lastProperties, byte(protocol.EncryptIV))
+		serverIP, hasIP := propertyNumber(lastProperties, byte(protocol.IndicateServerIP))
+		port, hasPort := propertyNumber(lastProperties, byte(protocol.IndicatePort))
+		if len(key) != 8 || len(iv) != 8 || !hasIP || !hasPort {
+			// The server did not deliver the direct-comm parameters,
+			// so there is no channel to keep alive.
+			return
+		}
+		server, err := dircomm.ParseServerAddress(uint32(serverIP), port)
+		if err != nil {
+			s.logf("SAM 心跳未启动: %v", err)
+			return
+		}
+		mac, err := net.ParseMAC(st.source)
+		if err != nil {
+			s.logf("SAM 心跳未启动: MAC %q: %v", st.source, err)
+			return
+		}
+		ip := net.ParseIP(st.network.IP).To4()
+		if ip == nil {
+			s.logf("SAM 心跳未启动: IP %q 不可用", st.network.IP)
+			return
+		}
+		interval := opts.HeartbeatInterval
+		if hello, ok := propertyNumber(lastProperties, byte(protocol.HelloInterval)); ok && hello > 0 {
+			interval = time.Duration(hello) * time.Second
+		}
+		if interval <= 0 {
+			interval = dircomm.DefaultInterval
+		}
+		localPort := 0
+		if clientPort, ok := propertyNumber(lastProperties, byte(protocol.MessageClientPort)); ok {
+			localPort = int(clientPort)
+		}
+		monitor, err := dircomm.NewMonitor(dircomm.MonitorOptions{
+			Config: dircomm.Config{
+				ServiceName: st.serviceName,
+				IP:          ip,
+				MAC:         mac,
+				Key:         key,
+				IV:          iv,
+			},
+			Server:    server,
+			LocalPort: localPort,
+			Interval:  interval,
+			Log:       func(m string) { s.logf("%s", m) },
+		})
+		if err != nil {
+			s.logf("SAM 心跳未启动: %v", err)
+			return
+		}
+		heartbeat = monitor
+		heartbeat.Start()
+		s.logf("SAM 心跳已启动: %s 每 %s", server, interval)
+	}
+
 	restartAuth := func(message string) error {
+		stopHeartbeat()
 		authenticated = false
 		connected = false
 		serverMAC = ""
@@ -500,6 +598,16 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 			}
 			startCheckTimer()
 
+		case event := <-hbEvents():
+			// The SAM heartbeat went unanswered past the official
+			// retry threshold (直通心跳超时重认证).
+			if event.Reauth {
+				s.logf("%s", event.Message)
+				if err := restartAuth("SAM 直通心跳超时，重新认证..."); err != nil {
+					return result(KindTransport, serverMAC, connected, authenticated, nil, lastProperties, err)
+				}
+			}
+
 		case frame, ok := <-st.raw.Packets():
 			if !ok {
 				return result(KindTransport, serverMAC, connected, authenticated, nil,
@@ -538,6 +646,7 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 				stopTimer(startTimer)
 				startReauthTimer()
 				startCheckTimer()
+				startHeartbeat()
 				message := "认证成功"
 				if len(messages) > 0 {
 					message += ": " + strings.Join(messages, " | ")
