@@ -647,6 +647,28 @@ tail-compare.json、full-diff-report.json）。
   多 SSID 全家桶+自家热点）、ch4=1、ch6=2、ch11=6（另一台校园 AP）、
   ch13=1（华为不卡-60）。5G 维持 52（VHT80）；2.4G 最佳 ch13，次选
   ch6；DFS 运行时 mac80211 拒绝离信道扫描（勘察需临时挪非 DFS）。
+- CN regdb 无 5470-5725（ch100-144）规则，非"空"而是"不允许用"；
+  5G 真实选项仅 36-48 / 52-64(DFS) / 149-165。计划改 wireless-regdb
+  源码去掉 CN 的 DFS 标志（OpenWrt 内核不校验 regdb 签名，自制
+  regulatory.db 经 FILES 覆盖即可，重启生效）。
+
+### 14.3 光遇"服务器繁忙"根因：ua3f-scope 强制开 desync_reorder（2026-11-22 深夜）
+
+- 现象：换路由器+UA3F+DoH 后光遇（sky.exe）一直"服务器繁忙"。
+- 根因：41a6bdf 的 `ua3f-scope`（cron 每分钟）在校园口有地址时**强制
+  `ua3f.main.desync_reorder=1`**，把 2292e4c（reorder 破坏 Android/iOS
+  的修复）整个短路。nft `DESYNC_REORDER_QUEUE` 实测 57k+ 包被重排
+  （80/443 新连接前 8 包）。光遇登录的 HTTPS 服务器丢弃乱序 TLS 记录
+  而非重传 → 登录失败。sysupgrade 保留的旧 overlay 配置叠加该动态
+  逻辑，使"默认 0"的修复从未真正生效。
+- 修复（提交 fdbcfa3）：ua3f-scope 不再强制开启 reorder，仅保留
+  "校园口无地址时自动关闭"的方向；显式设 `desync_reorder=1` 才会在
+  校园口保留。已部署 R3G（scp 覆盖 /usr/sbin/ua3f-scope，md5 一致），
+  cron 恢复，实测 reorder=0 稳定、DESYNC 链消失、出口 scope 照常。
+  关闭后光遇登录恢复正常。下次 ipk/固件构建自动带上。
+- 遗留：`ip id set 0`（内核 postrouting）对分片流量仍是重组杀手，
+  TCP 因 DF 无碍；若未来有 UDP 大包游戏/应用异常，优先查这条。
+
 
 
 
