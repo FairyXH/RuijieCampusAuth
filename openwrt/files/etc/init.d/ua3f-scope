@@ -1,0 +1,16 @@
+#!/bin/sh /etc/rc.common
+# Scope UA3F to the campus uplink once it has created its nft tables.
+START=99
+STOP=10
+
+boot() {
+	start
+}
+
+start() {
+	for _ in $(seq 1 30); do
+		nft list table inet UA3F_HELPER >/dev/null 2>&1 && break
+		sleep 1
+	done
+	/usr/sbin/ua3f-scope
+}

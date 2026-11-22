@@ -1,0 +1,85 @@
+#!/bin/sh
+# ua3f-scope - keep UA3F helpful and harmless.
+#
+# UA3F builds its nft tables at runtime with no interface filter, so every
+# uplink is queued into NFQUEUE. On a non-campus path the queue has nothing
+# to disguise, and the TCP timestamp/window rewrite plus desync reorder is
+# enough to break Android/iOS connections (Windows just retransmits through
+# it). Insert an early return for every egress except the campus uplink.
+#
+# desync_reorder only helps where DPI is present, so enable it only while
+# the campus uplink actually carries an IPv4 address.
+#
+# Never assume a device name: the campus uplink comes from the authenticator
+# (ruijie-auth), which may be configured as auto and resolved at runtime.
+# Safe to run repeatedly: a chain that already carries the correct rule is
+# left untouched.
+
+CAMPUS_IF=$(uci -q get ruijie-auth.main.device)
+[ -n "$CAMPUS_IF" ] || CAMPUS_IF=auto
+
+resolve_campus_dev() {
+	if [ "$CAMPUS_IF" = "auto" ]; then
+		cand=$(ruijie-auth interfaces --auto --json 2>/dev/null)
+		if [ -n "$cand" ]; then
+			i=0
+			while [ "$i" -lt 8 ]; do
+				logical=$(printf "%s\n" "$cand" | jsonfilter -e "@[$i].logical" 2>/dev/null)
+				name=$(printf "%s\n" "$cand" | jsonfilter -e "@[$i].name" 2>/dev/null)
+				[ -n "$name" ] || break
+				case "$logical" in
+					usbwan|wwan|modem|lte) ;;
+					*) printf "%s\n" "$name"; return 0 ;;
+				esac
+				i=$((i + 1))
+			done
+		fi
+		return 1
+	fi
+
+	dev=$(uci -q get "network.$CAMPUS_IF.device")
+	[ -n "$dev" ] || dev=$(ifstatus "$CAMPUS_IF" 2>/dev/null | jsonfilter -e "@.l3_device" 2>/dev/null)
+	[ -n "$dev" ] || dev="$CAMPUS_IF"
+	printf "%s\n" "$dev"
+}
+
+CAMPUS_DEV=$(resolve_campus_dev)
+if [ -z "$CAMPUS_DEV" ]; then
+	logger -t ua3f-scope "no campus interface resolved (device=$CAMPUS_IF), leaving UA3F global"
+	exit 0
+fi
+
+campus_active=0
+if ip -4 addr show "$CAMPUS_DEV" 2>/dev/null | grep -q "inet "; then
+	campus_active=1
+fi
+
+want=0
+[ "$campus_active" = 1 ] && want=1
+cur=$(uci -q get ua3f.main.desync_reorder)
+if [ "$cur" != "$want" ]; then
+	uci -q set ua3f.main.desync_reorder="$want"
+	uci -q commit ua3f
+	/etc/init.d/ua3f restart >/dev/null 2>&1
+	sleep 5
+	logger -t ua3f-scope "desync_reorder set to $want (campus_active=$campus_active)"
+fi
+
+scope_chain() {
+	tbl=$1; chain=$2
+	nft list chain inet "$tbl" "$chain" >/dev/null 2>&1 || return 0
+	cur_rules=$(nft list chain inet "$tbl" "$chain" 2>/dev/null | grep -c "oifname .* return")
+	if [ "$cur_rules" = "1" ] &&
+	   nft list chain inet "$tbl" "$chain" 2>/dev/null | grep -q "oifname != \"$CAMPUS_DEV\" return"; then
+		return 0
+	fi
+	for h in $(nft -a list chain inet "$tbl" "$chain" 2>/dev/null | awk "/oifname .* return/ {print \$NF}"); do
+		nft delete rule inet "$tbl" "$chain" handle "$h" 2>/dev/null
+	done
+	nft insert rule inet "$tbl" "$chain" oifname != "$CAMPUS_DEV" return 2>/dev/null
+	logger -t ua3f-scope "scoped $tbl/$chain to $CAMPUS_DEV"
+}
+
+scope_chain UA3F_HELPER HOOK_TCP_SYN
+scope_chain UA3F_HELPER TTL
+scope_chain UA3F_DESYNC DESYNC_REORDER_QUEUE

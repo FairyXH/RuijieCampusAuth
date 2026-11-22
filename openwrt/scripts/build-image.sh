@@ -145,10 +145,15 @@ gzip -dc "$MIHOMO_GZ" >"$STAGE/etc/openclash/core/clash_meta"
 chmod 0755 "$STAGE/usr/bin/ua3f" \
 	"$STAGE/etc/openclash/core/clash_meta" \
 	"$STAGE/etc/init.d/ua3f" \
+	"$STAGE/etc/init.d/ua3f-scope" \
 	"$STAGE/etc/init.d/ruijie-disguise" \
 	"$STAGE/etc/init.d/ruijie-auth" \
 	"$STAGE/etc/init.d/r3g-defaults" \
+	"$STAGE/usr/sbin/ua3f-scope" \
 	"$STAGE/usr/sbin/usbip-share" 2>/dev/null || true
+# crond refuses a world-readable crontab.
+mkdir -p "$STAGE/etc/crontabs"
+chmod 0600 "$STAGE/etc/crontabs/root" 2>/dev/null || true
 
 # Ship the rc.d links for the firmware-only services. Package postinst
 # normally creates these, but ruijie-disguise and r3g-defaults are not in
@@ -156,6 +161,8 @@ chmod 0755 "$STAGE/usr/bin/ua3f" \
 mkdir -p "$STAGE/etc/rc.d"
 ln -sf ../init.d/ruijie-disguise "$STAGE/etc/rc.d/S99ruijie-disguise"
 ln -sf ../init.d/r3g-defaults "$STAGE/etc/rc.d/S99r3g-defaults"
+ln -sf ../init.d/ua3f-scope "$STAGE/etc/rc.d/S99ua3f-scope"
+ln -sf ../init.d/ua3f-scope "$STAGE/etc/rc.d/K10ua3f-scope"
 ln -sf ../init.d/usbipd "$STAGE/etc/rc.d/S80usbipd"
 
 cd "$IB"
