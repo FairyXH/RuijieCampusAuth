@@ -12,9 +12,12 @@
 # including luci-openclash and luci-ua3f.
 
 for service in ua3f ruijie-disguise ruijie-auth https-dns-proxy \
-	mwan3 sqm nlbwmon vnstat miniupnpd upnpd p910nd watchcat usbipd; do
+	mwan3 nlbwmon vnstat miniupnpd upnpd p910nd watchcat usbipd; do
 	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
 done
+
+# SQM stays off by default; see /etc/config/sqm for the measured tradeoff.
+# Left unregistered so a fresh flash does not start shaping the link.
 
 # These two need external configuration before they are useful.
 for service in openclash frpc; do
@@ -105,9 +108,11 @@ if [ -f /etc/config/mwan3 ]; then
 fi
 
 # SQM parameters are easy to lose across sysupgrade because the old overlay
-# config wins over the image file. Enforce the intended defaults once.
+# config wins over the image file. Keep the parameters in sync but leave the
+# queue disabled: CAKE costs ~35-40 Mbit on the MT7621, and throughput was
+# chosen over shaping on this link. Enable it in LuCI when latency matters.
 if [ -f /etc/config/sqm ]; then
-	uci -q set sqm.wan.enabled='1'
+	uci -q set sqm.wan.enabled='0'
 	uci -q set sqm.wan.interface='wan'
 	uci -q set sqm.wan.download='95000'
 	uci -q set sqm.wan.upload='95000'
@@ -120,11 +125,14 @@ if [ -f /etc/config/sqm ]; then
 	uci -q set sqm.wan.linklayer='ethernet'
 	uci -q set sqm.wan.overhead='0'
 	uci commit sqm
-	/etc/init.d/sqm restart >/dev/null 2>&1 || true
+	/etc/init.d/sqm stop >/dev/null 2>&1 || true
+	/etc/init.d/sqm disable >/dev/null 2>&1 || true
 fi
 
-# UA3F connection-level desync. Reorder is cheap and TLS-safe; inject
-# breaks HTTPS on this campus network, so it stays off.
+# UA3F connection-level desync. reorder is the aggressive half of the
+# disguise (it shuffles the first packets of new 80/443 flows) and ua3f-scope
+# narrows every UA3F queue to the campus uplink, so it never touches other
+# uplinks. inject breaks HTTPS on this campus network and stays off.
 if [ -f /etc/config/ua3f ]; then
 	uci -q set ua3f.main.desync_reorder='1'
 	uci -q set ua3f.main.desync_reorder_bytes='1500'

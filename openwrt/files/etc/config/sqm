@@ -1,15 +1,18 @@
 # CAKE on the campus WAN, per-host fair sharing.
 #
-# The campus line is 100 Mbit; 95 Mbit leaves room for CAKE to be the
-# bottleneck, which is required for host isolation to work. Set the real
-# line rate (about 90-95% of it) in LuCI -> Network -> SQM QoS if it differs.
+# Disabled by default. Measured on this MT7621 board with UA3F active:
+#   SQM off          -> 82 Mbit, 71-81 ms under full download
+#   CAKE 98M/rtt30ms -> 46 Mbit, 26-33 ms under full download
+# Both ingress and egress run a per-packet queue, so CAKE costs roughly
+# 35-40 Mbit here. Throughput won; enable this in
+# LuCI -> Network -> SQM QoS when a link needs latency shaping more than
+# speed. The parameters below are kept so turning it on is one click.
 #
 # dual-srchost/dual-dsthost make CAKE isolate individual LAN hosts, so one
-# download cannot starve every other device. This is the part that solves
-# the "one tablet saturates the link" problem; bandwidth alone does not.
+# download cannot starve every other device.
 
 config queue 'wan'
-	option enabled '1'
+	option enabled '0'
 	option interface 'wan'
 	option download '95000'
 	option upload '95000'
