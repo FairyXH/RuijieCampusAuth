@@ -744,7 +744,7 @@ tail-compare.json、full-diff-report.json）。
   （80/443 新连接前 8 包）。光遇登录的 HTTPS 服务器丢弃乱序 TLS 记录
   而非重传 → 登录失败。sysupgrade 保留的旧 overlay 配置叠加该动态
   逻辑，使"默认 0"的修复从未真正生效。
-- 修复（提交 fdbcfa3）：ua3f-scope 不再强制开启 reorder，仅保留
+- 修复（提交 a36f31f）：ua3f-scope 不再强制开启 reorder，仅保留
   "校园口无地址时自动关闭"的方向；显式设 `desync_reorder=1` 才会在
   校园口保留。已部署 R3G（scp 覆盖 /usr/sbin/ua3f-scope，md5 一致），
   cron 恢复，实测 reorder=0 稳定、DESYNC 链消失、出口 scope 照常。

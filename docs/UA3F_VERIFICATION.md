@@ -133,7 +133,7 @@ msg="TCP Desync server started" reorder_bytes=1500 reorder_packets=8
 
 曾经的行为链：2292e4c 把默认改为 0，但 41a6bdf 的 `ua3f-scope`（cron
 每分钟）在校园口有地址时强制改回 1，存量 overlay 配置叠加使修复从未
-生效。修复见 fdbcfa3：`ua3f-scope` 只做"校园口无地址时自动关闭"，
+生效。修复见 a36f31f：`ua3f-scope` 只做"校园口无地址时自动关闭"，
 永不强制开启；显式 `ua3f.main.desync_reorder=1` 才会在校园口保留。
 
 现状（2026-11-22 之后）：reorder 全局关闭，保留 SYN 队列、TCP

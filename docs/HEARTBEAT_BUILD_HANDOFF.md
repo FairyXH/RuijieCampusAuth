@@ -17,10 +17,10 @@
 
 | 提交 | 内容 |
 |---|---|
-| `35a25a3` | Go `internal/dircomm` 包：心跳报文构建 + Monitor |
-| `9a440ff` | supplicant 会话接入 + UCI 开关（heartbeat / heartbeat_interval） |
-| `0d1b631` | Windows C# 版（Core + Service），不影响 ipk 内容 |
-| `45cb923` | 协议档案补实现状态 |
+| `f244af1` | Go `internal/dircomm` 包：心跳报文构建 + Monitor |
+| `73a7342` | supplicant 会话接入 + UCI 开关（heartbeat / heartbeat_interval） |
+| `1a13bd1` | Windows C# 版（Core + Service），不影响 ipk 内容 |
+| `547420d` | 协议档案补实现状态 |
 
 ipk 相关的是前两个提交；C# 提交虽不动 `openwrt/`，但同树构建无冲突。
 
@@ -74,9 +74,10 @@ ipk 相关的是前两个提交；C# 提交虽不动 `openwrt/`，但同树构�
   全部架构**，避免再次出现 mipsle/amd64 源不一致。
 - 逆向基准二进制：`C:\Program Files\Ruijie Networks\Ruijie
   Supplicant\8021x.exe`（SHA256 1a782d36...），与仓库 RE 文档同一份。
-- 线上网络状态（截至交接）：R3G 运行 0.10.0（commit 4310534 构建），
-  认证稳定；`desync_reorder` 已永久关闭（fdbcfa3）；无线 ch52/ch1，
-  2.4G 拟挪 ch13；这些与心跳无关，但同机部署时别顺手回滚。
+- 线上网络状态（截至交接）：R3G 运行 **0.11.4**（`9f1c6ad-hb-off` 构建，
+  SAM 心跳默认关闭），认证稳定；`desync_reorder` 已永久关闭（a36f31f）；
+  无线 5G ch60/VHT80、2.4G ch13/HT20；这些与心跳无关，但同机部署时
+  别顺手回滚。
 
 ## 6. 实网待验证（部署后观察，不阻塞交付）
 

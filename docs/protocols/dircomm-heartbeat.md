@@ -93,7 +93,7 @@
 
 ## 5. 实现状态（2026-11-23）
 
-两端已按本档案落地（提交 35a25a3 / 9a440ff / 0d1b631）：
+两端已按本档案落地（提交 f244af1 / 73a7342 / 1a13bd1）：
 
 - **OpenWrt（Go）**：`internal/dircomm` 包（TLV 构建、53×128 表嵌入、
   DES-CBC、Monitor 循环）；supplicant 常驻会话在 EAP 成功且服务器下发
