@@ -377,6 +377,7 @@ docs/                         逆向、協定、適配、建置與操作文件
 | [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt 移植可行性評估與 R3G 實測記錄 |
 | [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | 精簡韌體預裝外掛、kmod、更新與建置 |
 | [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | UA3F/nftables 防偵測的封包級實機驗證 |
+| [docs/MODEL_PORTFOLIO_AUDIT.md](docs/MODEL_PORTFOLIO_AUDIT.md) | 路由器機型覆蓋審計、體積分層與優先適配清單 |
 
 ### 維運與工具
 

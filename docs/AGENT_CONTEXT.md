@@ -520,6 +520,7 @@ Deep Freeze：
 | `docs/OPENWRT_PORT.md` | C# → OpenWrt 移植对照与验证 |
 | `docs/OPENWRT_BUILD_ENV.md` | OpenWrt 构建、镜像与 QEMU 测试记录 |
 | `docs/OPENWRT_FEASIBILITY.md` | OpenWrt 早期可行性评估（历史决策记录） |
+| `docs/MODEL_PORTFOLIO_AUDIT.md` | 路由器机型覆盖审计、体积分层与优先适配清单 |
 | `docs/protocols/README.md` | 逐协议档案索引 |
 | `docs/FROZEN_DEPLOYMENT.md` | 部署、升级与运行环境记录 |
 | `profiles/README.md` | 档案字段、正式档案与导入 |
