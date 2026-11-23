@@ -50,6 +50,18 @@ openwrt/
     po2lmo.py                  把 .po 编译成 LuCI 的 .lmo
 ```
 
+## 产物镜像
+
+预编译产物按 OpenWrt 原生层级组织，便于本地 opkg 源或文件服务器直接发布：
+
+```text
+ipk/<arch>/<package>/<version>/<file>.ipk
+firmware/<target>/<subtarget>/<profile>/<version>/...
+```
+
+目录约定、当前产物和校验方式见 [`ipk/README.md`](ipk/README.md)、
+[`firmware/README.md`](firmware/README.md)。
+
 ## 源码与编译分工
 
 源码统一在实体机仓库编辑、提交；编译和测试只在 Ubuntu VM 进行。

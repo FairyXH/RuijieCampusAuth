@@ -1,0 +1,110 @@
+锐捷认证器 · OpenWrt 产物
+================================
+
+构建日期：2026-11-22
+源码：RuijieCampusAuth
+分支：main
+提交：4310534
+Go：go1.25.5 linux/amd64
+OpenWrt：24.10.0
+Image Builder：openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
+目标：xiaomi_mi-router-3g（MT7621A / 256MB RAM / 128MB NAND）
+
+定位
+----
+「USB 全功能 + R3G 板载 + 插件依赖 + 打印机」的精简固件。
+rootfs 53,357,568 字节，UBI 包装后 56,098,816 字节；overlay 首次启动
+约 49.5 MiB 可用，可远程 sysupgrade。
+
+认证行为
+--------
+- 认证成功后不再按定时器主动重认证（reauth_interval=0，
+  proactive_reauth=0）；服务器主动发起的重认证仍正常应答。
+- 网络断开/被抢占时保留激进抢占重试（preempt=1、retry_interval=3）。
+- 00:00-06:00 为校园网认证关闭时段（quiet_window=1，Asia/Shanghai），
+  期间暂停自动认证；06:00 自动恢复，手动 auth/resume 可立即覆盖。
+- 认证器默认 device=wan，避免 USB 共享把 eth1 当成校园 WAN。
+- 外网判定：四台公共 DNS 并发执行真实 DNS 查询（www.baidu.com），
+  任一成功即在线；失败后并行 TCP 53 兜底，仍失败再用
+  https://www.baidu.com/、https://www.bing.com/、https://www.qq.com/
+  二次确认。探测绑定校园网出口。
+- 二进制内嵌 time/tzdata，守护进程使用 TZ=Asia/Shanghai；日志和
+  quiet window 都按本地时间。
+
+固件内置
+--------
+认证器：ruijie-auth 0.10.0（纯用户态、无专属 kmod）
+        + `log` / `probe --device`、logs2、full 帧伪装
+防检测：ruijie-disguise full
+        - nftables：TTL=128、TCP MSS=1460、IPID=0（内核改写）
+        - UA3F 3.7.0：NFQUEUE 只排队 TCP SYN，改写 TCP timestamp/window
+        - UA3F desync reorder=1（1500/8，80/443）；inject=0
+DoH：   https-dns-proxy（自定义 AdGuardHome 端点，单实例 5053）
+主题：  luci-theme-vantage + luci-app-vantage 1.0.21 + zh-cn
+上行：  mwan3，校园 WAN → USB 共享 → Wi-Fi STA
+        ICMP 223.5.5.5/119.29.29.29 跟踪，连续 3 次失败切换
+        default_rule 使用 use_policy（写成 policy 会让 mwan3_rules
+        为空、failover 静默失效）；zz-r3g-defaults 会纠正旧 overlay
+防检测范围：ua3f-scope 从锐捷认证器解析校园网接口（支持显式名与
+        auto），仅对该出口做 NFQUEUE/改写；desync_reorder 只在该
+        接口有地址时开启。其他出口直通，避免 Android/iOS 超时。
+DNS：   zz-r3g-defaults 设 filter_aaaa=1，LAN 客户端只拿到 IPv4
+Wi-Fi： wpad-mbedtls
+QoS：   SQM/CAKE 参数内置但默认关闭（MT7621 上 CAKE 损失约 35-40 Mbit；
+        实测关=82M/满载 71-81ms，开=46M/满载 26-33ms）。LuCI 可一键开启。
+统计：  nlbwmon（1h 持久化）+ vnstat2（5 分钟保存）
+打印：  p910nd + LuCI，TCP 9100，USB 打印机热插拔重启
+重启：  watchcat，6 小时无 ping 才重启
+穿透：  frpc 0.51.3 + LuCI（预配置，默认停止）
+代理：  OpenClash 0.48.002 + mihomo 1.19.34 softfloat（默认停止）
+USB/IP：usbipd TCP 3240 + usbip-server/client + usbip-share
+UPnP：  miniupnpd-nftables，LAN 侧 secure mode
+其他：  luci-app-wol、luci-app-commands、usbutils、usb-modeswitch
+kmod：  237 个（USB 全功能、常用文件系统、USB Wi-Fi、串口/网卡/
+        音频/视频/HID/打印机、R3G 板载、插件依赖）
+
+产物
+----
+ruijie-auth_0.10.0_mipsel_24kc.ipk
+    2,847,901 字节
+    SHA256 4d54dd24f03fbc4ab87c181f2f2975903851fbdb5eaac1c14bfb657dda9c642c
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin
+    56,546,426 字节
+    SHA256 62ba60388945d770672e79c429a33ab11756d4ebf26ed1132b943d8b65d672aa
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-breed.bin
+    64,487,424 字节
+    SHA256 aebfd309523d8481b902d30a5908ebfbd127886759c5602e4c6a29bbe222887d
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-kernel1.bin
+    3,181,020 字节
+    SHA256 f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-rootfs0.bin
+    56,098,816 字节
+    SHA256 ee1698d8d379249cbcc599a7f3ac69b692c20d6583407ecfae3d32a53f7fdac3
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g.manifest
+    15,633 字节
+    SHA256 ca9d039ba6ea2f401c36eb4ed302db26fdb203a9ffa2bb5279d45242d1121fb7
+
+ruijie-auth_0.10.0_mipsle
+    8,061,143 字节
+    SHA256 528d7595f2463beaa6541a6fc34facc192be5324d457232304d5db6e76c694d0
+ruijie-auth_0.10.0_amd64
+    7,352,504 字节
+    SHA256 118c3da7355bf2bc46d8ffaef4cbfb0cf1d33a3cc42f2367c57ab100965c21ed
+
+ruijie-auth.zh-cn.lmo
+    8,076 字节
+    SHA256 8b0ac639ca04268ac1280a3c916afe9b29d209d30ace0055d17405a73df34ddd
+
+校验
+----
+sha256sum -c SHA256SUMS.txt
+
+说明
+----
+- 认证器 ipk 保持纯用户态、无 kmod；USB/文件系统/打印/代理属于固件功能。
+- sysupgrade 约 56MB，低于 R3G 的 /tmp 121MB 与 overlay 49MB。
+- 实机验证见 docs/AGENT_CONTEXT.md 与 docs/UA3F_VERIFICATION.md。

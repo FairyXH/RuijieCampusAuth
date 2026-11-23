@@ -24,4 +24,8 @@ service_status.json
 discovery_service.json
 servers_service.json
 openwrt/build/
+# OpenWrt firmware mirror payloads are large; publish via Releases or a file server.
+openwrt/firmware/**/*.bin
+openwrt/firmware/**/*.img
+openwrt/firmware/**/*.trx
 .playwright-mcp/

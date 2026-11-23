@@ -1,0 +1,5 @@
+aebfd309523d8481b902d30a5908ebfbd127886759c5602e4c6a29bbe222887d *openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-breed.bin
+f1718d099cadae68bd6d24c4555e9fac8dcf5878bc4dc64d5b359255d4d5bf9a *openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-kernel1.bin
+ee1698d8d379249cbcc599a7f3ac69b692c20d6583407ecfae3d32a53f7fdac3 *openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-rootfs0.bin
+62ba60388945d770672e79c429a33ab11756d4ebf26ed1132b943d8b65d672aa *openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin
+ca9d039ba6ea2f401c36eb4ed302db26fdb203a9ffa2bb5279d45242d1121fb7 *openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g.manifest

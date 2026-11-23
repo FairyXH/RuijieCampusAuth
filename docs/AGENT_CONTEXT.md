@@ -57,6 +57,8 @@ profiles/                    学校档案（每校一份 JSON）
 tools/re_diff/               Unicorn 原版函数调用器
 docs/                        上下文、逆向、适配、协议档案
 openwrt/                     锐捷认证器 OpenWrt 版：ruijie-auth（Go）+ luci-app-ruijie-auth
+  ipk/                       预编译插件镜像：<arch>/<package>/<version>/<file>.ipk
+  firmware/                  预编译固件镜像：<target>/<subtarget>/<profile>/<version>/
 python/                      完整协议转译 + 菜单 CLI（60 项测试，无 GUI）
 ```
 
