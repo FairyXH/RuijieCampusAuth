@@ -240,6 +240,89 @@ Deep Freeze：
 - 仓库附带的正式档案已用 C# CLI 与 OpenWrt Go CLI 分别 `profile show`
   验证，并用 Go CLI 导入临时 UCI 配置，应用 13 个字段。
 
+### R3G 无线解锁固件（2026-11-23）
+
+- 需求：禁用 DFS、任意国家码下 2.4G/5G 全信道可用、发射功率解除监管
+  上限。无线栈是 **backports-6.12.6**（`kmod-cfg80211`），不是内核树，
+  所以只改 cfg80211，内核镜像不动。
+- 补丁在 `D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt\source-patches\wireless-unlock\`：
+  - `350`：`map_regdom_flags()` / `handle_channel()` 去掉 DFS / NO_IR 标志；
+  - `351`：`cfg80211_chandef_dfs_required()` 恒 0；辅助函数标
+    `__maybe_unused` 过 `-Werror`；
+  - `352`：`freq_reg_info_regd()` 无规则时返回兜底
+    `2402-2482@40`、`2474-2494@20`（ch14 802.11b）、`5150-5925@160`；
+  - `353`：`chan->max_power` 恢复驱动 `orig_mpwr`（mt76 每信道 30 dBm），
+    不再被国家码 max EIRP 压低；EEPROM/固件仍做硬件限幅。
+- 构建环境：源码树在 Ubuntu 26.04 上直接 `make` 会因新 glibc/GCC 编不过
+  老 host `m4 1.4.19` / `cpio 2.15`；改用官方 **SDK 24.10.0
+  mt7621**（内核 6.6.73）编译 `kmod-cfg80211`。最终模块 `5c5bd4…`，
+  vermagic `6.6.73 SMP mod_unload MIPS32_R2 32BIT`，
+  `CONFIG_MODVERSIONS` 未开，`compat.ko` 与官方字节一致。
+- 组镜像用 Image Builder + `EXTRA_FILES` 覆盖（包安装后覆盖
+  `/lib/modules/6.6.73/cfg80211.ko`）；`build-image.sh` 新增
+  `EXTRA_FILES` 可选覆盖层。全量镜像 507 包，kernel1 哈希仍为
+  `f1718d09…`，证明内核未变。
+- 固件使用正常命名（不再带 `_DFS` 后缀）。2026-11-23 0.11.4：
+  `ruijie-auth 0.11.4`（commit `9f1c6ad-hb-off`，SAM 心跳默认关闭），
+  内置官方 `zerotier 1.14.1-r3` + 本机 LuCI 页面（VPN → ZeroTier），
+  sysupgrade `3f679b…`，Breed `40007c…`，rootfs0 `c2c737…`，认证器
+  ipk `781d1b…`，kmod ipk `0a1016…`。旧固件与旧 0.10.0 ipk 在
+  `MiR3G_V1-Openwrt\Backup\firmware-2026-11-21\`。
+- 06:00 认证恢复成功，但 SAM 心跳目标 `172.22.11.1:53` 不可达
+  （ping 100% loss、DNS 超时；公共 DNS 正常），心跳每 3 次无响应
+  触发重认证，约每 1 分 36 秒循环一次。06:09 已 `heartbeat=0` 止损；
+  0.11.4 把 Go/UCI/LuCI 默认全部改回关闭。仅当 SAM 可达时手动开启。
+- ZeroTier：`/etc/config/zerotier` 是 conffile，sysupgrade 保留 secret/
+  网络 ID/enabled；LuCI 页面由固件 FILES 内置（`www/.../zerotier/*.js`、
+  menu/ACL/rpcd/lmo、`/etc/init.d/luci-zerotier`），daemon 由 opkg 管理。
+- 非内置应用保留：`/etc/custom-packages/` 或
+  `/mnt/*/custom-packages/` 放 ipk + install.sh；首启
+  `99-custom-packages` 调 `/usr/sbin/custom-packages-restore`，
+  `/lib/upgrade/keep.d/custom-packages` 保留缓存。natfrp 安装约 41MB，
+  overlay 约 53MB，大包建议放 U 盘。
+- 0.11.2 LuCI 补全：设置页新增“SAM 心跳”页签（开关 + 间隔）；Debug
+  页新增 `probe`（可选出口设备）与 `tail` 私有尾生成器；学校档案页
+  新增 `profile show` 的“查看”弹窗；PO 新增 20 条中文，LMO 9120 字节。
+  CLI 里只剩 `daemon`/`help` 没有 UI，其余全部有入口。
+- LuCI 静态资源 `?v=` 来自 `/usr/lib/opkg/status` 的 mtime。可复现镜像
+  把它固定成 2025-02-03，升级后浏览器会继续用旧 view。2026-11-23
+  01:32 已 `touch /usr/lib/opkg/status` 并清 `/tmp/luci-indexcache.*`，
+  主页面 `luci.js?v` 变为 `...-1795368721`；新增
+  `files/etc/uci-defaults/99-luci-cache-bust`，下次镜像首次启动自动
+  刷新资源版本。
+- 0.11.1 曾默认开启心跳；0.11.4 因 SAM `172.22.11.1` 不可达、
+  每约 1 分 36 秒触发重认证循环，已改回默认关闭；仅当 SAM 可达时
+  在设置页手动开启。
+  构建时 VM 不是 git checkout，用 `git archive` 同步 `ruijie-auth` 和
+  `files`，并做了 CRLF→LF 归一化。
+- 2026-11-23 01:00 已刷 0.11.0 并验证；01:07 打开 `heartbeat=1`；
+  01:24 刷到 0.11.2；01:52 刷到 0.11.3。06:00 认证成功，但 SAM
+  `172.22.11.1:53` 不可达，心跳每 3 次无响应触发重认证，约每
+  1 分 36 秒循环；06:09 `heartbeat=0` 止损；06:16 刷到 0.11.4
+  （默认心跳关闭），认证成功、ZeroTier ONLINE <zerotier-ip>/24、
+  无线 ch13/ch60 保持、overlay 46.8M 空闲。
+- 非内置包恢复机制已就位：`/etc/custom-packages` 或
+  `/mnt/*/custom-packages` + `install.sh`，首启
+  `99-custom-packages` / 手动 `/usr/sbin/custom-packages-restore`；
+  keep.d 保留缓存。SakuraFrp/雷神这次未装回，`/etc/config/natfrp`
+  等配置仍保留；natfrp 安装约 41MB，和大包雷神一起放 overlay 不现实，
+  建议 U 盘缓存。
+- 2026-11-23 02:04 起稳定性监测：每 15 分钟（02:15–09:30 的
+  :00/:15/:30/:45），日志 `logs/router-stability-2026-11-23.md`，
+  最终报告 `docs/ROUTER_STABILITY_2026-11-23.md`；自动化
+  `automation-87ecf198-7b77-441d-8aa5-43c33442c8f4`，09:30 出报告后暂停。
+  重点看 06:00 认证恢复、SAM 心跳是否稳定、ZeroTier 是否上线。
+- 最终报告已生成（`docs/ROUTER_STABILITY_2026-11-23.md`，覆盖到
+  09:37）：认证稳定，ZeroTier ONLINE <zerotier-ip>/24，无线未变；
+  SAM 心跳因目标不可达已默认关闭；09:03 一次 4 秒瞬时认证失败已自愈。
+  监测任务已暂停。
+- 实机调优（2026-11-23）：2.4G **ch13/HT20/26 dBm**（配置曾写 HT40，
+  ch13 实际回落 20MHz，已把配置对齐 HT20）；5G **ch60/VHT80/23 dBm**，
+  客户端协商 866 Mbps；ch165 VHT80 中心 171（5855）越界，客户端不吃
+  80MHz；5G 空闲块 36/52/60 均可。
+- 注意：这是非标准监管行为；实际 PA 输出仍受 EEPROM 限幅，ch14 只到
+  802.11b。
+
 ### 真实校园网端到端（2026-11-20）
 
 - **Ubuntu 桥接**：VMware 改为桥接后，Ubuntu `ens33`（`172.18.28.21/17`）
@@ -615,7 +698,7 @@ tail-compare.json、full-diff-report.json）。
   （10:17-10:55）它独占 38 分钟。192.168.137.112 是该客户端插线首次
   认证时私有尾上报的残留 ICS 地址（Windows 热点网段），拿到 DHCP 后
   变为 10.80.2.86；无线 PEAP 不上报 IP，故为有线设备。
-- **10.80.5.145 = 外部无线设备①**（MAC <external-client-mac>），与有线
+- **10.80.5.145 = 外部无线设备①**（MAC `<external-client-mac>`），与有线
   合法共存（16:30-21:08 与路由器重叠 4h38m，证实 1 有线+2 无线政策）。
   其无线会话被 WLC 精确 88 分钟一踢（多次 1h28m±10s），重认证的
   60-90s 窗口内本端数据面中断但 SAM 会话记录不断——即下午
@@ -668,6 +751,53 @@ tail-compare.json、full-diff-report.json）。
   关闭后光遇登录恢复正常。下次 ipk/固件构建自动带上。
 - 遗留：`ip id set 0`（内核 postrouting）对分片流量仍是重组杀手，
   TCP 因 DF 无碍；若未来有 UDP 大包游戏/应用异常，优先查这条。
+
+### 14.4 手动插件装回：SakuraFrp + 雷神，本地备份/恢复（2026-11-23 11:20）
+
+- R3G 已装回两个非内置插件，均开机自启并运行：
+  - **SakuraFrp Launcher 3.1.9**（`luci-app-natfrp`，`natfrp-service` +
+    `natfrp-frpc`），监听由服务自己管理；LuCI 入口“服务 → SakuraFrp”。
+  - **雷神加速器**（官方 `acc-gw.router.mipsel`，安装目录
+    `/usr/sbin/leigod`），tproxy 模式，监听 **TCP 5588/10001**。
+- overlay 实测：52.8MB 总，25.5MB 已用，24.6MB 可用。natfrp 安装体积
+  42MB，UBIFS 压缩后约 14MB；雷神目录约 8.8MB。两个同时装得下。
+- **SakuraFrp token 丢失**：旧 `/etc/natfrp/config.json` 不在 sysupgrade
+  保留列表，`/etc/config/natfrp` 里的 token 早被 init 脚本清空；当前
+  `config.json` 的 token 为空。服务能启动但没有隧道，需在 LuCI 重新
+  填访问密钥（或从 SakuraFrp 控制台取），保存后重启服务。填好后必须
+  再跑一次 `backup.sh` 把 token 收进本地备份。
+- 雷神官方安装器把 fw4 误判成 iptables：它只检查 `/usr/sbin/fw4`，
+  而本固件在 `/sbin/fw4`。补 `ln -sf /sbin/fw4 /usr/sbin/fw4` 后安装
+  成功；`acc_firewall.ini` 仍为 `backend=iptables`，运行时通过
+  `iptables-nft` 兼容层注入 nft 规则。已补
+  `/etc/hotplug.d/firewall/99-leigodacc-restart`（fw4 reload 后重启 acc
+  重新注入）；并恢复了 fw4 管理器的
+  `/usr/sbin/leigod/leigod-fw4.sh fix-tproxy` 和每 5 分钟 cron。
+  该 watcher 不是废弃脚本：官方引擎会把 `tproxy_ip` 硬编码成
+  `10.20.30.40`，watcher 把 `/etc/config/acc_firewall.ini` 和
+  `/tmp/acc/acc_core_conf.json` 拉回 LAN IP。当前已改为
+  `tproxy_ip=10.0.1.1`，daemon/web 均以 `-l 10.0.1.1` 运行，
+  `LeigodAcc` LAN→TCP 5588 放行规则保留。
+- 新增 PC 端工作流（不把大包长期放路由器）：
+  `D:\Files\Develop\OpenWrt\MiR3G_V1-Openwrt\tools\manual-apps\`
+  - `backup.sh`：打包 `/usr/bin/natfrp-*`、`/etc/natfrp`（含 token）、
+    `/usr/sbin/leigod`、`/etc/init.d/acc`、acc 配置和 fw4 hotplug，
+    拉到 `Backup/manual-apps/<时间戳>/`，并保存包列表/哈希。
+  - `restore.sh`：sysupgrade 后推回、装本地 ipk/依赖、解包、补防火墙
+    规则、enable/restart 两个服务并验证端口。
+  - 已实测 backup → restore 闭环通过；`natfrp.ipk`、`libpcap1.ipk`、
+    `tc-full.ipk`、`leigod-official-install.sh` 放在
+    `tools/manual-apps/packages/`。
+  - 备份含 natfrp token，`Backup/` 和备份目录都不得上传网盘/公开仓库。
+- 文档已更新：`tools/manual-apps/README.md`、工具包 `README.md`、
+  `固件刷写教程.txt`、`openwrt/files/etc/custom-packages/README`
+  （后者说明 PC 端备份优先，路由器缓存可选）。
+- 2026-11-23 11:46 生成正式备份
+  `Backup/manual-apps/20261123-1146/`（natfrp 14MB、雷神 3.4MB），
+  并用它完整跑过 `restore.sh`：natfrp/雷神均 running、开机自启，
+  `tproxy_ip=10.0.1.1`、`fix-tproxy` cron 与 fw4 hotplug 都在。
+  唯一未完成项：natfrp token 为空，待用户填入访问密钥后重启服务并
+  重新跑 `backup.sh` 把 token 收进本地备份。
 
 
 
