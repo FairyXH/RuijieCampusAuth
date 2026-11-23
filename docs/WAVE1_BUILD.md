@@ -70,8 +70,8 @@ R3P），已一并放入对应目录。
 - `uhttpd` 监听 `0.0.0.0:80/443`；
 - 关闭 flow offloading；
 - `dnsmasq filter_aaaa=1`；
-- DoH：`https://dns.google/dns-query`，监听 `127.0.0.1:5053`，
-  dnsmasq 转发到该端口；
+- DoH：`https://doh.pub/dns-query`（bootstrap `119.29.29.29,223.5.5.5`），
+  监听 `127.0.0.1:5053`，dnsmasq 转发到该端口；
 - UA2F：启用、`handle_fw/handle_tls/handle_intranet=1`、自定义 Chrome UA；
 - UA3F：`disguise=full`、`desync_reorder=0`、`desync_inject=0`。
 

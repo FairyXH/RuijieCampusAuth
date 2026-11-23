@@ -40,8 +40,8 @@ uci -q commit dhcp
 if [ -f /etc/config/https-dns-proxy ]; then
 	uci -q delete https-dns-proxy.@https-dns-proxy[0]
 	uci -q set https-dns-proxy.dns='https-dns-proxy'
-	uci -q set https-dns-proxy.dns.bootstrap_dns='223.5.5.5'
-	uci -q set https-dns-proxy.dns.resolver_url='https://dns.google/dns-query'
+	uci -q set https-dns-proxy.dns.bootstrap_dns='119.29.29.29,223.5.5.5'
+	uci -q set https-dns-proxy.dns.resolver_url='https://doh.pub/dns-query'
 	uci -q set https-dns-proxy.dns.listen_addr='127.0.0.1'
 	uci -q set https-dns-proxy.dns.listen_port='5053'
 	uci -q set https-dns-proxy.dns.user='nobody'
