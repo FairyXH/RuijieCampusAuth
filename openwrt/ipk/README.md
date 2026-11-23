@@ -14,12 +14,15 @@ ipk/<arch>/<package>/<version>/<file>.ipk
 
 - `ruijie-auth` 0.11.4：**33 个架构**全部预编译。
 - `ruijie-auth` 0.10.0：仅 `mipsel_24kc`（历史版本）。
-- `ua3f` 3.7.0-r1、`ua2f` 4.10.2-r1、`https-dns-proxy` 2026.05.06-r1、
-  `kmod-cfg80211`：当前为 `mipsel_24kc`。
+- `ua3f` 3.7.0-r1：上游支持的 **10 个架构**。
+- `ua2f` 4.10.2-r1：上游支持的 **9 个架构**（无 aarch64_cortex-a76）。
+- `https-dns-proxy` 2026.05.06-r1：OpenWrt 24.10 的 **36 个包架构**。
+- `kmod-cfg80211`：仅 `mipsel_24kc`（R3G 无线解锁，可选）。
 - `all/`：`luci-app-https-dns-proxy`、`luci-i18n-https-dns-proxy-zh-cn`。
 
 `ruijie-auth` 是纯 Go 静态二进制 + LuCI 页面，不依赖专属 kmod；33 个
-架构的 ipk 只差 `Architecture` 和二进制目标。
+架构的 ipk 只差 `Architecture` 和二进制目标。UA3F/UA2F/DoH 来自上游
+发布或 OpenWrt 24.10 feed；依赖包仍从目标系统的 feed 安装。
 
 ## 认证器架构矩阵
 
@@ -71,9 +74,10 @@ ipk/<arch>/<package>/<version>/<file>.ipk
 
 UA3F 3.7.0 上游提供 10 个架构的 ipk（aarch64_cortex-a53/a72/a76/generic、
 arm_cortex-a15/a7_neon/a9_vfpv3-d16、mipsel_24kc、mips_24kc、x86_64）。
-UA2F 4.10.2 提供 9 个（少 aarch64_cortex-a76）。i386、loong64、riscv64、
-mips64、armv5/v6 等只有认证器，没有预编译 UA3F/UA2F；这些平台如需
-DPI 伪装，需要从源码自行编译 UA2F。
+UA2F 4.10.2 提供 9 个（少 aarch64_cortex-a76）。本镜像已按这些架构
+补齐。i386、loong64、riscv64、mips64、armv5/v6 等只有认证器，没有
+预编译 UA3F/UA2F；这些平台如需 DPI 伪装，需要从源码自行编译 UA2F。
+DoH 已按 36 个 OpenWrt 24.10 包架构补齐。
 
 ## 架构与 Go 目标
 
