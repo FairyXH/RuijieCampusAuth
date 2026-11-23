@@ -44,9 +44,11 @@ RuijieCampusAuth is a third-party, open-source implementation of the 802.1X auth
 |---|---|---|---|
 | C# reference | C# / .NET 10 · Npcap · `SslStream` | Windows | Avalonia GUI, Windows service, CLI |
 | Python reference | Python 3.10+ · scapy · `ssl` + `MemoryBIO` | Windows / Linux / macOS | Numeric menu, argparse CLI |
-| OpenWrt | Go 1.25 · AF_PACKET · `crypto/tls` | OpenWrt 24.10 | LuCI, 8 pages |
+| OpenWrt | Go 1.25 · AF_PACKET · `crypto/tls` | OpenWrt 24.10 (same-arch devices; R3G is the test vehicle) | LuCI, 8 pages |
 
 The design principles are **protocol compatibility, verifiable behaviour, and externalised school configuration**. The project does not modify server behaviour, bypass the authentication flow, or compile school codes, service names, static IDs, or service addresses into the binary. School differences are injected through `profiles/*.json`; the software itself contains no hard-coded school parameters.
+
+The OpenWrt form is not limited to the R3G. The prebuilt ipk is a pure-userland static Go binary that only requires a same-architecture OpenWrt of a similar version; the R3G is the primary test vehicle and the first model we provide custom firmware for. Other soft routers can install the same-architecture ipk directly, and more model-specific firmware will follow.
 
 The project covers the authentication protocol and the operational surface around it. It does not reproduce non-protocol components of the official client such as skins, pop-ups, announcements, tray apps, or installers, and it embeds no school accounts, passwords, or login credentials.
 
@@ -60,7 +62,7 @@ The project covers the authentication protocol and the operational surface aroun
 | Component | Version | Distribution |
 |---|---|---|
 | C# client | 1.0.0 | `RuijieCampusAuth-1.0.0-win-x64.zip`, self-contained .NET 10 |
-| OpenWrt firmware / plugin | 0.11.4 | R3G full firmware + `ruijie-auth_0.11.4_mipsel_24kc.ipk` |
+| OpenWrt firmware / plugin | 0.11.4 | Same-architecture `ruijie-auth_0.11.4_mipsel_24kc.ipk` + R3G custom firmware (test vehicle) |
 | Python reference | Source tree | `pip install -e python` |
 
 See [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest) for the latest build.
@@ -72,7 +74,7 @@ See [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest) for 
 - **Multi-school adaptation**: authentication method, service name, static ID, portal/self-service/upgrade endpoints, and DHCP mode all come from JSON profiles. Importing a profile only overwrites the fields it declares.
 - **Verifiable implementation**: Unicorn calls into the original binary's algorithm functions for byte-for-byte differential testing; real server-accepted captures validate the 569-byte tails and private properties.
 - **Operational surface**: account pool, server learning and locking, guardian/preemption, re-authentication scheduling, DHCP renew/release, portal, diagnostics, client takeover, and a debug pipe.
-- **OpenWrt-friendly**: the supplicant itself is pure userland and depends only on AF_PACKET and the Go standard library. It is not tied to a specific model, and the WAN interface can be auto-detected or selected manually.
+- **OpenWrt-friendly**: the supplicant itself is pure userland and depends only on AF_PACKET and the Go standard library. The ipk is not tied to the R3G and runs on same-architecture OpenWrt of a similar version. The R3G is the current test vehicle and the first model we provide custom firmware for; the WAN interface can be auto-detected or selected manually, and more model-specific firmware will follow.
 
 ## Quick Start
 
@@ -80,7 +82,7 @@ See [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest) for 
 |---|---|
 | Windows desktop | Download `RuijieCampusAuth-1.0.0-win-x64.zip`, unzip, and run the GUI; requires Npcap and administrator rights |
 | Protocol research / scripting | `cd python && pip install -e . && python -m ruijie_auth` |
-| OpenWrt router | Install `ruijie-auth_0.11.4_mipsel_24kc.ipk`, or flash the R3G firmware |
+| OpenWrt router | Install the same-architecture `ruijie-auth_0.11.4_mipsel_24kc.ipk`; R3G users can flash the full firmware |
 
 > [!NOTE]
 > Layer-2 packet I/O on Windows requires Npcap. Enabling WinPcap compatibility mode during installation is recommended. The GUI and the service both need administrator rights to open adapters and change network settings.
@@ -227,7 +229,7 @@ The plugin is a static Go binary that uses AF_PACKET and the standard library an
 
 - `build-go.sh` cross-compiles `mipsle` (softfloat) by default; use `GOARCH=amd64` for x86_64.
 - `build-ipk.sh` produces `ruijie-auth_<version>_mipsel_24kc.ipk` by default; override the architecture with `PKG_ARCH`.
-- The full firmware targets the Xiaomi Router 3G (R3G, MT7621A) by default. For other models, use the standalone ipk; do not flash the R3G image.
+- The full firmware targets the Xiaomi Router 3G (R3G, MT7621A) by default; it is the current test vehicle. The ipk is a pure-userland static binary that works on same-architecture OpenWrt of a similar version and is not tied to the R3G. For other models, install the standalone ipk; do not flash the R3G image. More model-specific firmware will follow.
 - Back up the stock partitions and bootloader before flashing. See `docs/OPENWRT_BUILD_ENV.md` and `docs/MANUAL_OPENWRT.md` for the R3G Breed path and partition offsets.
 
 </details>
@@ -297,7 +299,7 @@ A capture accepted by a real server provides three 569-byte private tails (EAPOL
 - In x86_64 OpenWrt under QEMU, the daemon opens AF_PACKET and completes the full Logoff → Start retry → no-server pause lifecycle.
 - The ipk and R3G sysupgrade/Breed images are built and checked to contain the daemon, 8 LuCI views, and the Chinese `.lmo` catalogue in rootfs.
 - The LuCI runtime catalogue is hash-checked against menu titles and all 8 pages; the application's own translation coverage is 100%.
-- A physical R3G has been flashed and completed a real campus EAP-MD5 authentication; the full authentication cycle, portal address learning, server private-property parsing, and re-authentication all pass.
+- A physical R3G (the current test vehicle) has been flashed and completed a real campus EAP-MD5 authentication; the full authentication cycle, portal address learning, server private-property parsing, and re-authentication all pass.
 
 ### Not Yet Verified
 
@@ -372,7 +374,7 @@ docs/                         Reverse-engineering, protocol, adaptation, build, 
 |---|---|
 | [docs/OPENWRT_PORT.md](docs/OPENWRT_PORT.md) | C# → OpenWrt port mapping, behaviour alignment, and validation |
 | [docs/OPENWRT_BUILD_ENV.md](docs/OPENWRT_BUILD_ENV.md) | Build environment, ipk/image packaging, and Breed image flow |
-| [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt feasibility assessment and R3G specifics |
+| [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt feasibility assessment and R3G test records |
 | [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | Preinstalled plugins, kmods, updates, and build |
 | [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | Packet-level hardware validation of UA3F/nftables evasion |
 
@@ -381,7 +383,7 @@ docs/                         Reverse-engineering, protocol, adaptation, build, 
 | Document | Contents |
 |---|---|
 | [docs/FROZEN_DEPLOYMENT.md](docs/FROZEN_DEPLOYMENT.md) | Deployment, upgrade, and runtime-environment record |
-| [docs/ROUTER_STABILITY_2026-11-23.md](docs/ROUTER_STABILITY_2026-11-23.md) | Long-run R3G stability report |
+| [docs/ROUTER_STABILITY_2026-11-23.md](docs/ROUTER_STABILITY_2026-11-23.md) | R3G test: long-run stability report |
 | [skills/ruijie-adaptation/SKILL.md](skills/ruijie-adaptation/SKILL.md) | Agent-oriented end-to-end adaptation playbook |
 | [tools/re_diff/README.md](tools/re_diff/README.md) | Using the Unicorn differential tool |
 

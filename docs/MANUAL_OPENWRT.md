@@ -46,7 +46,7 @@ WAN 口 ── EAPOL/802.1X ── 校园网交换机
 |---|---|
 | 固件 | OpenWrt 24.10（x86_64 与 ramips/mt7621 实测） |
 | 架构 | 默认 `mipsle`（mipsel_24kc）；换架构改 `GOARCH` 重编 |
-| 设备 | 不绑定机型；R3G 只是默认 Image Builder `PROFILE` |
+| 设备 | 不绑定机型；预编译 ipk 同架构、版本相近通用；R3G 只是默认 Image Builder `PROFILE` 和当前实测载体 |
 | 依赖 | 运行时只有 `libc`、`luci-base`、`rpcd` |
 | 认证器不需要 | 专属 kmod、UA3F、NFQUEUE、iptables 扩展、USB 网卡驱动 |
 

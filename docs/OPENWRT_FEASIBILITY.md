@@ -7,6 +7,9 @@
 > `ruijie-auth` 纯用户态 ipk；固件构建后来恢复 UA3F/https-dns-proxy
 > 作为整机功能。当前架构、包名与验证结果见 `docs/OPENWRT_PORT.md` 与
 > `openwrt/README.md`。
+>
+> 本文以 R3G 作为当时的目标机型做可行性评估；项目本身不绑定 R3G。
+> 预编译 ipk 适用于同架构、版本相近的 OpenWrt，R3G 只是当前实测载体。
 
 范围：`RuijieCampusAuth.Core`、`.Service`、`.Cli`、`.App` 与 `python/` 参考实现。
 

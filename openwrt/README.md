@@ -10,6 +10,9 @@ OpenWrt 软路由端的锐捷校园网 802.1X 认证器：Go 守护进程 + LuCI
   固件。认证器只用到 Linux 自带的 AF_PACKET 原始套接字和 Go 标准库，
   `opkg` 依赖只有 `libc`、`luci-base`、`rpcd`；同一二进制在任何同架构
   OpenWrt 上都能跑。固件本身按需包含 UA3F、https-dns-proxy 及相应 kmod。
+- **R3G 是实测载体，不是适用范围**：预编译 ipk 不绑定 R3G，同架构、
+  OpenWrt 版本相近的设备可直接安装；R3G 定制固件用于验证整机功能，
+  后续会补充更多机型固件。
 - **不做机型绑定**：WAN 口由 daemon 自动识别（ubus 逻辑接口 + 默认路由 +
   链路状态），也可在 LuCI 里多选候选网口。
 - **协议一致**：私有尾、CRC16/XMODEM、字节混淆、MD5 链式凭据加密、

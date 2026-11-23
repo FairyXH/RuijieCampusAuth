@@ -18,13 +18,15 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 
 项目把“协议实现”和“学校差异”分开：认证方式、服务名、静态 ID、Portal/自助/升级地址、DHCP 模式等参数放在 `profiles/*.json`，软件本体不写死任何学校信息。同一份档案可以在 C# 与 OpenWrt 实现之间复用。
 
+OpenWrt 形态不以 R3G 为限：预编译 ipk 只要求同架构、版本相近的 OpenWrt，R3G 是当前实测载体，也是我们优先提供定制固件的机型；其他软路由可直接安装同架构 ipk，后续会补充更多机型固件。
+
 ### 三种形态
 
 | 形态 | 技术栈 | 适用平台 | 入口 |
 |---|---|---|---|
 | C# 参考实现 | .NET 10 · Npcap · Avalonia | Windows | GUI、Windows 服务、CLI |
 | Python 参考实现 | Python 3.10+ · scapy | Windows / Linux / macOS | 数字菜单、argparse CLI |
-| OpenWrt 实现 | Go 1.25 · AF_PACKET · LuCI | OpenWrt 24.10 | 守护进程、LuCI 8 页 |
+| OpenWrt 实现 | Go 1.25 · AF_PACKET · LuCI | OpenWrt 24.10（同架构设备；R3G 为实测载体） | 守护进程、LuCI 8 页 |
 
 ### 解决什么问题
 
@@ -42,7 +44,7 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 
 ### 当前状态
 
-- C# 客户端 **1.0.0**、OpenWrt 固件/插件 **0.11.4** 已发布。
+- C# 客户端 **1.0.0**、OpenWrt 插件 **0.11.4** 已发布；R3G 定制固件同步提供，作为当前实测载体。
 - EAP-MD5 已在真实校园网完成认证；569 字节私有尾与服务器私有属性已用真实抓包逐字节校验。
 - PEAP/MSCHAPv2 与 EAP-TLS 协议栈已实现，仍需真实 RADIUS 端到端验证。
 - 详细状态、验证证据与未闭环项见 [README](README.md) 与 [`docs/AGENT_CONTEXT.md`](docs/AGENT_CONTEXT.md)。
@@ -65,13 +67,15 @@ RuijieCampusAuth is a third-party, open-source implementation of the 802.1X auth
 
 The project separates the protocol implementation from school-specific differences. Authentication method, service name, static ID, portal/self-service/upgrade endpoints, and DHCP mode live in `profiles/*.json`; the software contains no hard-coded school information. The same profile works across the C# and OpenWrt implementations.
 
+The OpenWrt form is not limited to the R3G: the prebuilt ipk only requires a same-architecture OpenWrt of a similar version. The R3G is the current test vehicle and the first model we provide custom firmware for; other soft routers can install the same-architecture ipk directly, and more model-specific firmware will follow.
+
 ### Three forms
 
 | Form | Stack | Platforms | Entry point |
 |---|---|---|---|
 | C# reference | .NET 10 · Npcap · Avalonia | Windows | GUI, Windows service, CLI |
 | Python reference | Python 3.10+ · scapy | Windows / Linux / macOS | Numeric menu, argparse CLI |
-| OpenWrt | Go 1.25 · AF_PACKET · LuCI | OpenWrt 24.10 | Daemon, 8 LuCI pages |
+| OpenWrt | Go 1.25 · AF_PACKET · LuCI | OpenWrt 24.10 (same-arch devices; R3G is the test vehicle) | Daemon, 8 LuCI pages |
 
 ### What it solves
 
@@ -89,7 +93,7 @@ The project separates the protocol implementation from school-specific differenc
 
 ### Current status
 
-- C# client **1.0.0** and OpenWrt firmware/plugin **0.11.4** are released.
+- C# client **1.0.0** and the OpenWrt plugin **0.11.4** are released; the R3G custom firmware ships alongside it as the current test vehicle.
 - EAP-MD5 has completed authentication on a real campus network; the 569-byte private tails and server private properties have been validated byte for byte against real captures.
 - The PEAP/MSCHAPv2 and EAP-TLS stacks are implemented but still need end-to-end validation against a real RADIUS server.
 - See the [README](README.md) and [`docs/AGENT_CONTEXT.md`](docs/AGENT_CONTEXT.md) for detailed status, evidence, and open items.

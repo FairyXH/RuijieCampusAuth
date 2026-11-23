@@ -44,9 +44,11 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 |---|---|---|---|
 | C# 参考实现 | C# / .NET 10 · Npcap · `SslStream` | Windows | Avalonia GUI、Windows 服务、CLI |
 | Python 参考实现 | Python 3.10+ · scapy · `ssl` + `MemoryBIO` | Windows / Linux / macOS | 数字菜单、argparse CLI |
-| OpenWrt 实现 | Go 1.25 · AF_PACKET · `crypto/tls` | OpenWrt 24.10 | LuCI 8 页 |
+| OpenWrt 实现 | Go 1.25 · AF_PACKET · `crypto/tls` | OpenWrt 24.10（同架构设备；R3G 为实测载体） | LuCI 8 页 |
 
 设计原则是 **协议兼容、行为可验证、学校配置外置**：不修改服务器行为，不绕过认证流程，也不把学校代码、服务名、静态 ID 或服务地址编译进二进制。学校差异通过 `profiles/*.json` 注入，软件本体不写死任何学校参数。
+
+OpenWrt 形态不以 R3G 为限。预编译 ipk 是纯用户态静态 Go 二进制，只要求同架构与版本相近的 OpenWrt；R3G 是目前的主要实测载体，也是我们优先提供定制固件的机型。其他软路由可以直接安装同架构 ipk，后续会补充更多机型固件。
 
 项目只覆盖认证协议与必要的运维能力，不复制官方客户端的界面皮肤、弹窗、公告、托盘、安装器等非协议组件，也不内置任何学校的账号、密码或登录凭据。
 
@@ -60,7 +62,7 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 | 组件 | 版本 | 发布形态 |
 |---|---|---|
 | C# 客户端 | 1.0.0 | `RuijieCampusAuth-1.0.0-win-x64.zip`，自包含 .NET 10 |
-| OpenWrt 固件 / 插件 | 0.11.4 | R3G 整机固件 + `ruijie-auth_0.11.4_mipsel_24kc.ipk` |
+| OpenWrt 固件 / 插件 | 0.11.4 | 同架构通用的 `ruijie-auth_0.11.4_mipsel_24kc.ipk` + R3G 定制整机固件（实测载体） |
 | Python 参考实现 | 随源码 | `pip install -e python` |
 
 最新发布见 [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest)。
@@ -72,7 +74,7 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 - **多学校适配**：认证方式、服务名、静态 ID、Portal/自助/升级地址、DHCP 模式等全部由 JSON 档案提供，导入时只覆盖档案声明的字段。
 - **可验证实现**：用 Unicorn 直接调用原版二进制算法函数做逐字节差分，用真实服务器接受的抓包做 569 字节尾包与私有属性校验。
 - **完整运维面**：账号池、服务器学习与锁定、守护/抢占、重认证调度、DHCP 续租/释放、Portal、诊断、客户端接管与调试管道。
-- **OpenWrt 友好**：认证器本体纯用户态，只依赖 AF_PACKET 与 Go 标准库；不绑定具体机型，WAN 口可自动识别或多选。
+- **OpenWrt 友好**：认证器本体纯用户态，只依赖 AF_PACKET 与 Go 标准库；ipk 不绑定 R3G，同架构、OpenWrt 版本相近即可运行。R3G 是当前实测载体，也是我们优先提供定制固件的机型；WAN 口可自动识别或多选，后续会补充更多机型固件。
 
 ## 快速开始
 
@@ -80,7 +82,7 @@ RuijieCampusAuth 是锐捷（Ruijie）校园网 802.1X 认证协议的第三方�
 |---|---|
 | Windows 桌面使用 | 下载 `RuijieCampusAuth-1.0.0-win-x64.zip`，解压后运行 GUI；需要 Npcap 与管理权限 |
 | 协议研究 / 脚本 | `cd python && pip install -e . && python -m ruijie_auth` |
-| OpenWrt 路由器 | 安装 `ruijie-auth_0.11.4_mipsel_24kc.ipk`，或刷入 R3G 整机固件 |
+| OpenWrt 路由器 | 安装同架构 `ruijie-auth_0.11.4_mipsel_24kc.ipk`；R3G 可直接刷整机固件 |
 
 > [!NOTE]
 > Windows 端的二层收发依赖 Npcap。安装 Npcap 时建议勾选 WinPcap 兼容模式；GUI 与服务都需要管理员权限才能打开网卡并修改网络配置。
@@ -224,7 +226,7 @@ go test ./...
 
 - `build-go.sh` 默认交叉编译 `mipsle`（softfloat），可用 `GOARCH=amd64` 生成 x86_64 版本。
 - `build-ipk.sh` 默认产出 `ruijie-auth_<version>_mipsel_24kc.ipk`，可用 `PKG_ARCH` 覆盖架构。
-- 整机固件默认面向小米路由器 3G（R3G，MT7621A）；其他机型请使用独立 ipk，不要直接刷 R3G 镜像。
+- 整机固件默认面向小米路由器 3G（R3G，MT7621A），它是当前实测载体；ipk 为纯用户态静态二进制，同架构、OpenWrt 版本相近即可使用，不绑定 R3G。其他机型请安装独立 ipk，不要直接刷 R3G 镜像；后续会提供更多机型固件。
 - 刷机前先备份原厂分区与 Bootloader。R3G 的 Breed 刷写路径与分区偏移见 `docs/OPENWRT_BUILD_ENV.md` 和 `docs/MANUAL_OPENWRT.md`。
 
 </details>
@@ -294,7 +296,7 @@ C# 与 OpenWrt 使用同一份 schema。导入时只覆盖档案声明的字段�
 - x86_64 OpenWrt QEMU 中验证守护进程打开 AF_PACKET，并完成 Logoff → Start 重试 → 无服务器暂停的完整生命周期。
 - 构建 ipk 与 R3G sysupgrade/Breed 镜像，校验 rootfs 内含守护进程、8 个 LuCI 视图与中文 `.lmo`。
 - LuCI 运行时目录按 hash 校验菜单标题与 8 个页面词条，应用自身词条覆盖率 100%。
-- R3G 真机已刷入并完成真实校园网 EAP-MD5 认证；完整认证循环、Portal 地址学习、服务器私有属性解析与重认证均通过。
+- R3G（当前实测载体）已刷入并完成真实校园网 EAP-MD5 认证；完整认证循环、Portal 地址学习、服务器私有属性解析与重认证均通过。
 
 ### 尚未验证
 
@@ -369,7 +371,7 @@ docs/                         逆向、协议、适配、构建与操作文档
 |---|---|
 | [docs/OPENWRT_PORT.md](docs/OPENWRT_PORT.md) | C# → OpenWrt 移植对照、行为对齐与验证 |
 | [docs/OPENWRT_BUILD_ENV.md](docs/OPENWRT_BUILD_ENV.md) | 构建环境、ipk/镜像打包与 Breed 镜像流程 |
-| [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt 移植可行性评估与 R3G 专项 |
+| [docs/OPENWRT_FEASIBILITY.md](docs/OPENWRT_FEASIBILITY.md) | OpenWrt 移植可行性评估与 R3G 实测记录 |
 | [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | 精简固件预装插件、kmod、更新与构建 |
 | [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | UA3F/nftables 防检测的报文级实机验证 |
 
@@ -378,7 +380,7 @@ docs/                         逆向、协议、适配、构建与操作文档
 | 文档 | 内容 |
 |---|---|
 | [docs/FROZEN_DEPLOYMENT.md](docs/FROZEN_DEPLOYMENT.md) | 部署、升级与运行环境记录 |
-| [docs/ROUTER_STABILITY_2026-11-23.md](docs/ROUTER_STABILITY_2026-11-23.md) | R3G 长时间稳定性监测报告 |
+| [docs/ROUTER_STABILITY_2026-11-23.md](docs/ROUTER_STABILITY_2026-11-23.md) | R3G 实测：长时间稳定性监测报告 |
 | [skills/ruijie-adaptation/SKILL.md](skills/ruijie-adaptation/SKILL.md) | Agent 端到端适配作业手册 |
 | [tools/re_diff/README.md](tools/re_diff/README.md) | Unicorn 直调原版函数差分工具的使用 |
 
