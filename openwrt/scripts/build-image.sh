@@ -81,6 +81,7 @@ DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 	luci-app-wol luci-i18n-wol-zh-cn etherwake \
 	luci-app-commands luci-i18n-commands-zh-cn \
 	usbutils usb-modeswitch pciutils ethtool iw \
+	zerotier \
 	e2fsprogs dosfstools f2fs-tools ntfs-3g btrfs-progs \
 	bash curl ca-bundle unzip ip-full httping \
 	ruby ruby-yaml kmod-tun kmod-inet-diag kmod-netlink-diag \
@@ -140,6 +141,10 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/usr/bin" "$STAGE/etc/openclash/core" \
 	"$STAGE/etc/vnstat" "$STAGE/etc/nlbwmon"
 cp -a "$ROOT/files/." "$STAGE/"
+# Optional extra overlay (for example patched kernel modules).
+if [ -n "${EXTRA_FILES:-}" ]; then
+	cp -a "$EXTRA_FILES/." "$STAGE/"
+fi
 cp "$UA3F_DIR/root/usr/bin/ua3f" "$STAGE/usr/bin/ua3f"
 gzip -dc "$MIHOMO_GZ" >"$STAGE/etc/openclash/core/clash_meta"
 chmod 0755 "$STAGE/usr/bin/ua3f" \
