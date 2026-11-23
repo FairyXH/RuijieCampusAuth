@@ -1,0 +1,15 @@
+luci-ssl
+luci-i18n-base-zh-cn
+luci-i18n-firewall-zh-cn
+https-dns-proxy
+luci-app-https-dns-proxy
+luci-i18n-https-dns-proxy-zh-cn
+kmod-nft-queue
+kmod-nft-tproxy
+kmod-nfnetlink-queue
+kmod-nf-conntrack-netlink
+ipset
+luci-compat
+ip-full
+ca-bundle
+curl

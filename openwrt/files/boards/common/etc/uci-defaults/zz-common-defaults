@@ -1,0 +1,89 @@
+#!/bin/sh
+
+# Shared first-boot defaults for matrix-built images (lite/standard tiers).
+# Board-specific overlays are applied after this file and can override it.
+
+uci -q set luci.main.lang='zh_cn'
+uci -q commit luci
+
+# The campus uplink is the logical wan interface on all Wave 1 targets.
+# "auto" can pick a USB tether as soon as a phone is plugged in.
+uci -q set ruijie-auth.main.device='wan'
+uci -q set ruijie-auth.main.reauth_interval='0'
+uci -q set ruijie-auth.main.proactive_reauth='0'
+uci -q set ruijie-auth.main.quiet_window='1'
+uci -q set ruijie-auth.main.quiet_start='0'
+uci -q set ruijie-auth.main.quiet_end='360'
+uci -q set ruijie-auth.main.heartbeat='0'
+uci -q set ruijie-auth.main.connectivity_domain='www.baidu.com'
+uci -q set ruijie-auth.main.connectivity_url='https://www.baidu.com/'
+uci -q set ruijie-auth.main.connectivity_timeout='2'
+uci -q commit ruijie-auth
+
+# Flow offloading bypasses the netfilter postrouting hook, which would make
+# the TTL/MSS/IPID and UA rewriting ineffective.
+uci -q set firewall.@defaults[0].flow_offloading='0'
+uci -q set firewall.@defaults[0].flow_offloading_hw='0'
+uci -q commit firewall
+
+# Binding 10.0.0.1 directly can make uhttpd exit before the LAN address
+# exists; the firewall still rejects WAN-side input.
+uci -q set uhttpd.main.listen_http='0.0.0.0:80'
+uci -q set uhttpd.main.listen_https='0.0.0.0:443'
+uci -q commit uhttpd
+
+# IPv4-only clients; Android treats unreachable AAAA answers as "no internet".
+uci -q set dhcp.@dnsmasq[0].filter_aaaa='1'
+uci -q commit dhcp
+
+# DoH. The LuCI app and package are installed by the lite/standard tiers.
+if [ -f /etc/config/https-dns-proxy ]; then
+	uci -q delete https-dns-proxy.@https-dns-proxy[0]
+	uci -q set https-dns-proxy.dns='https-dns-proxy'
+	uci -q set https-dns-proxy.dns.bootstrap_dns='223.5.5.5'
+	uci -q set https-dns-proxy.dns.resolver_url='https://dns.google/dns-query'
+	uci -q set https-dns-proxy.dns.listen_addr='127.0.0.1'
+	uci -q set https-dns-proxy.dns.listen_port='5053'
+	uci -q set https-dns-proxy.dns.user='nobody'
+	uci -q set https-dns-proxy.dns.group='nogroup'
+	uci -q commit https-dns-proxy
+	uci -q delete dhcp.@dnsmasq[0].server
+	uci -q add_list dhcp.@dnsmasq[0].server='127.0.0.1#5053'
+	uci -q commit dhcp
+fi
+
+# UA2F: low-ROM tier. The basic nft rules in ruijie-disguise stay enabled.
+if [ -f /etc/config/ua2f ]; then
+	uci -q set ua2f.enabled.enabled='1'
+	uci -q set ua2f.firewall.handle_fw='1'
+	uci -q set ua2f.firewall.handle_tls='1'
+	uci -q set ua2f.firewall.handle_intranet='1'
+	uci -q set ua2f.main.mode='NFQUEUE'
+	uci -q set ua2f.main.custom_ua='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'
+	uci -q commit ua2f
+	uci -q set ruijie-auth.main.disguise='basic'
+	uci -q commit ruijie-auth
+fi
+
+# UA3F: standard tier. Full disguise starts UA3F at boot.
+if [ -f /etc/config/ua3f ]; then
+	# reorder breaks Android/iOS TLS on some networks; keep it opt-in.
+	uci -q set ua3f.main.desync_reorder='0'
+	uci -q set ua3f.main.desync_inject='0'
+	uci -q set ua3f.main.desync_ports='80,443'
+	uci -q commit ua3f
+	uci -q set ruijie-auth.main.disguise='full'
+	uci -q commit ruijie-auth
+fi
+
+for service in ruijie-auth ruijie-disguise https-dns-proxy ua2f ua3f; do
+	[ -x "/etc/init.d/$service" ] && /etc/init.d/"$service" enable
+done
+
+/etc/init.d/ruijie-auth restart >/dev/null 2>&1 || true
+/etc/init.d/ruijie-disguise restart >/dev/null 2>&1 || true
+/etc/init.d/https-dns-proxy restart >/dev/null 2>&1 || true
+[ -x /etc/init.d/ua2f ] && /etc/init.d/ua2f restart >/dev/null 2>&1 || true
+[ -x /etc/init.d/ua3f ] && /etc/init.d/ua3f restart >/dev/null 2>&1 || true
+
+exit 0

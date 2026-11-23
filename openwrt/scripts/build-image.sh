@@ -89,7 +89,7 @@ DEFAULT_PACKAGES="luci-ssl luci-i18n-base-zh-cn \
 PACKAGES=${PACKAGES:-$DEFAULT_PACKAGES}
 
 if [ ! -d "$IB" ]; then
-	IB=$(sh "$ROOT/scripts/fetch-imagebuilder.sh" "$ROOT/build/ib") || exit 2
+	IB=$(sh "$ROOT/scripts/fetch-imagebuilder.sh" ramips mt7621 "$ROOT/build/ib") || exit 2
 fi
 
 fetch() {
@@ -141,6 +141,9 @@ rm -rf "$STAGE"
 mkdir -p "$STAGE/usr/bin" "$STAGE/etc/openclash/core" \
 	"$STAGE/etc/vnstat" "$STAGE/etc/nlbwmon"
 cp -a "$ROOT/files/." "$STAGE/"
+if [ -d "$ROOT/files/boards/$PROFILE" ]; then
+	cp -a "$ROOT/files/boards/$PROFILE/." "$STAGE/"
+fi
 # Optional extra overlay (for example patched kernel modules).
 if [ -n "${EXTRA_FILES:-}" ]; then
 	cp -a "$EXTRA_FILES/." "$STAGE/"
