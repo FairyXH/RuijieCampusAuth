@@ -75,6 +75,7 @@ sh scripts/fetch-imagebuilder.sh  # 首次构建：下载并校验 24.10.0 IB
 sh scripts/build-image.sh   # 打 R3G 全功能固件
 sh scripts/build-target.sh scripts/profiles/<profile>.env  # 单机型 lite/standard
 sh scripts/build-wave1.sh   # Wave 1 全部 mipsel 机型
+sh scripts/build-arches.sh  # 全架构 ruijie-auth ipk
 ```
 
 `build-image.sh` 优先使用 `vendor/` 里的固定版本插件，其次才联网下载；

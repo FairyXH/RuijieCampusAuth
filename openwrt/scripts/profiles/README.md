@@ -36,6 +36,12 @@ IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
   JOBS=8 sh scripts/build-wave1.sh
 ```
 
+全架构认证 ipk：
+
+```sh
+VERSION=0.11.4 sh scripts/build-arches.sh
+```
+
 `build-target.sh` 默认把 Image Builder 的软件源切到清华镜像
 （`https://mirrors.tuna.tsinghua.edu.cn/openwrt`），避免 `make clean`
 清空本地包索引后无法从官方源拉包。需要官方源时加 `MIRROR=official`。
