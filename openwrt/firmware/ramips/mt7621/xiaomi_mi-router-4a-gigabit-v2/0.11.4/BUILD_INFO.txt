@@ -1,5 +1,5 @@
 版本: 0.11.4
-构建时间: 2026-11-23T08:58:55Z
+构建时间: 2026-11-23T09:47:52Z
 OpenWrt: 24.10.0
 Image Builder: openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
 Target: ramips/mt7621
@@ -11,4 +11,4 @@ UA: ua2f
 包数: 188
 
 镜像:
--rw-rw-r-- 1 zhang zhang 11273323 Nov 23 16:58 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4a-gigabit-v2/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4a-gigabit-v2-squashfs-sysupgrade.bin
+-rw-rw-r-- 1 zhang zhang 11273323 Nov 23 17:47 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4a-gigabit-v2/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4a-gigabit-v2-squashfs-sysupgrade.bin

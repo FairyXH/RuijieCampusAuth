@@ -1,5 +1,5 @@
 版本: 0.11.4
-构建时间: 2026-11-23T09:06:35Z
+构建时间: 2026-11-23T09:56:47Z
 OpenWrt: 24.10.0
 Image Builder: openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
 Target: ramips/mt7621
@@ -11,5 +11,5 @@ UA: ua3f
 包数: 203
 
 镜像:
--rw-rw-r-- 1 zhang zhang 17694720 Nov 23 17:06 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-cr6606/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-firmware.bin
--rw-rw-r-- 1 zhang zhang 15330386 Nov 23 17:06 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-cr6606/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-sysupgrade.bin
+-rw-rw-r-- 1 zhang zhang 17694720 Nov 23 17:56 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-cr6606/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-firmware.bin
+-rw-rw-r-- 1 zhang zhang 15330386 Nov 23 17:56 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-cr6606/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-cr6606-squashfs-sysupgrade.bin

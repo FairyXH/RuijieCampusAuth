@@ -37,6 +37,17 @@ if [ ! -d "$IB" ]; then
 	IB=$(sh "$ROOT/scripts/fetch-imagebuilder.sh" "$TARGET" "$SUBTARGET" "$OUT/ib")
 fi
 
+# Image Builder's local package index can be emptied by `make clean`. Point
+# its repositories at a reachable mirror; override with MIRROR=official.
+MIRROR=${MIRROR:-https://mirrors.tuna.tsinghua.edu.cn/openwrt}
+[ "$MIRROR" = "official" ] && MIRROR=https://downloads.openwrt.org
+if [ -f "$IB/repositories.conf" ]; then
+	sed -i \
+		-e "s|https://downloads.openwrt.org|${MIRROR}|g" \
+		-e "s|https://mirrors.tuna.tsinghua.edu.cn/openwrt|${MIRROR}|g" \
+		"$IB/repositories.conf"
+fi
+
 echo "== target:   $TARGET/$SUBTARGET"
 echo "== profile:  $PROFILE"
 echo "== arch:     $ARCH ($GOARCH)"
@@ -44,6 +55,7 @@ echo "== tier:     $TIER"
 echo "== ua:       $UA"
 echo "== version:  $VERSION"
 echo "== builder:  $IB"
+echo "== mirror:   $MIRROR"
 
 # Authenticator ipk for this architecture.
 VERSION="$VERSION" GOARCH="$GOARCH" PKG_ARCH="$ARCH" sh "$ROOT/scripts/build-ipk.sh"

@@ -1,5 +1,5 @@
 版本: 0.11.4
-构建时间: 2026-11-23T08:56:50Z
+构建时间: 2026-11-23T09:45:29Z
 OpenWrt: 24.10.0
 Image Builder: openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
 Target: ramips/mt7621
@@ -11,6 +11,6 @@ UA: ua2f
 包数: 187
 
 镜像:
--rw-rw-r-- 1 zhang zhang  3180955 Nov 23 16:56 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-kernel1.bin
--rw-rw-r-- 1 zhang zhang  8912896 Nov 23 16:56 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-rootfs0.bin
--rw-rw-r-- 1 zhang zhang 10835011 Nov 23 16:56 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-sysupgrade.bin
+-rw-rw-r-- 1 zhang zhang  3180955 Nov 23 17:45 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-kernel1.bin
+-rw-rw-r-- 1 zhang zhang  8912896 Nov 23 17:45 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-rootfs0.bin
+-rw-rw-r-- 1 zhang zhang 10835011 Nov 23 17:45 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/xiaomi_mi-router-4/0.11.4/openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-sysupgrade.bin

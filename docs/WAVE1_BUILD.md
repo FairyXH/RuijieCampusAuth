@@ -12,24 +12,30 @@
 
 | Profile | 层 | UA | sysupgrade 字节 | 大小 | 包数 | SHA256 前 16 位 |
 |---|---|---|---:|---:|---:|---|
-| `d-team_newifi-d2` | standard | ua3f | 15,139,905 | 14.4 MiB | 207 | `563a60dc41399722…` |
-| `lenovo_newifi-d1` | standard | ua3f | 15,205,463 | 14.5 MiB | 209 | `dba1bcbea14aa762…` |
-| `mikrotik_routerboard-750gr3` | lite | ua2f | 9,962,632 | 9.5 MiB | 163 | `c011ed7f14851045…` |
-| `phicomm_k2p` | lite | ua2f | 11,273,276 | 10.8 MiB | 187 | `767516631b74c50d…` |
-| `tplink_archer-a6-v3` | lite | ua2f | 11,273,290 | 10.8 MiB | 188 | `5977ff503e422eda…` |
-| `tplink_archer-c6-v3` | lite | ua2f | 11,273,290 | 10.8 MiB | 188 | `3c7dc078db478773…` |
-| `xiaomi_mi-router-3-pro` | standard | ua3f | 15,565,931 | 14.8 MiB | 209 | `27bfdaf605d04f92…` |
-| `xiaomi_mi-router-3g-v2` | standard | ua3f | 15,008,885 | 14.3 MiB | 201 | `89e197471e543cb8…` |
-| `xiaomi_mi-router-4` | lite | ua2f | 10,835,011 | 10.3 MiB | 187 | `d2d17b652b406d61…` |
-| `xiaomi_mi-router-4a-gigabit-v2` | lite | ua2f | 11,273,323 | 10.8 MiB | 188 | `fba2afdd6bfe1fb8…` |
-| `xiaomi_mi-router-4a-gigabit` | lite | ua2f | 10,880,098 | 10.4 MiB | 186 | `cfed9255ab117e2a…` |
-| `xiaomi_mi-router-ac2100` | standard | ua3f | 15,494,226 | 14.8 MiB | 203 | `fff68a7cf3430173…` |
-| `xiaomi_mi-router-cr6606` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `81bbf5b4cb49bf96…` |
-| `xiaomi_mi-router-cr6608` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `6815da5567383d71…` |
-| `xiaomi_mi-router-cr6609` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `028be744f5fdd6ff…` |
+| `d-team_newifi-d2` | standard | ua3f | 15,139,905 | 14.4 MiB | 207 | `0c3b456532cc2388…` |
+| `lenovo_newifi-d1` | standard | ua3f | 15,205,463 | 14.5 MiB | 209 | `bfeea8430f401caf…` |
+| `mikrotik_routerboard-750gr3` | lite | ua2f | 9,962,632 | 9.5 MiB | 163 | `984b6ce3f4c581df…` |
+| `phicomm_k2p` | lite | ua2f | 11,273,276 | 10.8 MiB | 187 | `b645cd17a2cf8a27…` |
+| `tplink_archer-a6-v3` | lite | ua2f | 11,273,290 | 10.8 MiB | 188 | `1b603ecd95ed5d49…` |
+| `tplink_archer-c6-v3` | lite | ua2f | 11,273,290 | 10.8 MiB | 188 | `bd44028d28a2daf0…` |
+| `xiaomi_mi-router-3-pro` | standard | ua3f | 15,565,931 | 14.8 MiB | 209 | `4d3122e366236e4a…` |
+| `xiaomi_mi-router-3g-v2` | standard | ua3f | 15,008,885 | 14.3 MiB | 201 | `af87be82faabcf9a…` |
+| `xiaomi_mi-router-4` | lite | ua2f | 10,835,011 | 10.3 MiB | 187 | `10bb4ed3c6b5d4ec…` |
+| `xiaomi_mi-router-4a-gigabit-v2` | lite | ua2f | 11,273,323 | 10.8 MiB | 188 | `4c0e5b41b8cb2bab…` |
+| `xiaomi_mi-router-4a-gigabit` | lite | ua2f | 10,880,098 | 10.4 MiB | 186 | `284900f7402c2884…` |
+| `xiaomi_mi-router-ac2100` | standard | ua3f | 15,494,226 | 14.8 MiB | 203 | `5ddf8ec46748f22b…` |
+| `xiaomi_mi-router-cr6606` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `f2cb1ca3f4bc4e60…` |
+| `xiaomi_mi-router-cr6608` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `0e1e1f429c1fac28…` |
+| `xiaomi_mi-router-cr6609` | standard | ua3f | 15,330,386 | 14.6 MiB | 203 | `12dbbb7734a7dd2d…` |
 
 合计 15 个 sysupgrade，199,176,488 字节（约 190 MiB）。
 完整 SHA256 见各版本目录的 `SHA256SUMS`。
+
+> 构建中遇到一个环境问题：Image Builder 的 `make clean` 会清空本地
+> 包索引，批量重打时 CR6606/8/9 因 `downloads.openwrt.org` 拉包失败。
+> 已把 `repositories.conf` 切到清华镜像；`build-target.sh` 现在默认
+> 使用 `https://mirrors.tuna.tsinghua.edu.cn/openwrt`，需要官方源时
+> 传 `MIRROR=official`。CR660x 已用镜像源重打并通过校验。
 
 部分 profile 还生成了 `-squashfs-factory.bin`（Archer A6/C6 v3、
 R3P），已一并放入对应目录。
