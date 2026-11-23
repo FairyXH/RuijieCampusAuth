@@ -1,0 +1,4 @@
+#!/bin/sh
+# Run the custom package restore helper once after a firmware upgrade.
+[ -x /usr/sbin/custom-packages-restore ] && /usr/sbin/custom-packages-restore &
+exit 0

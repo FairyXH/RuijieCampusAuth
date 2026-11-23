@@ -216,6 +216,11 @@ RNDIS/NCM/ECM/ipheth 后自动创建 `usbwan`，并交给 mwan3 管理。固件�
   不要跨版本升级内核。
 - 从改名前的老包迁移：老包的配置文件名与包名不同，先停老服务，把老配置
   内容手工复制到 `/etc/config/ruijie-auth`，再安装新 ipk。
+- 手动安装的 SakuraFrp/雷神不进固件，也不建议长期缓存在路由器。
+  固件工具包 `MiR3G_V1-Openwrt/tools/manual-apps/` 提供
+  `backup.sh`（升级前拉到 PC）和 `restore.sh`（sysupgrade 后推回、
+  装依赖/恢复配置/开机自启）。备份含 natfrp 访问密钥，只留本机，
+  不要提交或上传网盘。
 
 ## 验证状态（2026-11-20）
 

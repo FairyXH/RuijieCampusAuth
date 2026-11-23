@@ -1,0 +1,19 @@
+非内置应用缓存目录（可选）
+==========================
+
+推荐在 PC 上用固件工具包的 tools/manual-apps/backup.sh 和 restore.sh
+做“升级前备份、sysupgrade 后推回”，这样大包不占路由器空间，也不必
+把 ipk 长期放在这里。
+
+如果确实要在路由器上留离线包，把 .ipk 文件和可执行的 install.sh 放在
+这里（或 U 盘的 /mnt/<usb>/custom-packages/），sysupgrade 后首次启动
+会自动执行一次 install.sh；也可以随时手动执行：
+
+    /usr/sbin/custom-packages-restore
+
+install.sh 以 root 身份、在此目录下运行，负责 opkg install 以及应用自己
+的安装后步骤。目录会通过 /lib/upgrade/keep.d/custom-packages 在
+sysupgrade 时保留。
+
+注意：overlay 只有约 53MB，natfrp/雷神这类大包请先确认剩余空间，或者
+把缓存放在 U 盘上。

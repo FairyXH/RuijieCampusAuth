@@ -1,0 +1,8 @@
+#!/bin/sh
+# LuCI derives the static resource version (?v=) from the package database
+# mtime. Reproducible firmware builds keep that timestamp fixed, so a browser
+# can keep stale view modules after an upgrade. Bump it once per flash.
+[ -e /lib/apk/db/installed ] && touch /lib/apk/db/installed 2>/dev/null
+[ -e /usr/lib/opkg/status ] && touch /usr/lib/opkg/status 2>/dev/null
+rm -f /tmp/luci-indexcache.* 2>/dev/null
+exit 0
