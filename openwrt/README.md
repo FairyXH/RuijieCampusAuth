@@ -72,12 +72,19 @@ cd openwrt
 sh scripts/build-go.sh      # 只编译 daemon
 sh scripts/build-ipk.sh     # 打 ipk（默认 mipsle，可用 GOARCH= 改）
 sh scripts/fetch-imagebuilder.sh  # 首次构建：下载并校验 24.10.0 IB
-sh scripts/build-image.sh   # 打整机固件（默认 R3G Image Builder）
+sh scripts/build-image.sh   # 打 R3G 全功能固件
+sh scripts/build-target.sh scripts/profiles/<profile>.env  # 单机型 lite/standard
+sh scripts/build-wave1.sh   # Wave 1 全部 mipsel 机型
 ```
 
 `build-image.sh` 优先使用 `vendor/` 里的固定版本插件，其次才联网下载；
 Image Builder 的版本和 SHA256 由 `fetch-imagebuilder.sh` 固定。因此同一
 份仓库在干净环境里可以复现同一套包和内核 ABI。
+
+`build-target.sh` 读取 `scripts/profiles/*.env`，按 `scripts/packages/lite.txt`
+或 `standard.txt` 组装镜像，并把产物写入 `firmware/<target>/<subtarget>/
+<profile>/<version>/`。Wave 1 的 15 个机型结果见
+[`docs/WAVE1_BUILD.md`](../docs/WAVE1_BUILD.md)。
 
 `build-ipk.sh` 需要 `python3` 生成中文 `.lmo`；没有 python3 时只跳过翻译，
 其余照常构建。

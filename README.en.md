@@ -378,6 +378,7 @@ docs/                         Reverse-engineering, protocol, adaptation, build, 
 | [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | Preinstalled plugins, kmods, updates, and build |
 | [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | Packet-level hardware validation of UA3F/nftables evasion |
 | [docs/MODEL_PORTFOLIO_AUDIT.md](docs/MODEL_PORTFOLIO_AUDIT.md) | Router model coverage audit, size tiers, and priority targets |
+| [docs/WAVE1_BUILD.md](docs/WAVE1_BUILD.md) | Wave 1 build results and verification for 15 mipsel models |
 
 ### Operations and Tools
 

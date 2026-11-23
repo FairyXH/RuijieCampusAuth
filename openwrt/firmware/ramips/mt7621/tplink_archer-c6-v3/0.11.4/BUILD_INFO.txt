@@ -1,0 +1,15 @@
+版本: 0.11.4
+构建时间: 2026-11-23T08:51:43Z
+OpenWrt: 24.10.0
+Image Builder: openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
+Target: ramips/mt7621
+Profile: tplink_archer-c6-v3
+架构: mipsel_24kc
+Go: mipsle
+层: lite
+UA: ua2f
+包数: 188
+
+镜像:
+-rw-rw-r-- 1 zhang zhang 11244822 Nov 23 16:51 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/tplink_archer-c6-v3/0.11.4/openwrt-24.10.0-ramips-mt7621-tplink_archer-c6-v3-squashfs-factory.bin
+-rw-rw-r-- 1 zhang zhang 11273290 Nov 23 16:51 /home/zhang/src/RuijieCampusAuth-wave1/openwrt/firmware/ramips/mt7621/tplink_archer-c6-v3/0.11.4/openwrt-24.10.0-ramips-mt7621-tplink_archer-c6-v3-squashfs-sysupgrade.bin

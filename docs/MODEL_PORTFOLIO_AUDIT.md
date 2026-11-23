@@ -20,16 +20,19 @@
 | 社区优先适配 | 现在 12–13 个（mipsel）；2–4 周再加 18–20 个（ARM/AArch64）；1–2 个月 50–70 个 |
 | 不建议投入 | 4MB flash、RT3883/Octeon/APM821xx 的 DPI 伪装、16MB + UA3F |
 
+> 2026-11-23 Wave 1 已构建并校验 15 个 mipsel 机型；结果见
+> [`docs/WAVE1_BUILD.md`](WAVE1_BUILD.md)。
+
 关键判断：
 
 1. **认证器本体已经足够通用**：Go 静态二进制，`GOARCH`/`PKG_ARCH` 可覆盖
    MIPS/ARM/AArch64/x86；LuCI 页面是 `all`，DoH 也是全架构包。
 2. **UA3F 和 UA2F 是两种不同量级的东西**：UA3F 安装后约 17.8MB，UA2F
    只有 788KB。16MB 机型只能走 UA2F；32MB 以上才有 UA3F 的空间。
-3. **R4A 不是“换个 PROFILE 就行”**：16MB flash、约 8MB 固件区，官方
-   OpenWrt 镜像已 7.2MB，Lienol 带 UA2F 的镜像 8.4MB；再塞 2.8MB 的
-   认证 ipk 必然超。需要专门的精简包集，甚至无 LuCI/仅 EAP-MD5 的
-   lite 二进制。
+3. **R4A 不是“换个 PROFILE 就行”**：16MB flash，但 OpenWrt profile
+   `IMAGE_SIZE` 是 14,848KB（教程里的 `0x800000` 是保守擦除范围）。官方
+   镜像 7.2MB，Lienol 带 UA2F 的镜像 8.4MB；lite 镜像（auth + UA2F +
+   DoH）实测 10.88MB，能装下。UA3F 版本约 15.5MB，仍超出 14.5MB。
 4. **当前最大的工程缺口不是协议，而是构建矩阵**：`fetch-imagebuilder.sh`
    只认 mt7621，`build-image.sh` 只认 R3G，`kmods-r3g.txt` 和
    `zz-r3g-defaults` 都是 R3G 专用；`ruijie-disguise` 也只有 UA3F 模式，
@@ -69,9 +72,9 @@
 
 由此得到容量门槛：
 
-- **16MB flash（约 8MB 固件区）**：只能 UA2F；认证 2.85MB + UA2F 0.26MB +
-  DoH 0.03MB + 基础系统，必须把基础镜像压到约 5MB 以内。R4A 需要
-  专门的精简包集。
+- **16MB flash**：可用镜像上限因 profile 而异（R4A 14,848KB；部分机型
+  只有约 8MB rootfs）。只能 UA2F；auth + UA2F + DoH + 基础 LuCI 实测
+  10.9–11.3MB，R4A 可装；UA3F 版本约 15.5MB，超出 R4A 上限。
 - **32MB flash**：可以 auth + UA3F + DoH + 基础 LuCI，约 20–25MB；
   OpenClash/USB 全功能仍不够。
 - **128MB NAND**：可以完整 R3G 包集（56.5MB），overlay 还有约 50MB。
@@ -192,8 +195,9 @@ Breed、Lienol 防多终端固件、编程器备份和 `固件刷写教程.txt`�
 
 约束：
 
-- 16MB SPI flash；教程按 `0x180000` 启动地址、`0x800000` 固件区刷写，
-  约 8MB 可用。
+- 16MB SPI flash；教程按 `0x180000` 启动地址、`0x800000` 擦除，但
+  OpenWrt profile 的 `IMAGE_SIZE` 是 **14,848KB**（0xE80000），
+  `0x800000` 只是保守/单次擦除范围。
 - 官方 OpenWrt 镜像 7,209,588 字节（6.9MiB）。
 - Lienol 防多终端固件 8,389,730 字节（8.0MiB），已含 UA2F，未含
   锐捷认证。
@@ -201,15 +205,17 @@ Breed、Lienol 防多终端固件、编程器备份和 `固件刷写教程.txt`�
 - UA3F 5.5MB ipk / 17.8MB 安装后，R4A 放不下。
 - UA2F 261KB ipk / 788KB 安装后，可行。
 
-结论：R4A 只能做 **L 层（auth + UA2F + DoH）**，且必须裁剪基础镜像：
+结论：R4A 做 **L 层（auth + UA2F + DoH）**，不需要极端裁剪：
 
-- 去掉 OpenClash、USB、SQM、ZeroTier、mwan3、打印机、USB/IP 等；
-- LuCI 只保留 `luci-base`、认证页面和 DoH 页面，去掉主题和无关应用；
-- 或做无 LuCI 的 CLI 镜像；
-- 如果仍超 8MB，给 lite 构建加“仅 EAP-MD5”tag，砍掉 PEAP/TLS 的
-  `crypto/tls` 依赖，把认证二进制从 8.1MB 压到约 5–6MB。
+- 2026-11-23 实测 lite 镜像 10,880,098 字节（10.4MiB），
+  squashfs 7.46MB，manifest 186 包；低于 14,848KB 上限。
+- 仍建议去掉 OpenClash、USB、SQM、ZeroTier、mwan3、打印机、USB/IP；
+- LuCI 保留 `luci-ssl`、认证页面和 DoH 页面即可；
+- 不建议对 R4A 承诺 UA3F：standard 镜像约 15.5MB，已经超过
+  14,848KB；UA2F 是这个容量段的正确工具。
+- 如果未来要加更多包，再考虑“仅 EAP-MD5”lite 二进制；当前不需要。
 
-不建议对 16MB 机型承诺 UA3F；UA2F 是这个容量段的正确工具。
+构建与校验见 [`docs/WAVE1_BUILD.md`](WAVE1_BUILD.md)。
 
 ## 7. 工程改造建议
 
@@ -237,29 +243,30 @@ Breed、Lienol 防多终端固件、编程器备份和 `固件刷写教程.txt`�
 }
 ```
 
-`fetch-imagebuilder.sh` 接受 `TARGET/SUBTARGET`；`build-image.sh` 接受
-`TARGET/PROFILE/ARCH/TIER/UA`；`build-ipk.sh` 的 `GOARCH/PKG_ARCH` 已经
-具备，只需从 matrix 透传。
+`fetch-imagebuilder.sh` 接受 `TARGET/SUBTARGET`；`build-target.sh` 读取
+profile env，接受 `TARGET/PROFILE/ARCH/TIER/UA`；`build-ipk.sh` 的
+`GOARCH/PKG_ARCH` 已经具备，从 matrix 透传。`build-image.sh` 仍是 R3G
+全功能镜像的专用入口。
 
 ### 7.2 分层包集
 
 把 `DEFAULT_PACKAGES` 拆成：
 
-- `packages/full.txt`：现有 R3G 包集；
-- `packages/standard.txt`：认证 + UA3F + DoH + 基础 LuCI；
-- `packages/lite.txt`：认证 + UA2F + DoH + 极简 LuCI；
-- `packages/auth-only.txt`：认证 + CLI/极简 LuCI。
+- `packages/standard.txt`：认证 + UA3F + DoH + 基础 LuCI（已落地）；
+- `packages/lite.txt`：认证 + UA2F + DoH + 基础 LuCI（已落地）；
+- `packages/full.txt`：现有 R3G 包集（仍由 `build-image.sh` 维护）；
+- `packages/auth-only.txt`：认证 + CLI/极简 LuCI（后续）。
 
 ### 7.3 UA2F 集成
 
-`ruijie-disguise` 增加 `ua2f` 模式：
+当前实现不新增 `ruijie-disguise` 模式：lite 层保持 `basic`（nft
+TTL/MSS/IPID），UA2F 由自己的 init 独立启停。首启脚本设置：
 
-- 启动/停止 `ua2f`；
-- 设置 `ua2f.enabled=1`、`handle_fw/handle_tls/handle_intranet`；
-- 设置 `custom_ua`；
+- `ua2f.enabled=1`、`handle_fw/handle_tls/handle_intranet`；
+- `custom_ua`；
 - 关闭 flow offloading；
-- 如果保留 UA3F 的 `ua3f-scope` 思路，为 UA2F 增加按校园出口限定的
-  iptables/nft 规则，避免影响 USB/4G 出口。
+- 后续如需单开关，再给 `ruijie-disguise` 加 `ua2f` 模式；如需多出口，
+  再补 UA2F 的校园出口作用域。
 
 ### 7.4 每 target 的 kmod
 

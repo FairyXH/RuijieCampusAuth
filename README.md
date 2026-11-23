@@ -375,6 +375,7 @@ docs/                         逆向、协议、适配、构建与操作文档
 | [docs/FIRMWARE_PLUGINS.md](docs/FIRMWARE_PLUGINS.md) | 精简固件预装插件、kmod、更新与构建 |
 | [docs/UA3F_VERIFICATION.md](docs/UA3F_VERIFICATION.md) | UA3F/nftables 防检测的报文级实机验证 |
 | [docs/MODEL_PORTFOLIO_AUDIT.md](docs/MODEL_PORTFOLIO_AUDIT.md) | 路由器机型覆盖审计、体积分层与优先适配清单 |
+| [docs/WAVE1_BUILD.md](docs/WAVE1_BUILD.md) | Wave 1 15 个 mipsel 机型的构建结果与校验 |
 
 ### 运维与工具
 

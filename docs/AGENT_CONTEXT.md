@@ -325,6 +325,26 @@ Deep Freeze：
 - 注意：这是非标准监管行为；实际 PA 输出仍受 EEPROM 限幅，ch14 只到
   802.11b。
 
+### Wave 1 多机型构建（2026-11-23）
+
+- 新构建链：`openwrt/scripts/build-target.sh` + `scripts/profiles/*.env` +
+  `scripts/packages/{lite,standard}.txt`；`build-wave1.sh` 批量构建。
+  产物直接写入 `openwrt/firmware/<target>/<subtarget>/<profile>/<version>/`。
+- 15 个 mipsel profile 全部构建成功：lite/UA2F 7 个，standard/UA3F 8 个。
+  结果表见 `docs/WAVE1_BUILD.md`。
+- 关键尺寸：R4A V1 lite 10,880,098 字节（squashfs 7.46MB，186 包）；
+  standard 15.0–15.6MB；hEX lite 9.96MB 最小。
+- R4A profile 的 `IMAGE_SIZE` 是 **14,848KB**，教程里的 `0x800000`
+  只是保守擦除范围；lite 可装，standard 约 15.5MB 超出。UA2F 是 16MB
+  机型的正确工具，UA3F 需要 32MB+。
+- 矩阵构建只复制通用 overlay（auth/disguise/hotplug/sysctl/cache-bust）；
+  R3G 专用 `r3g-defaults`、`ua3f-scope`、mwan3、SQM、USB/IP、
+  custom-packages 不再进入 lite/standard。
+- 首启默认值在 `files/boards/common/etc/uci-defaults/zz-common-defaults`：
+  device=wan、DoH 127.0.0.1:5053、UA2F/UA3F 自动选择、flow offloading 关闭。
+- 待真机：R4A V1 优先（本地 Breed/备份/教程齐全），然后 K2P 或 C6 v3
+  验证 lite，Newifi D2 或 AC2100 验证 standard。
+
 ### 真实校园网端到端（2026-11-20）
 
 - **Ubuntu 桥接**：VMware 改为桥接后，Ubuntu `ens33`（`172.18.28.21/17`）
@@ -523,6 +543,7 @@ Deep Freeze：
 | `docs/OPENWRT_BUILD_ENV.md` | OpenWrt 构建、镜像与 QEMU 测试记录 |
 | `docs/OPENWRT_FEASIBILITY.md` | OpenWrt 早期可行性评估（历史决策记录） |
 | `docs/MODEL_PORTFOLIO_AUDIT.md` | 路由器机型覆盖审计、体积分层与优先适配清单 |
+| `docs/WAVE1_BUILD.md` | Wave 1 15 个 mipsel 机型的构建结果与校验 |
 | `docs/protocols/README.md` | 逐协议档案索引 |
 | `docs/FROZEN_DEPLOYMENT.md` | 部署、升级与运行环境记录 |
 | `profiles/README.md` | 档案字段、正式档案与导入 |

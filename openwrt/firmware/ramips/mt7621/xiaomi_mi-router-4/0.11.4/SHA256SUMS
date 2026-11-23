@@ -1,0 +1,4 @@
+85c570dec949bb0bc14b1f4bb4f149712a258b6c2ba308576896b6682de78e6d  ./openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-kernel1.bin
+8ade763e3ac635a5184687a23416fd7b9e897a6fc5d0c4cc9b06c210fe462bb5  ./openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-rootfs0.bin
+d2d17b652b406d6124f1b4057a4f250ea4d1c45e851a61dce5a6d77d7963ab8c  ./openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4-squashfs-sysupgrade.bin
+24dc5baa6a3c78a6ba75d05d2586c18e3ba26ad4a450f75ffad07d6fef6c099b  ./openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-4.manifest

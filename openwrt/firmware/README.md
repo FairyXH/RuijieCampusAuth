@@ -22,17 +22,39 @@ firmware/<target>/<subtarget>/<profile>/<version>/
 
 ```text
 firmware/
-  ramips/
-    mt7621/
-      xiaomi_mi-router-3g/
-        0.10.0/
-        0.11.4/
+  ramips/mt7621/
+    xiaomi_mi-router-3g/             0.10.0, 0.11.4（R3G 全功能）
+    xiaomi_mi-router-4a-gigabit/            0.11.4（lite/UA2F）
+    xiaomi_mi-router-4a-gigabit-v2/         0.11.4（lite/UA2F）
+    xiaomi_mi-router-4/                     0.11.4（lite/UA2F）
+    phicomm_k2p/                            0.11.4（lite/UA2F）
+    tplink_archer-c6-v3/                    0.11.4（lite/UA2F）
+    tplink_archer-a6-v3/                    0.11.4（lite/UA2F）
+    mikrotik_routerboard-750gr3/            0.11.4（lite/UA2F）
+    d-team_newifi-d2/                       0.11.4（standard/UA3F）
+    lenovo_newifi-d1/                       0.11.4（standard/UA3F）
+    xiaomi_mi-router-3-pro/                 0.11.4（standard/UA3F）
+    xiaomi_mi-router-3g-v2/                 0.11.4（standard/UA3F）
+    xiaomi_mi-router-ac2100/                0.11.4（standard/UA3F）
+    xiaomi_mi-router-cr6606/                0.11.4（standard/UA3F）
+    xiaomi_mi-router-cr6608/                0.11.4（standard/UA3F）
+    xiaomi_mi-router-cr6609/                0.11.4（standard/UA3F）
+  mediatek/filogic/xiaomi_mi-router-ax3000t/   # 预留
+  mediatek/mt7622/xiaomi_redmi-router-ax6s/    # 预留
+  qualcommax/ipq807x/xiaomi_ax3600/            # 预留
+  x86/64/generic/                              # 预留
+  rockchip/armv8/friendlyarm_nanopi-r2s/       # 预留
+  bcm27xx/bcm2711/rpi-4/                       # 预留
 ```
+
+Wave 1 的 15 个机型、大小、包数和完整校验见
+[`docs/WAVE1_BUILD.md`](../../docs/WAVE1_BUILD.md)。
 
 | 版本 | 设备 | 说明 |
 |---|---|---|
 | 0.10.0 | 小米路由器 3G 原版（R3G） | 精简全功能固件，完整 R3G 包集 |
 | 0.11.4 | 小米路由器 3G 原版（R3G） | 当前版；SAM 心跳默认关闭，ZeroTier 内置，无线解锁 |
+| 0.11.4 | Wave 1 的 15 个 mt7621 机型 | lite（UA2F）或 standard（UA3F） |
 
 ## 目录示例
 
@@ -59,6 +81,24 @@ firmware/
         <version>/
 ```
 
+## 构建
+
+```sh
+cd openwrt
+
+# 单个机型
+IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
+  sh scripts/build-target.sh scripts/profiles/xiaomi_mi-router-4a-gigabit.env
+
+# Wave 1 批量
+IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
+  JOBS=8 sh scripts/build-wave1.sh
+```
+
+Profile env 在 `scripts/profiles/`，包集在 `scripts/packages/`。
+`build-target.sh` 会把产物直接写入本目录的
+`<target>/<subtarget>/<profile>/<version>/`。
+
 ## 校验
 
 ```sh
@@ -83,10 +123,6 @@ R3G 的详细刷写步骤、分区偏移和回滚方式见
 下列目录已预留，构建后按 `<version>/` 放入固件。完整优先级和容量分层见
 [`docs/MODEL_PORTFOLIO_AUDIT.md`](../../docs/MODEL_PORTFOLIO_AUDIT.md)。
 
-- `ramips/mt7621/xiaomi_mi-router-4a-gigabit`（16MB，lite/UA2F）
-- `ramips/mt7621/xiaomi_mi-router-4a-gigabit-v2`（16MB，lite/UA2F）
-- `ramips/mt7621/phicomm_k2p`（16MB，lite/UA2F）
-- `ramips/mt7621/d-team_newifi-d2`（32MB，standard/UA3F）
 - `mediatek/filogic/xiaomi_mi-router-ax3000t`（128MB，full/standard）
 - `mediatek/mt7622/xiaomi_redmi-router-ax6s`（128MB，full）
 - `qualcommax/ipq807x/xiaomi_ax3600`（128MB，full）
