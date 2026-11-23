@@ -60,7 +60,7 @@ fi
 
 PKG_FILE="$ROOT/scripts/packages/${TIER}.txt"
 [ -f "$PKG_FILE" ] || { echo "missing $PKG_FILE" >&2; exit 2; }
-PACKAGES=$(cat "$PKG_FILE")
+PACKAGES=$(tr '\n' ' ' <"$PKG_FILE")
 [ -n "$UA_IPK" ] && PACKAGES="$PACKAGES $UA_IPK"
 PACKAGES="$PACKAGES $AUTH_IPK ${EXTRA_PACKAGES:-}"
 
@@ -68,7 +68,20 @@ PACKAGES="$PACKAGES $AUTH_IPK ${EXTRA_PACKAGES:-}"
 STAGE="$OUT/stage/$PROFILE"
 rm -rf "$STAGE"
 mkdir -p "$STAGE"
-cp -a "$ROOT/files/." "$STAGE/"
+# Curated generic overlay for matrix builds. Do not copy openwrt/files
+# wholesale: it also contains R3G/full-image extras (mwan3, SQM, USB/IP,
+# ua3f-scope, custom-packages).
+for p in \
+	etc/config/ruijie-auth \
+	etc/init.d/ruijie-auth \
+	etc/init.d/ruijie-disguise \
+	etc/hotplug.d/iface/90-ruijie-auth \
+	etc/hotplug.d/net/90-ruijie-usbwan \
+	etc/sysctl.d/90-ruijie.conf \
+	etc/uci-defaults/99-luci-cache-bust; do
+	mkdir -p "$STAGE/$(dirname "$p")"
+	cp -a "$ROOT/files/$p" "$STAGE/$p"
+done
 if [ -d "$ROOT/files/boards/common" ]; then
 	cp -a "$ROOT/files/boards/common/." "$STAGE/"
 fi
@@ -80,7 +93,9 @@ if [ -n "${EXTRA_FILES:-}" ]; then
 fi
 
 cd "$IB"
+mkdir -p "$IB/tmp"
 PATH=/opt/openwrt/gnu-bin:$PATH make clean >/dev/null 2>&1 || true
+mkdir -p "$IB/tmp"
 PATH=/opt/openwrt/gnu-bin:$PATH make image \
 	PROFILE="$PROFILE" \
 	PACKAGES="$PACKAGES" \
@@ -94,13 +109,21 @@ for f in "$SRC"/*"$PROFILE"*.bin; do
 	[ -f "$f" ] || continue
 	cp -f "$f" "$DEST/"
 done
-MANIFEST="$SRC/openwrt-${OWRT_VERSION}-${TARGET_DASH}.manifest"
+MANIFEST="$SRC/openwrt-${OWRT_VERSION}-${TARGET_DASH}-${PROFILE}.manifest"
+[ -f "$MANIFEST" ] || MANIFEST="$SRC/openwrt-${OWRT_VERSION}-${TARGET_DASH}.manifest"
 [ -f "$MANIFEST" ] && cp -f "$MANIFEST" "$DEST/openwrt-${OWRT_VERSION}-${TARGET_DASH}-${PROFILE}.manifest"
 
 (
 	cd "$DEST"
 	sha256sum ./*.bin ./*.manifest >SHA256SUMS 2>/dev/null || true
 )
+
+MF="$DEST/openwrt-${OWRT_VERSION}-${TARGET_DASH}-${PROFILE}.manifest"
+if [ -f "$MF" ]; then
+	PKG_COUNT=$(wc -l <"$MF")
+else
+	PKG_COUNT=?
+fi
 
 {
 	echo "版本: $VERSION"
@@ -113,7 +136,7 @@ MANIFEST="$SRC/openwrt-${OWRT_VERSION}-${TARGET_DASH}.manifest"
 	echo "Go: $GOARCH"
 	echo "层: $TIER"
 	echo "UA: $UA"
-	echo "包数: $(wc -l <"$DEST/openwrt-${OWRT_VERSION}-${TARGET_DASH}-${PROFILE}.manifest" 2>/dev/null || echo '?')"
+	echo "包数: $PKG_COUNT"
 	echo
 	echo "镜像:"
 	ls -l "$DEST"/*.bin 2>/dev/null || true
