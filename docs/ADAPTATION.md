@@ -16,7 +16,7 @@
 | 层 | 位置 |
 |---|---|
 | 学校档案 | `profiles/*.json`、`Core/SchoolProfile.cs` |
-| 档案导入 | `ProfileStore.Import`、CLI `profile import`、GUI「档案」页 |
+| 档案导入 | `ProfileStore.Import`、CLI `profile import`、GUI「配置」页 |
 | EAP-MD5 | `Core/Supplicant.cs`、`Core/Eapol.cs`、`Core/PrivateTail.cs` |
 | PEAP / EAP-TLS | `Core/Protocols/PeapSession.cs`、`PcapEapTransport.cs` |
 | 私有属性 | `Core/Protocols/PrivateProperties.cs` |

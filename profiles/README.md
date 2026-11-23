@@ -23,7 +23,7 @@ dotnet RuijieCampusAuth.Cli.dll profile import "profiles/<学校>.json" --root "
 导入只覆盖档案中声明的字段，账号、密码、网卡、接管与 Guardian 开关保持不变。
 导入前会在目标目录生成 `settings.json.bak-<时间戳>`。
 
-GUI 的「档案」页会扫描程序目录/当前目录的 `profiles/`，选择后点击“导入/切换”即可；
+GUI 的「配置」页会扫描程序目录/当前目录的 `profiles/`，选择后点击“导入/切换”即可；
 可以放多个学校档案，随时切换。CLI `profile list` 默认扫描同样的目录。
 
 OpenWrt 端使用完全相同的 JSON：
