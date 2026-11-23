@@ -26,6 +26,7 @@ return view.extend({
 		s.anonymous = true;
 		s.tab('auth', _('Authentication'));
 		s.tab('runtime', _('Protocol'));
+		s.tab('heartbeat', _('SAM heartbeat'));
 		s.tab('guard', _('Guard'));
 		s.tab('profile', _('Profile data'));
 		s.tab('misc', _('Other'));
@@ -92,6 +93,17 @@ return view.extend({
 		o = s.taboption('runtime', form.Flag, 'proactive_reauth', _('Allow proactive re-auth'),
 			_('When enabled, the server/configured interval timer may re-authenticate a healthy session. Keep off.'));
 		o.default = '0';
+
+		o = s.taboption('heartbeat', form.Flag, 'heartbeat', _('Enable SAM direct-comm heartbeat'),
+			_('Off by default. Enable only when the SAM direct-comm target is reachable; otherwise it can trigger re-authentication loops.'));
+		o.default = '0';
+		o.rmempty = false;
+
+		o = s.taboption('heartbeat', form.Value, 'heartbeat_interval', _('Heartbeat interval (s)'),
+			_('Fallback interval when the server does not send HELLO_INTERV. Default 30.'));
+		o.datatype = 'ufloat';
+		o.default = '30';
+		o.depends('heartbeat', '1');
 
 		o = s.taboption('runtime', form.Flag, 'quiet_window', _('Auth-off quiet window'),
 			_('Pause automatic authentication during the campus server maintenance window.'));

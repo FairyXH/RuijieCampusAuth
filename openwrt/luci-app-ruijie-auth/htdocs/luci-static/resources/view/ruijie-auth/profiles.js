@@ -149,6 +149,26 @@ return view.extend({
 				});
 		}
 
+		function showProfile(entry) {
+			return fs.exec('/usr/sbin/ruijie-auth', [ 'profile', 'show', '--file', entry.path ])
+				.then(function(result) {
+					ui.showModal(_('Profile details') + ': ' + (entry.name || entry.path), [
+						E('pre', {
+							'style': 'white-space:pre-wrap;max-height:60vh;overflow:auto;margin:0'
+						}, result.stdout || result.stderr || ''),
+						E('div', { 'class': 'right', 'style': 'margin-top:12px' }, [
+							E('button', {
+								'class': 'btn',
+								'click': function() { ui.hideModal(); }
+							}, _('Close'))
+						])
+					]);
+				})
+				.catch(function(err) {
+					ui.addNotification(null, E('p', {}, String(err)), 'danger');
+				});
+		}
+
 		var installedBody = E('tbody');
 		if (installed.length === 0) {
 			installedBody.appendChild(E('tr', { 'class': 'tr' }, [
@@ -161,10 +181,17 @@ return view.extend({
 				installedBody.appendChild(E('tr', { 'class': 'tr' }, [
 					E('td', { 'class': 'td' }, entry.name || '-'),
 					E('td', { 'class': 'td' }, E('code', {}, entry.path)),
-					E('td', { 'class': 'td' }, E('button', {
-						'class': 'btn cbi-button cbi-button-apply',
-						'click': function() { return importInstalled(entry.path); }
-					}, _('Import')))
+					E('td', { 'class': 'td' }, [
+						E('button', {
+							'class': 'btn cbi-button',
+							'click': function() { return showProfile(entry); }
+						}, _('View')),
+						' ',
+						E('button', {
+							'class': 'btn cbi-button cbi-button-apply',
+							'click': function() { return importInstalled(entry.path); }
+						}, _('Import'))
+					])
 				]));
 			});
 		}

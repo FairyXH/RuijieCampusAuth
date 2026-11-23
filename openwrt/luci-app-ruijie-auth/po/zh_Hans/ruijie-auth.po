@@ -627,3 +627,66 @@ msgstr "WAN 接口"
 
 msgid "When no authenticator answers but the probe URL is reachable, wait instead of retrying."
 msgstr "无认证服务器响应但探测地址可达时，暂停等待而不是反复重试。"
+
+msgid "SAM heartbeat"
+msgstr "SAM 心跳"
+
+msgid "Enable SAM direct-comm heartbeat"
+msgstr "启用 SAM 直通心跳"
+
+msgid "Off by default. Enable only when the SAM direct-comm target is reachable; otherwise it can trigger re-authentication loops."
+msgstr "默认关闭；仅当 SAM 直通目标可达时开启，否则可能触发反复重新认证。"
+
+msgid "Heartbeat interval (s)"
+msgstr "心跳间隔（秒）"
+
+msgid "Fallback interval when the server does not send HELLO_INTERV. Default 30."
+msgstr "服务器未下发 HELLO_INTERV 时的回退间隔，默认 30 秒。"
+
+msgid "Connectivity probe"
+msgstr "连通性探测"
+
+msgid "Checks DNS, TCP 53 and HTTP egress. Bind to the campus WAN if the default route is another uplink."
+msgstr "检查 DNS、TCP 53 和 HTTP 出口；如果默认路由不是校园网，请选择校园 WAN。"
+
+msgid "Egress device"
+msgstr "出口设备"
+
+msgid "Auto (default route)"
+msgstr "自动（默认路由）"
+
+msgid "Run probe"
+msgstr "运行探测"
+
+msgid "Private tail generator (debug)"
+msgstr "私有尾生成器（调试）"
+
+msgid "Builds the 569-byte private tail from the active account and WAN MAC. Debug only."
+msgstr "用当前账号和 WAN MAC 生成 569 字节私有尾，仅用于调试。"
+
+msgid "Reads the active account password from UCI and passes it to the local CLI."
+msgstr "从 UCI 读取当前账号密码并传给本地 CLI。"
+
+msgid "Generate tail"
+msgstr "生成私有尾"
+
+msgid "Generate a tail to see the 569-byte frame."
+msgstr "生成私有尾以查看 569 字节帧。"
+
+msgid "No active account with a password."
+msgstr "没有可用的账号或密码。"
+
+msgid "No WAN MAC available."
+msgstr "没有可用的 WAN MAC。"
+
+msgid "tail (credentials hidden)"
+msgstr "tail（凭据已隐藏）"
+
+msgid "Profile details"
+msgstr "档案详情"
+
+msgid "View"
+msgstr "查看"
+
+msgid "Close"
+msgstr "关闭"

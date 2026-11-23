@@ -17,6 +17,8 @@ config auth 'main'
 	option quiet_end '360'
 	option check_interval '2'
 	option retry_interval '3'
+	# SAM 直通心跳：默认关闭；仅当 SAM 直通目标可达时手动开启。
+	option heartbeat '0'
 	option autoguard '1'
 	option preempt '1'
 	option private_tail '1'
