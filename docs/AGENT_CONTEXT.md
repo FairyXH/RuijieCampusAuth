@@ -342,6 +342,9 @@ Deep Freeze：
   custom-packages 不再进入 lite/standard。
 - 首启默认值在 `files/boards/common/etc/uci-defaults/zz-common-defaults`：
   device=wan、DoH 127.0.0.1:5053、UA2F/UA3F 自动选择、flow offloading 关闭。
+- 全架构 ipk 已入库：`ruijie-auth` 33 个架构、UA3F 10 个、UA2F 9 个、
+  DoH 36 个；`openwrt/scripts/build-arches.sh` 可重建。见
+  `openwrt/ipk/README.md`。
 - 待真机：R4A V1 优先（本地 Breed/备份/教程齐全），然后 K2P 或 C6 v3
   验证 lite，Newifi D2 或 AC2100 验证 standard。
 
