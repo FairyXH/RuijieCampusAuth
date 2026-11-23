@@ -506,6 +506,8 @@ Deep Freeze：
 
 | 文档 | 内容 |
 |---|---|
+| `README.md` / `README.zh-TW.md` / `README.en.md` | 三语项目说明；简中为默认入口 |
+| `ABOUT.md` | 中英双语项目简介与 GitHub About 文案 |
 | `docs/MANUAL_CSHARP.md` | C# 版操作手册 |
 | `docs/MANUAL_PYTHON.md` | Python 版操作手册 |
 | `docs/MANUAL_OPENWRT.md` | OpenWrt 版操作手册 |
