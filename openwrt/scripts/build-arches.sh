@@ -1,11 +1,11 @@
 #!/bin/sh
 # Build the ruijie-auth ipk for every Go-supported OpenWrt 24.10 arch.
-# Usage: VERSION=0.11.4 sh scripts/build-arches.sh
+# Usage: VERSION=0.11.5 sh scripts/build-arches.sh
 
 set -u
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-VERSION=${VERSION:-0.11.4}
+VERSION=${VERSION:-0.11.5}
 OUT=${OUT_DIR:-"$ROOT/build"}
 MIRROR_ROOT=${MIRROR_ROOT:-"$ROOT/ipk"}
 LOG_DIR=${LOG_DIR:-"$OUT/logs"}

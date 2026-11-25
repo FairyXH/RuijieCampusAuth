@@ -61,6 +61,11 @@ type runner struct {
 	messages    []string
 	reauth      int
 	reauthSet   bool
+
+	// quietForced is set when the operator forces auth/resume inside the
+	// auth-off window. The resident session then tolerates the window for
+	// that attempt instead of pausing again on its next poll.
+	quietForced bool
 }
 
 // Run starts the resident daemon.
@@ -150,6 +155,10 @@ func (d *runner) loop(ctx context.Context) {
 		case supplicant.KindCanceled:
 			return
 		case supplicant.KindReload:
+			continue
+		case supplicant.KindQuiet:
+			// The window opened mid-session. Loop back so the check above
+			// routes into quietLoop instead of retrying through it.
 			continue
 		case supplicant.KindPaused:
 			switch d.manualPauseLoop(ctx, cfg) {
@@ -258,6 +267,19 @@ func (d *runner) runAccounts(ctx context.Context, cfg config.Config, accounts []
 			},
 			Probe: func(ctx context.Context) bool {
 				return d.probe(ctx, cfg, device)
+			},
+			// The session retries internally, so it has to see the window
+			// itself; the daemon only reaches its own check between sessions.
+			Quiet: func() bool {
+				live, err := config.Load(d.paths.Config)
+				if err != nil {
+					live = cfg
+				}
+				if !d.inQuietWindow(live) {
+					d.quietForced = false
+					return false
+				}
+				return !d.quietForced
 			},
 			Status: func(state, message, server string) {
 				d.setStatus(state, message, account.Username, device, server)
@@ -621,8 +643,12 @@ func (d *runner) quietLoop(ctx context.Context, cfg config.Config, device string
 		}
 		switch command {
 		case "auth", "resume":
+			// The operator asked for this attempt explicitly: let the
+			// resident session keep it for the rest of the window.
+			d.quietForced = true
 			return "auth"
 		case "reload":
+			d.quietForced = false
 			return "reload"
 		case "logoff", "pause":
 			return "logoff"

@@ -26,6 +26,10 @@ const (
 	KindLogoff
 	KindReload
 	KindCanceled
+	// KindQuiet reports that the campus auth-off window opened while the
+	// session was resident. The daemon must leave the session and re-enter
+	// quietLoop instead of retrying through the closed window.
+	KindQuiet
 )
 
 // Result is returned when a session stops holding.
@@ -76,8 +80,14 @@ type Options struct {
 	LockedServer      string
 	Network           func() protocol.NetworkInfo
 	Probe             func(context.Context) bool
-	Status            StatusFunc
-	Log               func(string)
+	// Quiet reports whether the campus auth-off window is currently active.
+	// A resident session polls it because the daemon only evaluates the
+	// window between sessions: a session that retries internally would
+	// otherwise keep hammering the server through the whole closed window.
+	Quiet     func() bool
+	QuietPoll time.Duration
+	Status    StatusFunc
+	Log       func(string)
 }
 
 // Session runs one account until it fails, pauses, is reloaded, or is
@@ -132,7 +142,16 @@ func (o Options) normalized() Options {
 	if o.ResponseDelay <= 0 {
 		o.ResponseDelay = 40 * time.Millisecond
 	}
+	if o.Quiet != nil && o.QuietPoll <= 0 {
+		o.QuietPoll = 30 * time.Second
+	}
 	return o
+}
+
+// quietStop reports whether the auth-off window opened while this session was
+// resident. Callers must return KindQuiet so the daemon can pause.
+func (s *Session) quietStop() bool {
+	return s.opts.Quiet != nil && s.opts.Quiet()
 }
 
 // setup holds every byte-level input the C# Supplicant constructor derives.
@@ -528,6 +547,13 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 		return nil
 	}
 
+	var quietC <-chan time.Time
+	if opts.Quiet != nil {
+		quietTicker := time.NewTicker(opts.QuietPoll)
+		defer quietTicker.Stop()
+		quietC = quietTicker.C
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -536,6 +562,16 @@ func (s *Session) runEAPMD5(ctx context.Context, commands <-chan string) Result 
 			}
 			return result(KindCanceled, serverMAC, connected, authenticated, nil,
 				lastProperties, nil)
+
+		case <-quietC:
+			// The resident loop never returns on its own, so the window has
+			// to be observed here; otherwise the daemon only notices it the
+			// next time a session ends.
+			if s.quietStop() {
+				s.status("paused", "校园网认证关闭时段，暂停认证", serverMAC)
+				return result(KindQuiet, serverMAC, connected, authenticated, nil,
+					lastProperties, nil)
+			}
 
 		case command := <-commands:
 			switch command {
@@ -774,6 +810,11 @@ func (s *Session) runTunnel(ctx context.Context, commands <-chan string) Result 
 	sendLogoff := func() error { return s.sendControl(st, 2, protocol.StandardGroup) }
 
 	for {
+		// One attempt is short, so checking between attempts is enough here.
+		if s.quietStop() {
+			s.status("paused", "校园网认证关闭时段，暂停认证", "")
+			return result(KindQuiet, "", false, false, nil, nil, nil)
+		}
 		identityTail, err := s.tail(st, make([]byte, 16), nil, nil)
 		if err != nil {
 			return result(KindFailure, "", false, false, nil, nil, err)
@@ -816,6 +857,11 @@ func (s *Session) runTunnel(ctx context.Context, commands <-chan string) Result 
 			checkC = time.After(opts.CheckInterval)
 		}
 
+		var quietC <-chan time.Time
+		if opts.Quiet != nil {
+			quietC = time.After(opts.QuietPoll)
+		}
+
 	hold:
 		for {
 			select {
@@ -840,6 +886,13 @@ func (s *Session) runTunnel(ctx context.Context, commands <-chan string) Result 
 				case "reload":
 					return result(KindReload, attempt.server, true, false, nil, nil, nil)
 				}
+			case <-quietC:
+				if s.quietStop() {
+					s.status("paused", "校园网认证关闭时段，暂停认证", attempt.server)
+					return result(KindQuiet, attempt.server, true, true, nil,
+						attempt.properties, nil)
+				}
+				quietC = time.After(opts.QuietPoll)
 			case <-reauthC:
 				s.logf("定时重认证...")
 				break hold

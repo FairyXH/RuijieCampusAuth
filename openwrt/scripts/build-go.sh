@@ -4,7 +4,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${OUT_DIR:-"$ROOT/build"}
 GOARCH=${GOARCH:-mipsle}
-VERSION=${VERSION:-0.10.0}
+VERSION=${VERSION:-0.11.5}
 MODULE=ruijie-auth
 # The build host often has a synced subset of the tree rather than a git
 # checkout, so allow the caller to pass the commit explicitly.

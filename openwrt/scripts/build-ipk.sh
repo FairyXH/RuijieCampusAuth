@@ -14,7 +14,7 @@ set -eu
 
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 OUT=${OUT_DIR:-"$ROOT/build"}
-VERSION=${VERSION:-0.10.0}
+VERSION=${VERSION:-0.11.5}
 ARCH=${PKG_ARCH:-mipsel_24kc}
 LUCI="$ROOT/luci-app-ruijie-auth"
 IPK="$OUT/ipk/ruijie-auth_${VERSION}_${ARCH}.ipk"

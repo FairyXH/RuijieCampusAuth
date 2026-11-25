@@ -1,7 +1,7 @@
 # Agent Context
 
 > 跨会话交接文档。描述项目当前状态、架构、验证结果与下一步，不记录完整对话历史。
-> 最后更新：2026-11-20
+> 最后更新：2026-11-26
 
 ## 0. 仓库位置
 
@@ -827,6 +827,34 @@ tail-compare.json、full-diff-report.json）。
   `tproxy_ip=10.0.1.1`、`fix-tproxy` cron 与 fw4 hotplug 都在。
   唯一未完成项：natfrp token 为空，待用户填入访问密钥后重启服务并
   重新跑 `backup.sh` 把 token 收进本地备份。
+
+## 15. 2026-11-26 静默窗口失效修复（0.11.5）
+
+现象：00:29 已处在 `quiet_start=0`/`quiet_end=360` 窗口内，守护进程仍
+每约 6 秒重试一轮，持续 40 分钟以上，`status` 显示「认证中 | 检测到
+掉线，重新认证...」。
+
+- **根因**：静默窗口只在 `daemon.loop()` 顶部按「会话之间」的粒度检查，
+  而会话是常驻的（`runEAPMD5()` 的 `for { select }` 自持认证/探活/重启
+  认证，正常永不返回）。00:00 窗口打开时会话正持有，`loop()` 再无迭代
+  机会，所以窗口从未被求值。13.1 里 20:06-20:08 的实测之所以通过，是
+  因为当时恰好处于会话结束后的 loop 迭代中。
+- **证据**：完整日志中 `账号池加载` 仅 14 次且集中在 12:32-13:24 与
+  23:23-23:24；`关闭时段`/`暂停认证` 出现 0 次；23:24:06 认证成功 →
+  00:02:54 才出现首条「检测到掉线」。二进制字符串齐全，排除「旧构建
+  不含特性」。
+- **修复**：`supplicant` 新增 `KindQuiet` 与 `Options.Quiet/QuietPoll`
+  （默认 30s），在 EAP-MD5 主 select、Tunnel 持有循环内自查窗口并
+  `status("paused", "校园网认证关闭时段，暂停认证")` 后返回；`daemon`
+  注入每次重新 `config.Load` 的 `Quiet` 闭包，`loop()` 新增
+  `case KindQuiet: continue` 转入既有 `quietLoop`。手动 `auth`/`resume`
+  置 `quietForced`，本轮不再被打断。
+- **验证**：新增 `TestSessionStopsWhenQuietWindowOpens` /
+  `TestSessionIgnoresClosedQuietWindow`，Windows 与 Ubuntu 均通过；
+  路由器 00:58 部署后 `status` 立刻为「已暂停 | 校园网认证关闭时段
+  （00:00-06:00）」，重启后 `正在寻找认证服务器` 计数为 0。
+- **详情**：`docs/QUIET_WINDOW_RESIDENT_FIX.md`。备份二进制
+  `/usr/sbin/ruijie-auth.bak-20261126` 留在路由器上用于回滚。
 
 
 

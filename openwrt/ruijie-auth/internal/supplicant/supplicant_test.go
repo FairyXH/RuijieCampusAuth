@@ -2,6 +2,7 @@ package supplicant
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -457,3 +458,71 @@ func waitForStatus(t *testing.T, statusCh <-chan string, want string) {
 		}
 	}
 }
+
+// TestSessionStopsWhenQuietWindowOpens covers the resident retry loop: once a
+// session is holding, the daemon never regains control, so the auth-off window
+// has to end the session from inside it. Without this the daemon retried every
+// few seconds straight through 00:00-06:00.
+func TestSessionStopsWhenQuietWindowOpens(t *testing.T) {
+	fake := transport.NewFake(clientMAC)
+	statusCh := make(chan string, 32)
+	options := testOptions(statusCh)
+	options.QuietPoll = 10 * time.Millisecond
+	var quiet atomic.Bool
+	options.Quiet = func() bool { return quiet.Load() }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resultCh := make(chan Result, 1)
+	go func() {
+		resultCh <- New(options, func(device string) (transport.Transport, error) {
+			return fake, nil
+		}).Run(ctx, make(chan string, 1))
+	}()
+
+	waitForControl(t, fake, 1)
+	quiet.Store(true)
+
+	select {
+	case result := <-resultCh:
+		if result.Kind != KindQuiet {
+			t.Fatalf("result kind = %v, want KindQuiet (%v)", result.Kind, result.Err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("session kept running after the quiet window opened")
+	}
+}
+
+// TestSessionIgnoresOpenQuietWindow covers a forced auth: the daemon clears
+// its override flag and the session must not pause again.
+func TestSessionIgnoresClosedQuietWindow(t *testing.T) {
+	fake := transport.NewFake(clientMAC)
+	statusCh := make(chan string, 32)
+	options := testOptions(statusCh)
+	options.QuietPoll = 10 * time.Millisecond
+	options.Quiet = func() bool { return false }
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	resultCh := make(chan Result, 1)
+	go func() {
+		resultCh <- New(options, func(device string) (transport.Transport, error) {
+			return fake, nil
+		}).Run(ctx, make(chan string, 1))
+	}()
+
+	waitForControl(t, fake, 1)
+	fake.Inject(eapFrame(t, protocol.EapRequest, 1, protocol.EapIdentity, nil))
+	waitForEAP(t, fake, protocol.EapResponse, protocol.EapIdentity)
+	fake.Inject(eapFrame(t, protocol.EapSuccess, 1, 0, nil))
+	waitForStatus(t, statusCh, "authenticated")
+
+	select {
+	case result := <-resultCh:
+		t.Fatalf("session stopped with an inactive window: %+v", result)
+	case <-time.After(200 * time.Millisecond):
+		// Still resident, as expected.
+	}
+	cancel()
+}
+

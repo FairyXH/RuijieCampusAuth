@@ -39,7 +39,7 @@ IB_DIR=/opt/openwrt/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64 \
 全架构认证 ipk：
 
 ```sh
-VERSION=0.11.4 sh scripts/build-arches.sh
+VERSION=0.11.5 sh scripts/build-arches.sh
 ```
 
 `build-target.sh` 默认把 Image Builder 的软件源切到清华镜像

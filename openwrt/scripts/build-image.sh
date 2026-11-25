@@ -13,7 +13,7 @@ OUT=${OUT_DIR:-"$ROOT/build"}
 IB=${IB_DIR:-"$ROOT/build/ib/openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64"}
 PROFILE=${PROFILE:-xiaomi_mi-router-3g}
 JOBS=${JOBS:-4}
-VERSION=${VERSION:-0.10.0}
+VERSION=${VERSION:-0.11.5}
 
 UA3F_VERSION=3.7.0
 UA3F_SHA256=a1d710233ab69af2e127193d7de81d7fd7c400294dc2147368694f2fd56e073f

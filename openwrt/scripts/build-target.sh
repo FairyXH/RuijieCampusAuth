@@ -22,7 +22,7 @@ PROFILE_ENV=${1:?usage: build-target.sh <profile.env>}
 : "${GOARCH:?GOARCH missing}"
 TIER=${TIER:-lite}
 UA=${UA:-ua2f}
-VERSION=${VERSION:-0.11.4}
+VERSION=${VERSION:-0.11.5}
 OWRT_VERSION=${OWRT_VERSION:-24.10.0}
 JOBS=${JOBS:-$(nproc 2>/dev/null || echo 4)}
 OUT=${OUT_DIR:-"$ROOT/build"}
