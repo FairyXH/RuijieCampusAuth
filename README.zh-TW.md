@@ -62,7 +62,7 @@ OpenWrt 形態不以 R3G 為限。預編譯 ipk 是純使用者態靜態 Go 二�
 | 元件 | 版本 | 發布形態 |
 |---|---|---|
 | C# 用戶端 | 1.0.0 | `RuijieCampusAuth-1.0.0-win-x64.zip`，自包含 .NET 10 |
-| OpenWrt 韌體 / 外掛 | 0.11.4 | 同架構通用的 `ruijie-auth_0.11.4_mipsel_24kc.ipk` + R3G 客製整機韌體（實測載體） |
+| OpenWrt 韌體 / 外掛 | 0.11.5 | 同架構通用的 `ruijie-auth_0.11.5_mipsel_24kc.ipk` + R3G 客製整機韌體（實測載體） |
 | Python 參考實作 | 隨原始碼 | `pip install -e python` |
 
 最新發布見 [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest)。
@@ -82,7 +82,7 @@ OpenWrt 形態不以 R3G 為限。預編譯 ipk 是純使用者態靜態 Go 二�
 |---|---|
 | Windows 桌面使用 | 下載 `RuijieCampusAuth-1.0.0-win-x64.zip`，解壓後執行 GUI；需要 Npcap 與管理權限 |
 | 協定研究 / 指令碼 | `cd python && pip install -e . && python -m ruijie_auth` |
-| OpenWrt 路由器 | 安裝同架構 `ruijie-auth_0.11.4_mipsel_24kc.ipk`；R3G 可直接刷整機韌體 |
+| OpenWrt 路由器 | 安裝同架構 `ruijie-auth_0.11.5_mipsel_24kc.ipk`；R3G 可直接刷整機韌體 |
 
 > [!NOTE]
 > Windows 端的第二層收發依賴 Npcap。安裝 Npcap 時建議勾選 WinPcap 相容模式；GUI 與服務都需要管理員權限才能開啟網路卡並修改網路設定。
@@ -112,7 +112,7 @@ Python 版適合協定研究、指令碼化與嵌入式情境；第二層收發�
 
 ```sh
 # 路由器上安裝獨立外掛（保留既有設定）
-opkg install --force-reinstall /tmp/ruijie-auth_0.11.4_mipsel_24kc.ipk
+opkg install --force-reinstall /tmp/ruijie-auth_0.11.5_mipsel_24kc.ipk
 
 # 匯入學校設定檔
 ruijie-auth profile import --file "/etc/ruijie-auth/profiles/<學校>.json"

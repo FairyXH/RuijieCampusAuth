@@ -44,7 +44,7 @@ OpenWrt 形态不以 R3G 为限：预编译 ipk 只要求同架构、版本相�
 
 ### 当前状态
 
-- C# 客户端 **1.0.0**、OpenWrt 插件 **0.11.4** 已发布；R3G 定制固件同步提供，作为当前实测载体。
+- C# 客户端 **1.0.0**、OpenWrt 插件 **0.11.5** 已发布；R3G 定制固件同步提供，作为当前实测载体。
 - EAP-MD5 已在真实校园网完成认证；569 字节私有尾与服务器私有属性已用真实抓包逐字节校验。
 - PEAP/MSCHAPv2 与 EAP-TLS 协议栈已实现，仍需真实 RADIUS 端到端验证。
 - 详细状态、验证证据与未闭环项见 [README](README.md) 与 [`docs/AGENT_CONTEXT.md`](docs/AGENT_CONTEXT.md)。
@@ -93,7 +93,7 @@ The OpenWrt form is not limited to the R3G: the prebuilt ipk only requires a sam
 
 ### Current status
 
-- C# client **1.0.0** and the OpenWrt plugin **0.11.4** are released; the R3G custom firmware ships alongside it as the current test vehicle.
+- C# client **1.0.0** and the OpenWrt plugin **0.11.5** are released; the R3G custom firmware ships alongside it as the current test vehicle.
 - EAP-MD5 has completed authentication on a real campus network; the 569-byte private tails and server private properties have been validated byte for byte against real captures.
 - The PEAP/MSCHAPv2 and EAP-TLS stacks are implemented but still need end-to-end validation against a real RADIUS server.
 - See the [README](README.md) and [`docs/AGENT_CONTEXT.md`](docs/AGENT_CONTEXT.md) for detailed status, evidence, and open items.

@@ -62,7 +62,7 @@ The project covers the authentication protocol and the operational surface aroun
 | Component | Version | Distribution |
 |---|---|---|
 | C# client | 1.0.0 | `RuijieCampusAuth-1.0.0-win-x64.zip`, self-contained .NET 10 |
-| OpenWrt firmware / plugin | 0.11.4 | Same-architecture `ruijie-auth_0.11.4_mipsel_24kc.ipk` + R3G custom firmware (test vehicle) |
+| OpenWrt firmware / plugin | 0.11.5 | Same-architecture `ruijie-auth_0.11.5_mipsel_24kc.ipk` + R3G custom firmware (test vehicle) |
 | Python reference | Source tree | `pip install -e python` |
 
 See [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest) for the latest build.
@@ -82,7 +82,7 @@ See [Releases](https://github.com/FairyXH/RuijieCampusAuth/releases/latest) for 
 |---|---|
 | Windows desktop | Download `RuijieCampusAuth-1.0.0-win-x64.zip`, unzip, and run the GUI; requires Npcap and administrator rights |
 | Protocol research / scripting | `cd python && pip install -e . && python -m ruijie_auth` |
-| OpenWrt router | Install the same-architecture `ruijie-auth_0.11.4_mipsel_24kc.ipk`; R3G users can flash the full firmware |
+| OpenWrt router | Install the same-architecture `ruijie-auth_0.11.5_mipsel_24kc.ipk`; R3G users can flash the full firmware |
 
 > [!NOTE]
 > Layer-2 packet I/O on Windows requires Npcap. Enabling WinPcap compatibility mode during installation is recommended. The GUI and the service both need administrator rights to open adapters and change network settings.
@@ -112,7 +112,7 @@ The Python implementation is aimed at protocol research, scripting, and embedded
 
 ```sh
 # Install the standalone plugin on the router (keeps existing config)
-opkg install --force-reinstall /tmp/ruijie-auth_0.11.4_mipsel_24kc.ipk
+opkg install --force-reinstall /tmp/ruijie-auth_0.11.5_mipsel_24kc.ipk
 
 # Import a school profile
 ruijie-auth profile import --file "/etc/ruijie-auth/profiles/<school>.json"

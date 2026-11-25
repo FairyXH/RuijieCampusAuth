@@ -1,0 +1,66 @@
+锐捷认证器 · OpenWrt 产物
+================================
+
+版本：0.11.5
+日期：2026-11-26
+OpenWrt：24.10.0
+Image Builder：openwrt-imagebuilder-24.10.0-ramips-mt7621.Linux-x86_64
+Target：ramips/mt7621
+Profile：xiaomi_mi-router-3g
+设备：小米路由器 3G 原版（MT7621A / 256MB RAM / 128MB NAND）
+认证器：ruijie-auth 0.11.5（commit d9d4cc4；静默窗口修复）
+包数：511
+rootfs0：57,016,320 字节
+sysupgrade：57,457,786 字节
+首次启动 overlay：约 47MiB 可用
+
+本版变更
+--------
+- 修复 00:00-06:00 认证关闭时段失效：原实现只在会话之间的
+  daemon 循环里检查窗口，而常驻认证会话（runEAPMD5/runTunnel）在内部
+  自行重试且永不返回，导致窗口打开后仍每约 6 秒重试。现在会话内自行
+  轮询窗口并返回 KindQuiet，由 daemon 转入 quietLoop 暂停。
+- 手动 auth/resume 仍可强制认证，本窗口内不会被自动打断。
+- 详见 docs/QUIET_WINDOW_RESIDENT_FIX.md。
+
+文件
+----
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-breed.bin
+    65,404,928 字节
+    合并镜像（kernel1 + 填充至 4MiB + kernel1 + 填充至 8MiB + rootfs0），
+    写 Breed 第二分区 0x200000；内核双写，rootfs 落于 0xA00000
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-kernel1.bin
+    3,181,020 字节
+    Breed OpenWrt 布局内核，写 0x600000
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-rootfs0.bin
+    57,016,320 字节
+    Breed OpenWrt 布局 rootfs，写 0xA00000
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g-squashfs-sysupgrade.bin
+    57,457,786 字节
+    OpenWrt 内升级用
+
+openwrt-24.10.0-ramips-mt7621-xiaomi_mi-router-3g.manifest
+    15,726 字节
+    511 包清单
+
+功能
+----
+- 认证器：ruijie-auth 0.11.5，纯用户态，无专属 kmod。
+- 静默窗口：00:00-06:00 暂停自动认证（quiet_start=0 / quiet_end=360）。
+- 防检测：ruijie-disguise full；UA3F 3.7.0；nftables TTL/MSS/IPID。
+- DoH：https-dns-proxy，单实例 5053。
+- 代理：OpenClash 0.48.002 + mihomo 1.19.34 softfloat，默认停止。
+- 上行：mwan3 校园 WAN → USB 共享 → Wi-Fi STA。
+- 统计：nlbwmon + vnstat2。
+- 打印：p910nd + LuCI，TCP 9100。
+- 穿透：frpc 0.51.3，默认停止。
+- USB/IP：usbipd TCP 3240。
+- 其他：ZeroTier 1.14.1 + LuCI、Vantage 主题、无线解锁 cfg80211。
+
+注意
+----
+本固件只适用于 R3G 原版。不要刷到 R3Gv2、R4A 或其他机型。
+刷机前备份原厂分区、factory/eeprom 和 Bootloader。
