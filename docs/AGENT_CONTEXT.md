@@ -855,6 +855,14 @@ tail-compare.json、full-diff-report.json）。
   （00:00-06:00）」，重启后 `正在寻找认证服务器` 计数为 0。
 - **详情**：`docs/QUIET_WINDOW_RESIDENT_FIX.md`。备份二进制
   `/usr/sbin/ruijie-auth.bak-20261126` 留在路由器上用于回滚。
+- **工具包与发布（2026-11-26）**：`MiR3G_V1-Openwrt` 根目录已换上
+  0.11.5 全套（Breed `0db228ae`、rootfs0 `9980c147`、sysupgrade
+  `dd55fc66`、manifest `5d872f26`、ipk `420134f6`；kernel1 未变
+  `f1718d09`），旧 0.11.4 归档到 `Backup/firmware-2026-11-26/`；
+  `checksums.txt` 覆盖当前版与两套备份共 19 项，全部校验通过；
+  README 与《固件刷写教程》的版本、尺寸、静默窗口说明已同步。
+  GitHub Release `v0.11.5` 发布整机固件、ipk、mipsle/amd64 静态二进制，
+  C# 客户端沿用 1.0.0（本版无改动）。
 
 
 
