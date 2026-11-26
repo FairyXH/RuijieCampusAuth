@@ -852,7 +852,8 @@ tail-compare.json、full-diff-report.json）。
 - **验证**：新增 `TestSessionStopsWhenQuietWindowOpens` /
   `TestSessionIgnoresClosedQuietWindow`，Windows 与 Ubuntu 均通过；
   路由器 00:58 部署后 `status` 立刻为「已暂停 | 校园网认证关闭时段
-  （00:00-06:00）」，重启后 `正在寻找认证服务器` 计数为 0。
+  （00:00-06:00）」，重启后 `正在寻找认证服务器` 计数为 0；06:00 边界
+  实测自动恢复（05:59:48 最后一次 paused → 06:00:18 开始认证 → 成功）。
 - **详情**：`docs/QUIET_WINDOW_RESIDENT_FIX.md`。备份二进制
   `/usr/sbin/ruijie-auth.bak-20261126` 留在路由器上用于回滚。
 - **工具包与发布（2026-11-26）**：`MiR3G_V1-Openwrt` 根目录已换上
